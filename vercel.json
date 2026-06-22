@@ -4,7 +4,7 @@
   "outputDirectory": "artifacts/chat-widget/dist/public",
   "installCommand": "pnpm install",
   "functions": {
-    "api/index.js": {
+    "api/index.mjs": {
       "maxDuration": 30
     }
   },
