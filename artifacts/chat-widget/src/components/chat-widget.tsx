@@ -198,7 +198,7 @@ export function ChatWidget() {
                       <p>Диагностика завершена.</p>
                       <p>Ваши ответы сохранены.</p>
                       <p>На следующем этапе здесь появится персональная рекомендация.</p>
-                      <div className="mt-2 flex items-center gap-2 text-accent" data-testid="status-completion">
+                      <div className="mt-2 flex items-center gap-2 text-primary" data-testid="status-completion">
                         <CheckCircle2 className="w-5 h-5" />
                         <span className="text-sm font-medium">Сохранено</span>
                       </div>
@@ -242,7 +242,7 @@ export function ChatWidget() {
             key={opt.id}
             data-testid={`chip-${q.id}-${opt.id}`}
             onClick={() => handleOptionSelect(qIndex, opt, false)}
-            className="px-3 py-1.5 text-sm rounded-full border transition-all duration-200 bg-card text-foreground border-border hover:border-secondary hover:bg-background"
+            className="px-3 py-1.5 text-sm rounded-full border transition-all duration-200 bg-white text-foreground border-border hover:border-primary hover:text-primary"
           >
             {opt.label}
           </button>
@@ -255,7 +255,7 @@ export function ChatWidget() {
           className={`px-3 py-1.5 text-sm rounded-full border transition-all duration-200 ${
             activeCustomQ === q.id
               ? "bg-primary text-primary-foreground border-primary"
-              : "bg-card text-foreground border-border hover:border-secondary hover:bg-background"
+              : "bg-white text-foreground border-border hover:border-primary hover:text-primary"
           }`}
         >
           Другое
@@ -273,14 +273,14 @@ export function ChatWidget() {
                 value={customInput}
                 onChange={(e) => setCustomInput(e.target.value)}
                 placeholder="Напишите ваш вариант..."
-                className="min-h-[80px] text-sm resize-none pr-12 bg-card border-border"
+                className="min-h-[80px] text-sm resize-none pr-12 bg-white border-border rounded"
                 autoFocus
               />
               <Button
                 data-testid="button-submit-custom"
                 size="icon"
                 onClick={() => submitCustomAnswer(qIndex)}
-                className="absolute bottom-2 right-2 h-8 w-8 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                className="absolute bottom-2 right-2 h-8 w-8 rounded bg-primary hover:bg-primary/90 text-primary-foreground"
                 disabled={!customInput.trim()}
               >
                 <Send className="w-4 h-4" />
@@ -294,15 +294,15 @@ export function ChatWidget() {
 
   if (step === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-6 animate-in fade-in zoom-in duration-500 bg-card">
-        <div className="w-20 h-20 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground mb-4 shadow-xl shadow-primary/20">
-          <Building2 className="w-10 h-10 text-accent" />
+      <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-6 animate-in fade-in zoom-in duration-500 bg-white">
+        <div className="w-12 h-12 rounded bg-primary/10 flex items-center justify-center text-primary mb-4">
+          <Building2 className="w-6 h-6 text-primary" />
         </div>
         <div className="space-y-3 max-w-[320px]">
-          <h1 className="text-[22px] font-semibold tracking-tight leading-snug text-foreground">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
             Подходит ли вам профессия строительного эксперта?
           </h1>
-          <p className="text-muted-foreground text-[15px] leading-relaxed">
+          <p className="text-muted-foreground text-base">
             Ответьте на несколько вопросов и получите предварительную рекомендацию.
           </p>
         </div>
@@ -311,7 +311,7 @@ export function ChatWidget() {
             data-testid="button-start-diagnostic"
             onClick={handleStart}
             size="lg"
-            className="w-full rounded-full py-6 text-[15px] font-medium bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 transition-all"
+            className="w-full rounded font-medium px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground transition-all"
             disabled={!sessionId}
           >
             {!sessionId ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
@@ -325,21 +325,21 @@ export function ChatWidget() {
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
       {/* Header */}
-      <div className="px-5 py-4 border-b border-border flex items-center gap-3 bg-card z-10 shadow-sm">
-        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center shrink-0 shadow-inner">
-          <Building2 className="w-5 h-5 text-accent" />
+      <div className="px-5 py-4 flex items-center gap-3 bg-[#002B5C] text-white z-10">
+        <div className="w-10 h-10 rounded flex items-center justify-center shrink-0 border border-white/20 bg-white/10">
+          <Building2 className="w-5 h-5 text-white" />
         </div>
         <div>
-          <h2 className="font-semibold text-[15px] text-foreground leading-tight">ИНОБР Ассистент</h2>
-          <p className="text-[13px] text-muted-foreground flex items-center gap-1.5 mt-0.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
+          <h2 className="font-semibold text-[15px] text-white leading-tight">ИНОБР Ассистент</h2>
+          <p className="text-[13px] text-white/70 flex items-center gap-1.5 mt-0.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
             Консультант онлайн
           </p>
         </div>
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 px-4 py-6" ref={scrollRef}>
+      <ScrollArea className="flex-1 px-4 py-6 bg-muted/30" ref={scrollRef}>
         <div className="space-y-6 pb-20">
           <AnimatePresence initial={false}>
             {messages.map((msg) => (
@@ -352,16 +352,16 @@ export function ChatWidget() {
                 }`}
               >
                 {msg.role === "bot" && (
-                  <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 mt-1 shadow-sm">
-                    <Building2 className="w-4 h-4 text-accent" />
+                  <div className="w-8 h-8 rounded bg-[#002B5C]/10 border border-[#002B5C]/20 flex items-center justify-center shrink-0 mt-1">
+                    <Building2 className="w-4 h-4 text-primary" />
                   </div>
                 )}
                 
                 <div
-                  className={`px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap shadow-sm border ${
+                  className={`px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap border ${
                     msg.role === "user"
-                      ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-sm border-transparent"
-                      : "bg-card text-foreground rounded-2xl rounded-tl-sm border-border"
+                      ? "bg-primary text-primary-foreground rounded-lg rounded-tr-sm border-transparent"
+                      : "bg-secondary text-foreground rounded-lg rounded-tl-sm border-border"
                   }`}
                 >
                   {msg.content}
@@ -376,13 +376,13 @@ export function ChatWidget() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 className="flex gap-3 max-w-[80%] mr-auto items-center"
               >
-                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 shadow-sm">
-                  <Building2 className="w-4 h-4 text-accent" />
+                <div className="w-8 h-8 rounded bg-[#002B5C]/10 border border-[#002B5C]/20 flex items-center justify-center shrink-0">
+                  <Building2 className="w-4 h-4 text-primary" />
                 </div>
-                <div className="bg-card border border-border shadow-sm rounded-2xl rounded-tl-sm px-4 py-3.5 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-                  <span className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-                  <span className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce"></span>
+                <div className="bg-secondary border border-border rounded-lg rounded-tl-sm px-4 py-3.5 flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                  <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                  <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce"></span>
                 </div>
               </motion.div>
             )}
@@ -397,7 +397,7 @@ export function ChatWidget() {
               <Button
                 data-testid="button-begin-questions"
                 onClick={handleBeginQuestions}
-                className="rounded-full shadow-md bg-primary hover:bg-primary/90 text-primary-foreground px-6"
+                className="rounded bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2"
               >
                 Начать
               </Button>
