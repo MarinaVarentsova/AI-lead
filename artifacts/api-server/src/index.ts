@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { knowledgeBaseService } from "./services/KnowledgeBaseService";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,13 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Log knowledge base availability on startup
+  knowledgeBaseService.checkStatus().then((status) => {
+    if (status.available) {
+      logger.info({ source: status.source, entries: status.entryCount }, "Knowledge base ready");
+    } else {
+      logger.warn({ source: status.source, error: status.error }, "Knowledge base unavailable");
+    }
+  });
 });
