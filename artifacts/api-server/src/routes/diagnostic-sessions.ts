@@ -1,12 +1,11 @@
 import { Router, type IRouter } from "express";
-import { db, diagnosticSessionsTable } from "@workspace/db";
-import { CreateDiagnosticSessionBody } from "@workspace/api-zod";
+import { db, diagnosticSessionsTable, insertDiagnosticSessionSchema } from "@workspace/db";
 import { desc } from "drizzle-orm";
 
 const router: IRouter = Router();
 
 router.post("/diagnostic-sessions", async (req, res): Promise<void> => {
-  const parsed = CreateDiagnosticSessionBody.safeParse(req.body);
+  const parsed = insertDiagnosticSessionSchema.safeParse(req.body);
   if (!parsed.success) {
     req.log.warn({ errors: parsed.error.message }, "Invalid diagnostic session input");
     res.status(400).json({ error: parsed.error.message });
