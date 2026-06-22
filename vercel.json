@@ -1,0 +1,22 @@
+{
+  "version": 2,
+  "buildCommand": "pnpm run typecheck:libs && pnpm --filter @workspace/chat-widget run build",
+  "outputDirectory": "artifacts/chat-widget/dist/public",
+  "installCommand": "pnpm install",
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/api/index" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Content-Language", "value": "ru" }
+      ]
+    }
+  ]
+}

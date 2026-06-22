@@ -83,6 +83,7 @@ export function ChatWidget() {
 
   const [customInput, setCustomInput] = useState("");
   const [activeCustomQ, setActiveCustomQ] = useState<string | null>(null);
+  const [sessionError, setSessionError] = useState(false);
 
   const createSession = useCreateSession();
   const createConversation = useCreateConversation();
@@ -91,6 +92,7 @@ export function ChatWidget() {
   useEffect(() => {
     createSession.mutate(undefined, {
       onSuccess: (data) => setSessionId(data.sessionId),
+      onError: () => setSessionError(true),
     });
   }, []);
 
@@ -421,16 +423,38 @@ export function ChatWidget() {
             </p>
           </div>
           <div className="pt-2 w-full max-w-[260px]">
-            <Button
-              data-testid="button-start-diagnostic"
-              onClick={handleStart}
-              size="lg"
-              className="w-full rounded-md font-semibold px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground transition-all uppercase tracking-wide text-sm"
-              disabled={!sessionId}
-            >
-              {!sessionId ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-              Начать диагностику
-            </Button>
+            {sessionError ? (
+              <div className="text-center space-y-3">
+                <p className="text-sm text-red-600">
+                  Сервис временно недоступен. Попробуйте обновить страницу.
+                </p>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full rounded-md font-semibold px-6 py-2.5 uppercase tracking-wide text-sm"
+                  onClick={() => {
+                    setSessionError(false);
+                    createSession.mutate(undefined, {
+                      onSuccess: (data) => setSessionId(data.sessionId),
+                      onError: () => setSessionError(true),
+                    });
+                  }}
+                >
+                  Попробовать снова
+                </Button>
+              </div>
+            ) : (
+              <Button
+                data-testid="button-start-diagnostic"
+                onClick={handleStart}
+                size="lg"
+                className="w-full rounded-md font-semibold px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground transition-all uppercase tracking-wide text-sm"
+                disabled={!sessionId}
+              >
+                {!sessionId ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+                Начать диагностику
+              </Button>
+            )}
           </div>
         </div>
       </div>
