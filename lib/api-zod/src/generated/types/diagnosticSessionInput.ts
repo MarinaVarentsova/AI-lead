@@ -5,9 +5,6 @@
  * API specification for AI Квалификатор ИНОБР
  * OpenAPI spec version: 0.1.0
  */
-export interface HealthStatus {
-  status: string;
-}
 
 export interface DiagnosticSessionInput {
   /** Answer to question 1: background/experience area */
@@ -19,17 +16,3 @@ export interface DiagnosticSessionInput {
   /** Answer to question 4: learning goal */
   question4: string;
 }
-
-export interface DiagnosticSession {
-  id: number;
-  createdAt: string;
-  question1: string;
-  question2: string;
-  question3: string;
-  question4: string;
-}
-
-export interface ErrorResponse {
-  error: string;
-}
-

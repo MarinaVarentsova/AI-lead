@@ -1,6 +1,6 @@
-# [Project name]
+# AI Квалификатор ИНОБР
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Чат-виджет для квалификации потенциальных студентов института ИНОБР по специальности «строительная экспертиза». Пользователь проходит 4 коротких вопроса, ответы сохраняются в базе данных.
 
 ## Run & Operate
 
@@ -14,7 +14,8 @@ _Replace the heading above with the project's name, and this line with one sente
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
+- Frontend: React + Vite + Tailwind (artifacts/chat-widget)
+- API: Express 5 (artifacts/api-server)
 - DB: PostgreSQL + Drizzle ORM
 - Validation: Zod (`zod/v4`), `drizzle-zod`
 - API codegen: Orval (from OpenAPI spec)
@@ -22,15 +23,26 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- DB schema: `lib/db/src/schema/diagnostic-sessions.ts`
+- API contract: `lib/api-spec/openapi.yaml`
+- Backend routes: `artifacts/api-server/src/routes/diagnostic-sessions.ts`
+- Frontend widget: `artifacts/chat-widget/src/components/chat-widget.tsx`
+- CSS theme: `artifacts/chat-widget/src/index.css`
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Single-page chat widget at `/` — the entire UX lives in one component state machine.
+- No auth for MVP — sessions saved anonymously by design (Phase 1 scope).
+- Used Replit's built-in PostgreSQL instead of Supabase — same SQL, no OAuth setup required.
+- Drizzle ORM for type-safe DB access; schema pushed with `drizzle-kit push` (not migrations).
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- **Launch screen**: heading + "Начать диагностику" button
+- **Welcome message**: bot greeting with "Начать" button
+- **4 diagnostic questions**: compact chip answers + free-text "Другое" fallback
+- **Completion screen**: thank-you message after answers are saved to DB
+- **Responsive**: mobile, tablet, desktop
 
 ## User preferences
 
@@ -38,7 +50,9 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- After adding new tables to `lib/db/src/schema/`, run `pnpm run typecheck:libs` before typechecking artifacts — stale lib declarations cause false TS2305 errors.
+- Run `pnpm --filter @workspace/db run push` to sync schema changes to the dev DB.
+- After any OpenAPI spec change, run `pnpm --filter @workspace/api-spec run codegen` before editing routes or frontend.
 
 ## Pointers
 

@@ -6,7 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export * from './diagnosticSession';
-export * from './diagnosticSessionInput';
-export * from './errorResponse';
-export * from './healthStatus';
+export interface ErrorResponse {
+  error: string;
+}

@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "AI Квалификатор ИНОБР"
+version = "1.0.0"
+id = "artifacts/chat-widget"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19365
+
+[services.development]
+run = "pnpm --filter @workspace/chat-widget run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/chat-widget", "run", "build" ]
+publicDir = "artifacts/chat-widget/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19365"
+BASE_PATH = "/"
