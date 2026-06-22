@@ -3,33 +3,85 @@
  * Do not edit manually.
  * Api
  * API specification for AI Квалификатор ИНОБР
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 export interface HealthStatus {
   status: string;
 }
 
-export interface DiagnosticSessionInput {
-  /** Answer to question 1: background/experience area */
-  question1: string;
-  /** Answer to question 2: years of work experience */
-  question2: string;
-  /** Answer to question 3: education level */
-  question3: string;
-  /** Answer to question 4: learning goal */
-  question4: string;
-}
-
-export interface DiagnosticSession {
-  id: number;
-  createdAt: string;
-  question1: string;
-  question2: string;
-  question3: string;
-  question4: string;
-}
-
 export interface ErrorResponse {
   error: string;
 }
+
+export interface DictionaryItem {
+  id: number;
+  label: string;
+  sortOrder: number;
+}
+
+export interface SessionResult {
+  sessionId: number;
+  sessionToken: string;
+}
+
+export interface ConversationInput {
+  sessionId: number;
+}
+
+export interface ConversationResult {
+  conversationId: number;
+  sessionId: number;
+}
+
+export type MessageInputRole = typeof MessageInputRole[keyof typeof MessageInputRole];
+
+
+export const MessageInputRole = {
+  bot: 'bot',
+  user: 'user',
+} as const;
+
+export interface MessageInput {
+  conversationId: number;
+  role: MessageInputRole;
+  content: string;
+}
+
+export interface MessageResult {
+  messageId: number;
+  conversationId: number;
+}
+
+export interface DiagnosticAnswerItem {
+  questionNumber: number;
+  questionKey: string;
+  answerText: string;
+  /** @nullable */
+  dictId?: number | null;
+  isCustom: boolean;
+}
+
+export interface DiagnosticAnswersInput {
+  conversationId: number;
+  answers: DiagnosticAnswerItem[];
+}
+
+export interface DiagnosticAnswersResult {
+  saved: number;
+  conversationId: number;
+}
+
+export type GetDictionaryParams = {
+type: GetDictionaryType;
+};
+
+export type GetDictionaryType = typeof GetDictionaryType[keyof typeof GetDictionaryType];
+
+
+export const GetDictionaryType = {
+  experience_area: 'experience_area',
+  experience_years: 'experience_years',
+  education: 'education',
+  goals: 'goals',
+} as const;
 

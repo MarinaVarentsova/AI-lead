@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.1.0
+  version: 0.2.0
   description: API specification for AI Квалификатор ИНОБР
 servers:
   - url: /api
@@ -10,15 +10,22 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: dictionaries
+    description: Reference dictionary lookups
+  - name: sessions
+    description: Session management
+  - name: conversations
+    description: Conversation management
+  - name: messages
+    description: Message persistence
   - name: diagnostic
-    description: Diagnostic session operations
+    description: Diagnostic answer submission
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -27,25 +34,69 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
-  /diagnostic-sessions:
+  /dictionaries:
+    get:
+      operationId: getDictionary
+      tags: [dictionaries]
+      summary: Get dictionary items by type
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum:
+              - experience_area
+              - experience_years
+              - education
+              - goals
+      responses:
+        "200":
+          description: Dictionary items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DictionaryItem"
+        "400":
+          description: Invalid type
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /sessions:
     post:
-      operationId: createDiagnosticSession
-      tags: [diagnostic]
-      summary: Save diagnostic session answers
-      description: Saves the user's answers from the 4-question diagnostic flow
+      operationId: createSession
+      tags: [sessions]
+      summary: Create a new session when widget opens
+      responses:
+        "201":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SessionResult"
+
+  /conversations:
+    post:
+      operationId: createConversation
+      tags: [conversations]
+      summary: Create a new conversation when diagnostic starts
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/DiagnosticSessionInput"
+              $ref: "#/components/schemas/ConversationInput"
       responses:
         "201":
-          description: Session saved
+          description: Conversation created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DiagnosticSession"
+                $ref: "#/components/schemas/ConversationResult"
         "400":
           description: Invalid input
           content:
@@ -53,80 +104,160 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
-    get:
-      operationId: listDiagnosticSessions
-      tags: [diagnostic]
-      summary: List all diagnostic sessions
-      description: Returns all saved diagnostic sessions
+  /messages:
+    post:
+      operationId: saveMessage
+      tags: [messages]
+      summary: Save a single chat message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MessageInput"
       responses:
-        "200":
-          description: List of sessions
+        "201":
+          description: Message saved
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/DiagnosticSession"
+                $ref: "#/components/schemas/MessageResult"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /diagnostic-answers:
+    post:
+      operationId: saveDiagnosticAnswers
+      tags: [diagnostic]
+      summary: Save all diagnostic answers after completion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiagnosticAnswersInput"
+      responses:
+        "201":
+          description: Answers saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiagnosticAnswersResult"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
-          type: string
-      required:
-        - status
-
-    DiagnosticSessionInput:
-      type: object
-      required:
-        - question1
-        - question2
-        - question3
-        - question4
-      properties:
-        question1:
-          type: string
-          description: "Answer to question 1: background/experience area"
-        question2:
-          type: string
-          description: "Answer to question 2: years of work experience"
-        question3:
-          type: string
-          description: "Answer to question 3: education level"
-        question4:
-          type: string
-          description: "Answer to question 4: learning goal"
-
-    DiagnosticSession:
-      type: object
-      required:
-        - id
-        - createdAt
-        - question1
-        - question2
-        - question3
-        - question4
-      properties:
-        id:
-          type: integer
-        createdAt:
-          type: string
-          format: date-time
-        question1:
-          type: string
-        question2:
-          type: string
-        question3:
-          type: string
-        question4:
           type: string
 
     ErrorResponse:
       type: object
-      required:
-        - error
+      required: [error]
       properties:
         error:
           type: string
+
+    DictionaryItem:
+      type: object
+      required: [id, label, sortOrder]
+      properties:
+        id:
+          type: integer
+        label:
+          type: string
+        sortOrder:
+          type: integer
+
+    SessionResult:
+      type: object
+      required: [sessionId, sessionToken]
+      properties:
+        sessionId:
+          type: integer
+        sessionToken:
+          type: string
+
+    ConversationInput:
+      type: object
+      required: [sessionId]
+      properties:
+        sessionId:
+          type: integer
+
+    ConversationResult:
+      type: object
+      required: [conversationId, sessionId]
+      properties:
+        conversationId:
+          type: integer
+        sessionId:
+          type: integer
+
+    MessageInput:
+      type: object
+      required: [conversationId, role, content]
+      properties:
+        conversationId:
+          type: integer
+        role:
+          type: string
+          enum: [bot, user]
+        content:
+          type: string
+
+    MessageResult:
+      type: object
+      required: [messageId, conversationId]
+      properties:
+        messageId:
+          type: integer
+        conversationId:
+          type: integer
+
+    DiagnosticAnswerItem:
+      type: object
+      required: [questionNumber, questionKey, answerText, isCustom]
+      properties:
+        questionNumber:
+          type: integer
+        questionKey:
+          type: string
+        answerText:
+          type: string
+        dictId:
+          type: ["integer", "null"]
+        isCustom:
+          type: boolean
+
+    DiagnosticAnswersInput:
+      type: object
+      required: [conversationId, answers]
+      properties:
+        conversationId:
+          type: integer
+        answers:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiagnosticAnswerItem"
+
+    DiagnosticAnswersResult:
+      type: object
+      required: [saved, conversationId]
+      properties:
+        saved:
+          type: integer
+        conversationId:
+          type: integer

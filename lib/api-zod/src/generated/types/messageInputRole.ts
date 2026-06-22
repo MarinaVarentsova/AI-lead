@@ -6,6 +6,10 @@
  * OpenAPI spec version: 0.2.0
  */
 
-export interface HealthStatus {
-  status: string;
-}
+export type MessageInputRole = typeof MessageInputRole[keyof typeof MessageInputRole];
+
+
+export const MessageInputRole = {
+  bot: 'bot',
+  user: 'user',
+} as const;

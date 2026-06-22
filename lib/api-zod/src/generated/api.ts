@@ -3,13 +3,12 @@
  * Do not edit manually.
  * Api
  * API specification for AI Квалификатор ИНОБР
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import * as zod from 'zod';
 
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const HealthCheckResponse = zod.object({
@@ -18,29 +17,50 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
- * Saves the user's answers from the 4-question diagnostic flow
- * @summary Save diagnostic session answers
+ * @summary Get dictionary items by type
  */
-export const CreateDiagnosticSessionBody = zod.object({
-  "question1": zod.string().describe('Answer to question 1: background\/experience area'),
-  "question2": zod.string().describe('Answer to question 2: years of work experience'),
-  "question3": zod.string().describe('Answer to question 3: education level'),
-  "question4": zod.string().describe('Answer to question 4: learning goal')
+export const GetDictionaryQueryParams = zod.object({
+  "type": zod.enum(['experience_area', 'experience_years', 'education', 'goals'])
+})
+
+export const GetDictionaryResponseItem = zod.object({
+  "id": zod.number(),
+  "label": zod.string(),
+  "sortOrder": zod.number()
+})
+export const GetDictionaryResponse = zod.array(GetDictionaryResponseItem)
+
+
+/**
+ * @summary Create a new conversation when diagnostic starts
+ */
+export const CreateConversationBody = zod.object({
+  "sessionId": zod.number()
 })
 
 
 /**
- * Returns all saved diagnostic sessions
- * @summary List all diagnostic sessions
+ * @summary Save a single chat message
  */
-export const ListDiagnosticSessionsResponseItem = zod.object({
-  "id": zod.number(),
-  "createdAt": zod.coerce.date(),
-  "question1": zod.string(),
-  "question2": zod.string(),
-  "question3": zod.string(),
-  "question4": zod.string()
+export const SaveMessageBody = zod.object({
+  "conversationId": zod.number(),
+  "role": zod.enum(['bot', 'user']),
+  "content": zod.string()
 })
-export const ListDiagnosticSessionsResponse = zod.array(ListDiagnosticSessionsResponseItem)
+
+
+/**
+ * @summary Save all diagnostic answers after completion
+ */
+export const SaveDiagnosticAnswersBody = zod.object({
+  "conversationId": zod.number(),
+  "answers": zod.array(zod.object({
+  "questionNumber": zod.number(),
+  "questionKey": zod.string(),
+  "answerText": zod.string(),
+  "dictId": zod.number().nullish(),
+  "isCustom": zod.boolean()
+}))
+})
 
 

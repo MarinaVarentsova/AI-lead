@@ -5,7 +5,9 @@
  * API specification for AI Квалификатор ИНОБР
  * OpenAPI spec version: 0.2.0
  */
+import type { DiagnosticAnswerItem } from './diagnosticAnswerItem';
 
-export interface HealthStatus {
-  status: string;
+export interface DiagnosticAnswersInput {
+  conversationId: number;
+  answers: DiagnosticAnswerItem[];
 }

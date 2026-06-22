@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * API specification for AI Квалификатор ИНОБР
- * OpenAPI spec version: 0.1.0
+ * OpenAPI spec version: 0.2.0
  */
 import {
   useMutation,
@@ -20,10 +20,17 @@ import type {
 } from '@tanstack/react-query';
 
 import type {
-  DiagnosticSession,
-  DiagnosticSessionInput,
+  ConversationInput,
+  ConversationResult,
+  DiagnosticAnswersInput,
+  DiagnosticAnswersResult,
+  DictionaryItem,
   ErrorResponse,
-  HealthStatus
+  GetDictionaryParams,
+  HealthStatus,
+  MessageInput,
+  MessageResult,
+  SessionResult
 } from './api.schemas';
 
 import { customFetch } from '../custom-fetch';
@@ -47,7 +54,6 @@ export const getHealthCheckUrl = () => {
 }
 
 /**
- * Returns server health status
  * @summary Health check
  */
 export const healthCheck = async ( options?: RequestInit): Promise<HealthStatus> => {
@@ -116,93 +122,27 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
 
 
 
-export const getCreateDiagnosticSessionUrl = () => {
+export const getGetDictionaryUrl = (params: GetDictionaryParams,) => {
+  const normalizedParams = new URLSearchParams();
 
+  Object.entries(params || {}).forEach(([key, value]) => {
 
-
-
-  return `/api/diagnostic-sessions`
-}
-
-/**
- * Saves the user's answers from the 4-question diagnostic flow
- * @summary Save diagnostic session answers
- */
-export const createDiagnosticSession = async (diagnosticSessionInput: DiagnosticSessionInput, options?: RequestInit): Promise<DiagnosticSession> => {
-
-  return customFetch<DiagnosticSession>(getCreateDiagnosticSessionUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      diagnosticSessionInput,)
-  }
-);}
-
-
-
-
-export const getCreateDiagnosticSessionMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDiagnosticSession>>, TError,{data: BodyType<DiagnosticSessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof createDiagnosticSession>>, TError,{data: BodyType<DiagnosticSessionInput>}, TContext> => {
-
-const mutationKey = ['createDiagnosticSession'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createDiagnosticSession>>, {data: BodyType<DiagnosticSessionInput>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  createDiagnosticSession(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type CreateDiagnosticSessionMutationResult = NonNullable<Awaited<ReturnType<typeof createDiagnosticSession>>>
-    export type CreateDiagnosticSessionMutationBody = BodyType<DiagnosticSessionInput>
-    export type CreateDiagnosticSessionMutationError = ErrorType<ErrorResponse>
-
-    /**
- * @summary Save diagnostic session answers
- */
-export const useCreateDiagnosticSession = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createDiagnosticSession>>, TError,{data: BodyType<DiagnosticSessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof createDiagnosticSession>>,
-        TError,
-        {data: BodyType<DiagnosticSessionInput>},
-        TContext
-      > => {
-      return useMutation(getCreateDiagnosticSessionMutationOptions(options));
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : value.toString())
     }
+  });
 
-export const getListDiagnosticSessionsUrl = () => {
+  const stringifiedParams = normalizedParams.toString();
 
-
-
-
-  return `/api/diagnostic-sessions`
+  return stringifiedParams.length > 0 ? `/api/dictionaries?${stringifiedParams}` : `/api/dictionaries`
 }
 
 /**
- * Returns all saved diagnostic sessions
- * @summary List all diagnostic sessions
+ * @summary Get dictionary items by type
  */
-export const listDiagnosticSessions = async ( options?: RequestInit): Promise<DiagnosticSession[]> => {
+export const getDictionary = async (params: GetDictionaryParams, options?: RequestInit): Promise<DictionaryItem[]> => {
 
-  return customFetch<DiagnosticSession[]>(getListDiagnosticSessionsUrl(),
+  return customFetch<DictionaryItem[]>(getGetDictionaryUrl(params),
   {
     ...options,
     method: 'GET'
@@ -215,45 +155,45 @@ export const listDiagnosticSessions = async ( options?: RequestInit): Promise<Di
 
 
 
-export const getListDiagnosticSessionsQueryKey = () => {
+export const getGetDictionaryQueryKey = (params?: GetDictionaryParams,) => {
     return [
-    `/api/diagnostic-sessions`
+    `/api/dictionaries`, ...(params ? [params] : [])
     ] as const;
     }
 
 
-export const getListDiagnosticSessionsQueryOptions = <TData = Awaited<ReturnType<typeof listDiagnosticSessions>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDiagnosticSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetDictionaryQueryOptions = <TData = Awaited<ReturnType<typeof getDictionary>>, TError = ErrorType<ErrorResponse>>(params: GetDictionaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDictionary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
 
-  const queryKey =  queryOptions?.queryKey ?? getListDiagnosticSessionsQueryKey();
+  const queryKey =  queryOptions?.queryKey ?? getGetDictionaryQueryKey(params);
 
 
 
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof listDiagnosticSessions>>> = ({ signal }) => listDiagnosticSessions({ signal, ...requestOptions });
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDictionary>>> = ({ signal }) => getDictionary(params, { signal, ...requestOptions });
 
 
 
 
 
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listDiagnosticSessions>>, TError, TData> & { queryKey: QueryKey }
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDictionary>>, TError, TData> & { queryKey: QueryKey }
 }
 
-export type ListDiagnosticSessionsQueryResult = NonNullable<Awaited<ReturnType<typeof listDiagnosticSessions>>>
-export type ListDiagnosticSessionsQueryError = ErrorType<unknown>
+export type GetDictionaryQueryResult = NonNullable<Awaited<ReturnType<typeof getDictionary>>>
+export type GetDictionaryQueryError = ErrorType<ErrorResponse>
 
 
 /**
- * @summary List all diagnostic sessions
+ * @summary Get dictionary items by type
  */
 
-export function useListDiagnosticSessions<TData = Awaited<ReturnType<typeof listDiagnosticSessions>>, TError = ErrorType<unknown>>(
-  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listDiagnosticSessions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export function useGetDictionary<TData = Awaited<ReturnType<typeof getDictionary>>, TError = ErrorType<ErrorResponse>>(
+ params: GetDictionaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDictionary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
-  const queryOptions = getListDiagnosticSessionsQueryOptions(options)
+  const queryOptions = getGetDictionaryQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -265,4 +205,287 @@ export function useListDiagnosticSessions<TData = Awaited<ReturnType<typeof list
 
 
 
+
+export const getCreateSessionUrl = () => {
+
+
+
+
+  return `/api/sessions`
+}
+
+/**
+ * @summary Create a new session when widget opens
+ */
+export const createSession = async ( options?: RequestInit): Promise<SessionResult> => {
+
+  return customFetch<SessionResult>(getCreateSessionUrl(),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getCreateSessionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSession>>, TError,void, TContext> => {
+
+const mutationKey = ['createSession'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSession>>, void> = () => {
+
+
+          return  createSession(requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateSessionMutationResult = NonNullable<Awaited<ReturnType<typeof createSession>>>
+
+    export type CreateSessionMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Create a new session when widget opens
+ */
+export const useCreateSession = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createSession>>,
+        TError,
+        void,
+        TContext
+      > => {
+      return useMutation(getCreateSessionMutationOptions(options));
+    }
+
+export const getCreateConversationUrl = () => {
+
+
+
+
+  return `/api/conversations`
+}
+
+/**
+ * @summary Create a new conversation when diagnostic starts
+ */
+export const createConversation = async (conversationInput: ConversationInput, options?: RequestInit): Promise<ConversationResult> => {
+
+  return customFetch<ConversationResult>(getCreateConversationUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      conversationInput,)
+  }
+);}
+
+
+
+
+export const getCreateConversationMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createConversation>>, TError,{data: BodyType<ConversationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createConversation>>, TError,{data: BodyType<ConversationInput>}, TContext> => {
+
+const mutationKey = ['createConversation'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createConversation>>, {data: BodyType<ConversationInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  createConversation(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateConversationMutationResult = NonNullable<Awaited<ReturnType<typeof createConversation>>>
+    export type CreateConversationMutationBody = BodyType<ConversationInput>
+    export type CreateConversationMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Create a new conversation when diagnostic starts
+ */
+export const useCreateConversation = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createConversation>>, TError,{data: BodyType<ConversationInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createConversation>>,
+        TError,
+        {data: BodyType<ConversationInput>},
+        TContext
+      > => {
+      return useMutation(getCreateConversationMutationOptions(options));
+    }
+
+export const getSaveMessageUrl = () => {
+
+
+
+
+  return `/api/messages`
+}
+
+/**
+ * @summary Save a single chat message
+ */
+export const saveMessage = async (messageInput: MessageInput, options?: RequestInit): Promise<MessageResult> => {
+
+  return customFetch<MessageResult>(getSaveMessageUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      messageInput,)
+  }
+);}
+
+
+
+
+export const getSaveMessageMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveMessage>>, TError,{data: BodyType<MessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveMessage>>, TError,{data: BodyType<MessageInput>}, TContext> => {
+
+const mutationKey = ['saveMessage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveMessage>>, {data: BodyType<MessageInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveMessage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveMessageMutationResult = NonNullable<Awaited<ReturnType<typeof saveMessage>>>
+    export type SaveMessageMutationBody = BodyType<MessageInput>
+    export type SaveMessageMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Save a single chat message
+ */
+export const useSaveMessage = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveMessage>>, TError,{data: BodyType<MessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveMessage>>,
+        TError,
+        {data: BodyType<MessageInput>},
+        TContext
+      > => {
+      return useMutation(getSaveMessageMutationOptions(options));
+    }
+
+export const getSaveDiagnosticAnswersUrl = () => {
+
+
+
+
+  return `/api/diagnostic-answers`
+}
+
+/**
+ * @summary Save all diagnostic answers after completion
+ */
+export const saveDiagnosticAnswers = async (diagnosticAnswersInput: DiagnosticAnswersInput, options?: RequestInit): Promise<DiagnosticAnswersResult> => {
+
+  return customFetch<DiagnosticAnswersResult>(getSaveDiagnosticAnswersUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      diagnosticAnswersInput,)
+  }
+);}
+
+
+
+
+export const getSaveDiagnosticAnswersMutationOptions = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveDiagnosticAnswers>>, TError,{data: BodyType<DiagnosticAnswersInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof saveDiagnosticAnswers>>, TError,{data: BodyType<DiagnosticAnswersInput>}, TContext> => {
+
+const mutationKey = ['saveDiagnosticAnswers'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveDiagnosticAnswers>>, {data: BodyType<DiagnosticAnswersInput>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  saveDiagnosticAnswers(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SaveDiagnosticAnswersMutationResult = NonNullable<Awaited<ReturnType<typeof saveDiagnosticAnswers>>>
+    export type SaveDiagnosticAnswersMutationBody = BodyType<DiagnosticAnswersInput>
+    export type SaveDiagnosticAnswersMutationError = ErrorType<ErrorResponse>
+
+    /**
+ * @summary Save all diagnostic answers after completion
+ */
+export const useSaveDiagnosticAnswers = <TError = ErrorType<ErrorResponse>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveDiagnosticAnswers>>, TError,{data: BodyType<DiagnosticAnswersInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof saveDiagnosticAnswers>>,
+        TError,
+        {data: BodyType<DiagnosticAnswersInput>},
+        TContext
+      > => {
+      return useMutation(getSaveDiagnosticAnswersMutationOptions(options));
+    }
 

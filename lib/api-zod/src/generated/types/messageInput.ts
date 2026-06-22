@@ -5,7 +5,10 @@
  * API specification for AI Квалификатор ИНОБР
  * OpenAPI spec version: 0.2.0
  */
+import type { MessageInputRole } from './messageInputRole';
 
-export interface HealthStatus {
-  status: string;
+export interface MessageInput {
+  conversationId: number;
+  role: MessageInputRole;
+  content: string;
 }

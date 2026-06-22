@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @plugin "@tailwindcss/typography";
@@ -21,23 +22,18 @@
 
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
-  --color-primary-border: var(--primary-border);
 
   --color-secondary: hsl(var(--secondary));
   --color-secondary-foreground: hsl(var(--secondary-foreground));
-  --color-secondary-border: var(--secondary-border);
 
   --color-muted: hsl(var(--muted));
   --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-muted-border: var(--muted-border);
 
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-accent-border: var(--accent-border);
 
   --color-destructive: hsl(var(--destructive));
   --color-destructive-foreground: hsl(var(--destructive-foreground));
-  --color-destructive-border: var(--destructive-border);
 
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -48,75 +44,66 @@
 }
 
 :root {
-  --background: 220 20% 10%;
-  --foreground: 220 10% 98%;
+  --background: 218 33% 97%;
+  --foreground: 0 0% 17%;
 
-  --border: 220 15% 20%;
-  --input: 220 15% 20%;
-  --ring: 200 60% 40%;
+  --border: 220 22% 75%;
+  --input: 220 22% 75%;
+  --ring: 214 50% 24%;
 
-  --card: 220 20% 12%;
-  --card-foreground: 220 10% 98%;
-  --card-border: 220 15% 20%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 17%;
+  --card-border: 220 22% 75%;
 
-  --popover: 220 20% 12%;
-  --popover-foreground: 220 10% 98%;
-  --popover-border: 220 15% 20%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 17%;
+  --popover-border: 220 22% 75%;
 
-  --primary: 200 60% 40%;
+  --primary: 214 50% 24%;
   --primary-foreground: 0 0% 100%;
   
-  --secondary: 220 15% 20%;
-  --secondary-foreground: 220 10% 98%;
+  --secondary: 210 50% 36%;
+  --secondary-foreground: 0 0% 100%;
 
-  --muted: 220 15% 18%;
-  --muted-foreground: 220 10% 70%;
+  --muted: 218 33% 97%;
+  --muted-foreground: 220 15% 50%;
 
-  --accent: 200 40% 25%;
-  --accent-foreground: 220 10% 98%;
+  --accent: 36 47% 57%;
+  --accent-foreground: 0 0% 100%;
 
   --destructive: 0 60% 50%;
   --destructive-foreground: 0 0% 100%;
 
-  --radius: 0.75rem;
-
-  --sidebar: 220 20% 12%;
-  --sidebar-foreground: 220 10% 98%;
-  --sidebar-border: 220 15% 20%;
-  --sidebar-primary: 200 60% 40%;
-  --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 220 15% 20%;
-  --sidebar-accent-foreground: 220 10% 98%;
-  --sidebar-ring: 200 60% 40%;
+  --radius: 1rem;
 }
 
 .dark {
-  --background: 220 20% 10%;
-  --foreground: 220 10% 98%;
+  --background: 218 33% 97%;
+  --foreground: 0 0% 17%;
 
-  --border: 220 15% 20%;
-  --input: 220 15% 20%;
-  --ring: 200 60% 40%;
+  --border: 220 22% 75%;
+  --input: 220 22% 75%;
+  --ring: 214 50% 24%;
 
-  --card: 220 20% 12%;
-  --card-foreground: 220 10% 98%;
-  --card-border: 220 15% 20%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 17%;
+  --card-border: 220 22% 75%;
 
-  --popover: 220 20% 12%;
-  --popover-foreground: 220 10% 98%;
-  --popover-border: 220 15% 20%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 0 0% 17%;
+  --popover-border: 220 22% 75%;
 
-  --primary: 200 60% 40%;
+  --primary: 214 50% 24%;
   --primary-foreground: 0 0% 100%;
   
-  --secondary: 220 15% 20%;
-  --secondary-foreground: 220 10% 98%;
+  --secondary: 210 50% 36%;
+  --secondary-foreground: 0 0% 100%;
 
-  --muted: 220 15% 18%;
-  --muted-foreground: 220 10% 70%;
+  --muted: 218 33% 97%;
+  --muted-foreground: 220 15% 50%;
 
-  --accent: 200 40% 25%;
-  --accent-foreground: 220 10% 98%;
+  --accent: 36 47% 57%;
+  --accent-foreground: 0 0% 100%;
 
   --destructive: 0 60% 50%;
   --destructive-foreground: 0 0% 100%;
