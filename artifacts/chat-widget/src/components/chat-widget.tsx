@@ -395,29 +395,43 @@ export function ChatWidget() {
 
   if (step === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-8 text-center space-y-6 animate-in fade-in zoom-in duration-500 bg-white">
-        <div className="w-12 h-12 rounded bg-primary/10 flex items-center justify-center text-primary mb-4">
-          <Building2 className="w-6 h-6 text-primary" />
+      <div className="flex flex-col h-full bg-background">
+        {/* INOBR header */}
+        <div className="px-5 py-3 flex items-center gap-3 bg-[#18181E] text-white shrink-0">
+          <div className="w-9 h-9 rounded flex items-center justify-center shrink-0 bg-primary/20 border border-primary/40">
+            <Building2 className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-[14px] text-white leading-tight">ИНОБР Ассистент</h2>
+            <p className="text-[12px] text-white/60">Институт образования</p>
+          </div>
         </div>
-        <div className="space-y-3 max-w-[320px]">
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Подходит ли вам профессия строительного эксперта?
-          </h1>
-          <p className="text-muted-foreground text-base">
-            Ответьте на несколько вопросов и получите предварительную рекомендацию.
-          </p>
-        </div>
-        <div className="pt-4 w-full max-w-[280px]">
-          <Button
-            data-testid="button-start-diagnostic"
-            onClick={handleStart}
-            size="lg"
-            className="w-full rounded font-medium px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground transition-all"
-            disabled={!sessionId}
-          >
-            {!sessionId ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
-            Начать диагностику
-          </Button>
+
+        {/* Launch screen body */}
+        <div className="flex flex-col items-center justify-center flex-1 p-8 text-center space-y-6 animate-in fade-in zoom-in duration-500">
+          <div className="w-14 h-14 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center mb-2">
+            <Building2 className="w-7 h-7 text-primary" />
+          </div>
+          <div className="space-y-3 max-w-[320px]">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
+              Подходит ли вам профессия строительного эксперта?
+            </h1>
+            <p className="text-muted-foreground text-sm leading-relaxed">
+              Ответьте на несколько вопросов и получите предварительную рекомендацию.
+            </p>
+          </div>
+          <div className="pt-2 w-full max-w-[260px]">
+            <Button
+              data-testid="button-start-diagnostic"
+              onClick={handleStart}
+              size="lg"
+              className="w-full rounded-md font-semibold px-6 py-2.5 bg-primary hover:bg-primary/90 text-primary-foreground transition-all uppercase tracking-wide text-sm"
+              disabled={!sessionId}
+            >
+              {!sessionId ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+              Начать диагностику
+            </Button>
+          </div>
         </div>
       </div>
     );
@@ -426,14 +440,14 @@ export function ChatWidget() {
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
       {/* Header */}
-      <div className="px-5 py-4 flex items-center gap-3 bg-[#002B5C] text-white z-10">
-        <div className="w-10 h-10 rounded flex items-center justify-center shrink-0 border border-white/20 bg-white/10">
-          <Building2 className="w-5 h-5 text-white" />
+      <div className="px-5 py-3 flex items-center gap-3 bg-[#18181E] text-white z-10 shrink-0">
+        <div className="w-9 h-9 rounded flex items-center justify-center shrink-0 bg-primary/20 border border-primary/40">
+          <Building2 className="w-4 h-4 text-primary" />
         </div>
         <div>
-          <h2 className="font-semibold text-[15px] text-white leading-tight">ИНОБР Ассистент</h2>
-          <p className="text-[13px] text-white/70 flex items-center gap-1.5 mt-0.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+          <h2 className="font-semibold text-[14px] text-white leading-tight">ИНОБР Ассистент</h2>
+          <p className="text-[12px] text-white/60 flex items-center gap-1.5 mt-0.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block"></span>
             Консультант онлайн
           </p>
         </div>
@@ -453,7 +467,7 @@ export function ChatWidget() {
                 }`}
               >
                 {msg.role === "bot" && (
-                  <div className="w-8 h-8 rounded bg-[#002B5C]/10 border border-[#002B5C]/20 flex items-center justify-center shrink-0 mt-1">
+                  <div className="w-8 h-8 rounded bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-1">
                     <Building2 className="w-4 h-4 text-primary" />
                   </div>
                 )}
@@ -461,7 +475,7 @@ export function ChatWidget() {
                   className={`px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap border ${
                     msg.role === "user"
                       ? "bg-primary text-primary-foreground rounded-lg rounded-tr-sm border-transparent"
-                      : "bg-secondary text-foreground rounded-lg rounded-tl-sm border-border"
+                      : "bg-white text-foreground rounded-lg rounded-tl-sm border-border shadow-sm"
                   }`}
                 >
                   {msg.content}
@@ -476,10 +490,10 @@ export function ChatWidget() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 className="flex gap-3 max-w-[80%] mr-auto items-center"
               >
-                <div className="w-8 h-8 rounded bg-[#002B5C]/10 border border-[#002B5C]/20 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
                   <Building2 className="w-4 h-4 text-primary" />
                 </div>
-                <div className="bg-secondary border border-border rounded-lg rounded-tl-sm px-4 py-3.5 flex items-center gap-1.5">
+                <div className="bg-white border border-border shadow-sm rounded-lg rounded-tl-sm px-4 py-3.5 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                   <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
                   <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce"></span>
