@@ -492,8 +492,8 @@ export function ChatWidget() {
                 }`}
               >
                 {msg.role === "bot" && (
-                  <div className="w-8 h-8 rounded bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 mt-1">
-                    <Building2 className="w-4 h-4 text-primary" />
+                  <div className="w-8 h-8 overflow-hidden rounded shrink-0 mt-1">
+                    <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
                   </div>
                 )}
                 <div
@@ -515,8 +515,8 @@ export function ChatWidget() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 className="flex gap-3 max-w-[80%] mr-auto items-center"
               >
-                <div className="w-8 h-8 rounded bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
-                  <Building2 className="w-4 h-4 text-primary" />
+                <div className="w-8 h-8 overflow-hidden rounded shrink-0">
+                  <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
                 </div>
                 <div className="bg-white border border-border shadow-sm rounded-lg rounded-tl-sm px-4 py-3.5 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 bg-muted-foreground/50 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
