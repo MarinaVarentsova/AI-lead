@@ -6,6 +6,8 @@ import {
   useCreateConversation,
   useSaveDiagnosticAnswers,
   useGetDictionary,
+  getGetDictionaryQueryKey,
+  GetDictionaryType,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -94,9 +96,15 @@ export function ChatWidget() {
 
   const currentQIndex = Math.max(0, step - 2);
   const currentQuestionKey = QUESTIONS[currentQIndex]?.key;
+  const dictionaryType = currentQuestionKey as GetDictionaryType;
   const { data: currentDictionary, isLoading: isDictLoading } = useGetDictionary(
-    { type: currentQuestionKey as any },
-    { query: { enabled: step >= 2 && step <= QUESTIONS.length + 1 } }
+    { type: dictionaryType },
+    {
+      query: {
+        queryKey: getGetDictionaryQueryKey({ type: dictionaryType }),
+        enabled: step >= 2 && step <= QUESTIONS.length + 1 && Boolean(currentQuestionKey),
+      },
+    }
   );
 
   const scrollToBottom = () => {
