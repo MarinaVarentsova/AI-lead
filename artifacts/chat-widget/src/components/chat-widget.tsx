@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircle2, Send, Building2, Loader2 } from "lucide-react";
+import { CheckCircle2, Send, Loader2 } from "lucide-react";
+import inobrLogo from "@assets/image_1782127452755.png";
 import {
   useCreateSession,
   useCreateConversation,
@@ -400,8 +401,8 @@ export function ChatWidget() {
       <div className="flex flex-col h-full bg-background">
         {/* INOBR header */}
         <div className="px-5 py-3 flex items-center gap-3 bg-[#18181E] text-white shrink-0">
-          <div className="w-9 h-9 rounded flex items-center justify-center shrink-0 bg-primary/20 border border-primary/40">
-            <Building2 className="w-4 h-4 text-primary" />
+          <div className="h-9 w-[78px] overflow-hidden shrink-0 rounded">
+            <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
           </div>
           <div>
             <h2 className="font-semibold text-[14px] text-white leading-tight">ИНОБР Ассистент</h2>
@@ -411,8 +412,8 @@ export function ChatWidget() {
 
         {/* Launch screen body */}
         <div className="flex flex-col items-center justify-center flex-1 p-8 text-center space-y-6 animate-in fade-in zoom-in duration-500">
-          <div className="w-14 h-14 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center mb-2">
-            <Building2 className="w-7 h-7 text-primary" />
+          <div className="h-16 w-[140px] overflow-hidden rounded-lg mb-2">
+            <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
           </div>
           <div className="space-y-3 max-w-[320px]">
             <h1 className="text-xl font-semibold tracking-tight text-foreground">
@@ -465,8 +466,8 @@ export function ChatWidget() {
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
       {/* Header */}
       <div className="px-5 py-3 flex items-center gap-3 bg-[#18181E] text-white z-10 shrink-0">
-        <div className="w-9 h-9 rounded flex items-center justify-center shrink-0 bg-primary/20 border border-primary/40">
-          <Building2 className="w-4 h-4 text-primary" />
+        <div className="h-9 w-[78px] overflow-hidden shrink-0 rounded">
+          <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
         </div>
         <div>
           <h2 className="font-semibold text-[14px] text-white leading-tight">ИНОБР Ассистент</h2>
