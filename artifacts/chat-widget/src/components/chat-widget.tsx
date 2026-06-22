@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { CheckCircle2, Send, Building2, Loader2 } from "lucide-react";
-import { 
-  useCreateSession, 
-  useCreateConversation, 
-  useSaveMessage, 
-  useSaveDiagnosticAnswers, 
-  useGetDictionary 
+import {
+  useCreateSession,
+  useCreateConversation,
+  useSaveDiagnosticAnswers,
+  useGetDictionary,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,51 +26,69 @@ type DiagnosticAnswer = {
 };
 
 const QUESTIONS = [
-  {
-    id: "q1",
-    key: "experience_area",
-    botMessage: "Ваш опыт ближе к чему?",
-  },
-  {
-    id: "q2",
-    key: "experience_years",
-    botMessage: "Какой у вас опыт работы?",
-  },
-  {
-    id: "q3",
-    key: "education",
-    botMessage: "Какое образование у вас есть?",
-  },
-  {
-    id: "q4",
-    key: "goals",
-    botMessage: "Для чего рассматриваете обучение?",
-  },
+  { id: "q1", key: "experience_area" },
+  { id: "q2", key: "experience_years" },
+  { id: "q3", key: "education" },
+  { id: "q4", key: "goals" },
 ] as const;
+
+// ─── API helpers (native fetch, no SDK needed) ─────────────────────────────
+
+async function apiChat(
+  conversationId: number,
+  content: string
+): Promise<{ reply: string; messageId: number }> {
+  const res = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ conversationId, content }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as any).error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+async function apiQualify(
+  conversationId: number,
+  sessionId: number
+): Promise<{ leadId: number; leadScore: number; leadTemperature: string; qualification: any; aiBrief: string }> {
+  const res = await fetch("/api/qualify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ conversationId, sessionId }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as any).error ?? `HTTP ${res.status}`);
+  }
+  return res.json();
+}
+
+// ─── Component ─────────────────────────────────────────────────────────────
 
 export function ChatWidget() {
   const [step, setStep] = useState<number>(0);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  
+
   const [answers, setAnswers] = useState<DiagnosticAnswer[]>([]);
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [conversationId, setConversationId] = useState<number | null>(null);
-  
+  const [leadId, setLeadId] = useState<number | null>(null);
+
   const [customInput, setCustomInput] = useState("");
   const [activeCustomQ, setActiveCustomQ] = useState<string | null>(null);
 
   const createSession = useCreateSession();
   const createConversation = useCreateConversation();
-  const saveMessage = useSaveMessage();
   const saveDiagnosticAnswers = useSaveDiagnosticAnswers();
 
   useEffect(() => {
     createSession.mutate(undefined, {
-      onSuccess: (data) => {
-        setSessionId(data.sessionId);
-      }
+      onSuccess: (data) => setSessionId(data.sessionId),
     });
   }, []);
 
@@ -84,11 +101,7 @@ export function ChatWidget() {
 
   const scrollToBottom = () => {
     if (scrollRef.current) {
-      const scrollContainer = scrollRef.current;
-      scrollContainer.scrollTo({
-        top: scrollContainer.scrollHeight,
-        behavior: "smooth"
-      });
+      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }
   };
 
@@ -96,46 +109,76 @@ export function ChatWidget() {
     scrollToBottom();
   }, [messages, isTyping, activeCustomQ, currentDictionary]);
 
-  const recordMessage = (role: "bot" | "user", content: string) => {
-    if (conversationId) {
-      saveMessage.mutate({ data: { conversationId, role, content } });
+  // ─── Add bot message (from AI or local) ──────────────────────────────────
+
+  const addBotMessage = (content: string | React.ReactNode) => {
+    setMessages((prev) => [
+      ...prev,
+      { id: Date.now().toString() + Math.random(), role: "bot", content },
+    ]);
+  };
+
+  // ─── Call AI and show reply ───────────────────────────────────────────────
+
+  const sendToAI = async (convId: number, userText: string): Promise<string> => {
+    setIsTyping(true);
+    try {
+      const { reply } = await apiChat(convId, userText);
+      setIsTyping(false);
+      addBotMessage(reply);
+      return reply;
+    } catch (err) {
+      setIsTyping(false);
+      addBotMessage("Что-то пошло не так. Попробуйте ещё раз.");
+      throw err;
     }
   };
 
-  const addBotMessage = (content: string, delay = 400) => {
-    setIsTyping(true);
-    setTimeout(() => {
-      setIsTyping(false);
-      setMessages((prev) => [...prev, { id: Date.now().toString(), role: "bot", content }]);
-      recordMessage("bot", content);
-    }, delay);
-  };
+  // ─── Step 0 → Step 1: "Начать диагностику" ───────────────────────────────
 
   const handleStart = () => {
     setStep(1);
+    // Show the fixed welcome message from the knowledge base (no API call needed yet — no conv_id)
     addBotMessage(
-      "Здравствуйте.\n\nЯ помогу понять, подходит ли вам обучение по строительной экспертизе и какой вариант стоит рассмотреть.\n\nСначала задам 4 коротких вопроса.\n\nЭто займет около 2 минут."
+      "Здравствуйте.\n\nЯ помогу понять, подходит ли вам обучение по строительной экспертизе и какой вариант стоит рассмотреть.\n\nСначала задам 4 коротких вопроса.\n\nЭто займёт около 2 минут."
     );
   };
 
+  // ─── Step 1 → Step 2: "Начать" button ────────────────────────────────────
+
   const handleBeginQuestions = () => {
     if (!sessionId) return;
-    
     setIsTyping(true);
-    createConversation.mutate({ data: { sessionId } }, {
-      onSuccess: (data) => {
-        setConversationId(data.conversationId);
-        setIsTyping(false);
-        setStep(2);
-        
-        const userMsg = "Начать";
-        setMessages((prev) => [...prev, { id: Date.now().toString(), role: "user", content: userMsg }]);
-        saveMessage.mutate({ data: { conversationId: data.conversationId, role: "user", content: userMsg } });
-        
-        addBotMessage(QUESTIONS[0].botMessage);
+
+    createConversation.mutate(
+      { data: { sessionId } },
+      {
+        onSuccess: async (data) => {
+          const convId = data.conversationId;
+          setConversationId(convId);
+          setStep(2);
+
+          const userMsg = "Начать";
+          setMessages((prev) => [
+            ...prev,
+            { id: Date.now().toString(), role: "user", content: userMsg },
+          ]);
+
+          try {
+            await sendToAI(convId, userMsg);
+          } catch {
+            // error already shown by sendToAI
+          }
+        },
+        onError: () => {
+          setIsTyping(false);
+          addBotMessage("Не удалось начать диалог. Обновите страницу.");
+        },
       }
-    });
+    );
   };
+
+  // ─── Handle chip / answer selection ──────────────────────────────────────
 
   const handleOptionSelect = (qIndex: number, dictItem: any, isCustom: boolean) => {
     if (isCustom) {
@@ -143,7 +186,6 @@ export function ChatWidget() {
       setCustomInput("");
       return;
     }
-
     submitAnswer(qIndex, dictItem.label, dictItem.id, false);
   };
 
@@ -153,66 +195,111 @@ export function ChatWidget() {
     setActiveCustomQ(null);
   };
 
-  const submitAnswer = (qIndex: number, answerText: string, dictId: number | null, isCustom: boolean) => {
+  const submitAnswer = (
+    qIndex: number,
+    answerText: string,
+    dictId: number | null,
+    isCustom: boolean
+  ) => {
     const q = QUESTIONS[qIndex];
     const newAnswer: DiagnosticAnswer = {
       questionNumber: qIndex + 1,
       questionKey: q.key,
       answerText,
       dictId,
-      isCustom
+      isCustom,
     };
-    
-    setAnswers((prev) => [...prev, newAnswer]);
-    setMessages((prev) => [...prev, { id: Date.now().toString(), role: "user", content: answerText }]);
-    recordMessage("user", answerText);
-    
+
+    const allAnswers = [...answers, newAnswer];
+    setAnswers(allAnswers);
+
+    setMessages((prev) => [
+      ...prev,
+      { id: Date.now().toString(), role: "user", content: answerText },
+    ]);
+
     const nextStep = step + 1;
     setStep(nextStep);
 
+    if (!conversationId || !sessionId) return;
+    const convId = conversationId;
+    const sessId = sessionId;
+
     if (qIndex < QUESTIONS.length - 1) {
-      addBotMessage(QUESTIONS[qIndex + 1].botMessage);
+      // More questions — send to AI, it will ask next question
+      sendToAI(convId, answerText).catch(() => {});
     } else {
+      // Last answer — save diagnostic answers, then qualify
       setIsTyping(true);
-      const allAnswers = [...answers, newAnswer];
-      if (conversationId) {
-        saveDiagnosticAnswers.mutate(
-          {
-            data: {
-              conversationId,
-              answers: allAnswers
+      saveDiagnosticAnswers.mutate(
+        { data: { conversationId: convId, answers: allAnswers } },
+        {
+          onSuccess: async () => {
+            try {
+              await sendToAI(convId, answerText);
+            } catch {
+              // non-fatal — proceed to qualify
+            }
+
+            // Qualify the lead
+            try {
+              const result = await apiQualify(convId, sessId);
+              setLeadId(result.leadId);
+
+              const tempLabel: Record<string, string> = {
+                hot: "🔥 Горячий",
+                warm: "🌤 Тёплый",
+                cold: "🧊 Холодный",
+                info: "ℹ️ Информационный",
+              };
+
+              setIsTyping(false);
+              addBotMessage(
+                <div className="flex flex-col gap-3">
+                  <p>Диагностика завершена. Спасибо за ваши ответы.</p>
+                  <p>
+                    Предварительная оценка:{" "}
+                    <span className="font-semibold">
+                      {tempLabel[result.leadTemperature] ?? result.leadTemperature}
+                    </span>
+                  </p>
+                  <p>Менеджер свяжется с вами для подробной консультации.</p>
+                  <div
+                    className="mt-2 flex items-center gap-2 text-primary"
+                    data-testid="status-completion"
+                  >
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span className="text-sm font-medium">Ваши данные сохранены</span>
+                  </div>
+                </div>
+              );
+            } catch {
+              setIsTyping(false);
+              addBotMessage(
+                <div className="flex flex-col gap-3">
+                  <p>Диагностика завершена. Спасибо за ваши ответы.</p>
+                  <p>Ваши данные сохранены. Менеджер свяжется с вами.</p>
+                  <div
+                    className="mt-2 flex items-center gap-2 text-primary"
+                    data-testid="status-completion"
+                  >
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span className="text-sm font-medium">Сохранено</span>
+                  </div>
+                </div>
+              );
             }
           },
-          {
-            onSettled: () => {
-              setIsTyping(false);
-              const content = "Спасибо.\n\nДиагностика завершена.\n\nВаши ответы сохранены.\n\nНа следующем этапе здесь появится персональная рекомендация.";
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: "completion",
-                  role: "bot",
-                  content: (
-                    <div className="flex flex-col gap-3">
-                      <p>Спасибо.</p>
-                      <p>Диагностика завершена.</p>
-                      <p>Ваши ответы сохранены.</p>
-                      <p>На следующем этапе здесь появится персональная рекомендация.</p>
-                      <div className="mt-2 flex items-center gap-2 text-primary" data-testid="status-completion">
-                        <CheckCircle2 className="w-5 h-5" />
-                        <span className="text-sm font-medium">Сохранено</span>
-                      </div>
-                    </div>
-                  ),
-                },
-              ]);
-              recordMessage("bot", content);
-            }
-          }
-        );
-      }
+          onError: () => {
+            setIsTyping(false);
+            addBotMessage("Данные сохранены. Менеджер свяжется с вами.");
+          },
+        }
+      );
     }
   };
+
+  // ─── Render chips ─────────────────────────────────────────────────────────
 
   const renderChips = (qIndex: number) => {
     const q = QUESTIONS[qIndex];
@@ -221,7 +308,11 @@ export function ChatWidget() {
 
     if (isDictLoading) {
       return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 text-muted-foreground px-4 mt-2">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center gap-2 text-muted-foreground px-4 mt-2"
+        >
           <Loader2 className="w-4 h-4 animate-spin" />
           <span className="text-sm">Загрузка...</span>
         </motion.div>
@@ -247,7 +338,7 @@ export function ChatWidget() {
             {opt.label}
           </button>
         ))}
-        
+
         <button
           key={customId}
           data-testid={`chip-${q.id}-5`}
@@ -291,6 +382,8 @@ export function ChatWidget() {
       </motion.div>
     );
   };
+
+  // ─── Render ───────────────────────────────────────────────────────────────
 
   if (step === 0) {
     return (
@@ -356,7 +449,6 @@ export function ChatWidget() {
                     <Building2 className="w-4 h-4 text-primary" />
                   </div>
                 )}
-                
                 <div
                   className={`px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap border ${
                     msg.role === "user"
@@ -368,7 +460,7 @@ export function ChatWidget() {
                 </div>
               </motion.div>
             ))}
-            
+
             {isTyping && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -387,7 +479,7 @@ export function ChatWidget() {
               </motion.div>
             )}
           </AnimatePresence>
-          
+
           {step === 1 && !isTyping && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}

@@ -6,6 +6,9 @@ import conversationsRouter from "./conversations";
 import messagesRouter from "./messages";
 import diagnosticAnswersRouter from "./diagnostic-answers";
 import knowledgeBaseRouter from "./knowledge-base";
+import chatRouter from "./chat";
+import qualifyRouter from "./qualify";
+import contactsRouter from "./contacts";
 
 const router: IRouter = Router();
 
@@ -16,5 +19,8 @@ router.use(conversationsRouter);
 router.use(messagesRouter);
 router.use(diagnosticAnswersRouter);
 router.use(knowledgeBaseRouter);
+router.use(chatRouter);
+router.use(qualifyRouter);
+router.use(contactsRouter);
 
 export default router;

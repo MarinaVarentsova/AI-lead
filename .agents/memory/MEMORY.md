@@ -1,0 +1,4 @@
+- [OpenAI via native fetch](openai-native-fetch.md) — openai npm package fails to install in this environment; use Node 24 built-in fetch to call the Chat Completions API directly.
+- [Zod in api-server routes](zod-api-server.md) — zod is NOT a direct dependency of @workspace/api-server; existing routes import schemas from @workspace/api-zod. New routes must use manual validation or add zod explicitly.
+- [DB schema push](db-schema-push.md) — drizzle-kit push times out in this environment; use psql with ALTER TABLE ... ADD COLUMN IF NOT EXISTS instead.
+- [pnpm install timeouts](pnpm-install-timeouts.md) — pnpm install and pnpm add both time out or fail silently in this environment for large packages. Add to package.json manually then run pnpm install at root, or use psql/native approaches to avoid large dependencies.

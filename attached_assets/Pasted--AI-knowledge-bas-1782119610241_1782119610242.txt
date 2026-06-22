@@ -1,0 +1,346 @@
+Продолжаем проект AI-консультанта ИНОБР.
+
+Файл базы знаний уже загружен в проект:
+
+knowledge_base_inobr_ai_consultant_v2.md
+
+В Secrets проекта уже есть:
+
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+SESSION_SECRET
+OPENAI_API_KEY
+
+Задача: подключить OpenAI, обработку базы знаний, квалификацию лида и запись результата в Supabase.
+
+ВАЖНО:
+AI не должен использовать интернет.
+AI должен отвечать только на основании файла knowledge_base_inobr_ai_consultant_v2.md и истории текущего диалога.
+Если ответа нет в базе знаний, AI должен отвечать:
+"В моей базе нет точной информации по этому вопросу. Я передам его менеджеру, чтобы он ответил корректно."
+
+НЕ менять структуру существующей БД.
+НЕ создавать новые таблицы.
+НЕ хардкодить справочники.
+SUPABASE_SERVICE_ROLE_KEY использовать только на backend.
+OPENAI_API_KEY использовать только на backend.
+
+--------------------------------------------------
+1. KnowledgeBaseService
+--------------------------------------------------
+
+Создать сервис KnowledgeBaseService.
+
+Он должен:
+- читать файл knowledge_base_inobr_ai_consultant_v2.md;
+- кэшировать его в памяти;
+- отдавать текст базы знаний для OpenAI;
+- не обращаться в интернет.
+
+Файл должен использоваться как единственный источник знаний AI.
+
+--------------------------------------------------
+2. OpenAIService
+--------------------------------------------------
+
+Создать сервис OpenAIService.
+
+Он должен:
+- брать OPENAI_API_KEY из env;
+- не логировать ключ;
+- отправлять в OpenAI:
+  1) system prompt;
+  2) текст базы знаний;
+  3) историю текущего диалога;
+  4) текущее сообщение пользователя.
+
+System prompt должен содержать правила:
+
+- Ты AI-консультант ИНОБР.
+- Отвечай только по базе знаний.
+- Не используй внешние знания.
+- Не придумывай тарифы, документы, сроки, гарантии, скидки.
+- Не обещай заработок, трудоустройство, судебный результат.
+- Если ответа нет в базе знаний, используй фразу:
+  "В моей базе нет точной информации по этому вопросу. Я передам его менеджеру, чтобы он ответил корректно."
+
+Ответ OpenAI должен возвращаться пользователю в чат.
+
+--------------------------------------------------
+3. Сохранение сообщений
+--------------------------------------------------
+
+После каждого сообщения пользователя и ответа AI сохранять данные в ai_messages.
+
+Использовать существующий conversation_id.
+
+role:
+- user
+- assistant
+
+message:
+текст сообщения.
+
+--------------------------------------------------
+4. Структурированная квалификация лида
+--------------------------------------------------
+
+После завершения мини-диагностики и консультации AI должен вернуть структурированный JSON квалификации.
+
+Формат JSON:
+
+{
+  "education_type": "",
+  "experience_area": "",
+  "experience_years": "",
+  "goal": "",
+  "recommended_track": "",
+  "recommended_tariff": "",
+  "main_question": "",
+  "main_objection": "",
+  "installment_interest": false,
+  "start_readiness": "",
+  "contact_channel": "",
+  "manager_note": ""
+}
+
+Разрешенные значения брать из базы знаний и справочников Supabase.
+
+Основные значения:
+
+education_type:
+higher_technical
+secondary_technical
+non_profile
+school_only
+diploma_not_available
+need_clarification
+
+experience_area:
+construction
+design
+supervision
+legal_expertise
+no_experience
+other
+
+experience_years:
+none
+up_to_3
+from_3_to_10
+more_than_10
+related_experience
+need_clarification
+
+goal:
+extra_income
+new_profession
+expand_services
+apartment_acceptance
+construction_expertise
+research_only
+
+recommended_track:
+sste
+apartment_acceptance
+sste_plus_acceptance
+ijs
+need_manager_review
+
+recommended_tariff:
+basic
+standard
+premium
+premium_ijs
+not_defined
+
+main_objection:
+expensive
+no_orders
+no_time
+education_doubt
+compare_competitors
+other
+none
+
+start_readiness:
+now
+this_month
+later
+just_researching
+unknown
+
+contact_channel:
+phone
+whatsapp
+telegram
+max
+email
+unknown
+
+--------------------------------------------------
+5. LeadQualificationService
+--------------------------------------------------
+
+Создать LeadQualificationService.
+
+Он должен:
+1. Получить JSON от AI.
+2. Проверить значения по справочникам Supabase.
+3. Если значение не найдено в справочнике:
+   - заменить на need_manager_review / other / unknown / not_defined;
+   - не ломать сценарий.
+4. Рассчитать lead_score на backend.
+5. Определить lead_temperature.
+6. Сформировать ai_brief.
+7. Записать результат в ai_leads.
+
+--------------------------------------------------
+6. Расчет lead_score на backend
+--------------------------------------------------
+
+OpenAI НЕ считает итоговый lead_score.
+
+Backend считает lead_score так:
+
++20 если education_type = higher_technical, secondary_technical, non_profile
+
++20 если education_type = higher_technical или secondary_technical
+
++20 если experience_years = from_3_to_10 или more_than_10
+
++20 если goal = extra_income, new_profession, expand_services, construction_expertise
+
++20 если installment_interest = true
+или main_question связан со стоимостью / рассрочкой / договором / документами
+
++20 если start_readiness = now или this_month
+
++10 если contact_channel = phone, whatsapp, telegram, max
+
+Ограничение:
+если education_type = school_only:
+- recommended_track = apartment_acceptance
+- recommended_tariff = not_defined
+- lead_score не выше 30
+- manager_note обязательно содержит пометку:
+  "У клиента только аттестат. ССТЭ / ДПО не предлагать как основной вариант."
+
+lead_temperature:
+
+90+ = hot
+60–89 = warm
+30–59 = cold
+0–29 = info
+
+--------------------------------------------------
+7. Запись в ai_leads
+--------------------------------------------------
+
+В таблицу ai_leads записать:
+
+conversation_id
+lead_score
+lead_temperature
+recommended_track
+recommended_tariff
+main_question
+main_objection
+ai_brief
+
+Если contact_id уже есть — привязать contact_id.
+
+Если контакта еще нет — создать лид после сбора контакта.
+
+--------------------------------------------------
+8. AI-бриф
+--------------------------------------------------
+
+Сформировать ai_brief по шаблону из базы знаний.
+
+В брифе обязательно должны быть:
+
+- профиль / опыт
+- образование
+- ограничение по образованию
+- цель
+- интерес
+- предварительно подходящий тариф
+- рекомендуемая траектория
+- главный вопрос
+- главное возражение
+- предпочтительный канал связи
+- готовность / температура лида
+- рекомендация менеджеру
+
+--------------------------------------------------
+9. Контакт
+--------------------------------------------------
+
+После того как пользователь выбрал канал связи и оставил данные:
+
+создать запись в ai_contacts.
+
+Поля брать из существующей структуры:
+
+name
+phone
+email
+telegram
+contact_channel
+preferred_time
+comment
+conversation_id
+
+После создания контакта:
+- обновить / создать ai_leads;
+- привязать contact_id к ai_leads.
+
+--------------------------------------------------
+10. Bitrix24 пока не подключать
+--------------------------------------------------
+
+На этом этапе Bitrix24 НЕ подключать.
+
+Но подготовить функцию-заглушку:
+
+prepareBitrixPayload(lead_id)
+
+Она должна собрать объект, который потом отправим в Bitrix:
+
+- имя
+- телефон
+- email
+- источник: AI-квалификатор на сайте
+- страница входа
+- UTM-метки
+- полный текст диалога
+- краткий AI-бриф
+- главный вопрос
+- главное возражение
+- lead_score
+- recommended_track
+
+Ничего в Bitrix пока не отправлять.
+
+--------------------------------------------------
+11. Что показать после выполнения
+--------------------------------------------------
+
+После завершения покажи:
+
+1. Какие файлы созданы / изменены.
+2. Где читается knowledge_base_inobr_ai_consultant_v2.md.
+3. Где вызывается OpenAI.
+4. Где сохраняются ai_messages.
+5. Где считается lead_score.
+6. Где создается ai_leads.
+7. Пример JSON квалификации.
+8. Пример ai_brief.
+9. Как протестировать сценарий:
+   - профильный специалист;
+   - пользователь с аттестатом;
+   - пользователь спрашивает скидку;
+   - пользователь спрашивает про суд;
+   - пользователь спрашивает про доход.
