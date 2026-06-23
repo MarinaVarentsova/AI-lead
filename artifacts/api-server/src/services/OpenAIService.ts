@@ -28,6 +28,20 @@ export interface QualifyOptions {
   history: ChatMessage[];
 }
 
+export interface DiagnoseOptions {
+  knowledgeBase: string;
+  answers: {
+    experienceArea: string | null;
+    experienceAreaRaw: string | null;
+    experienceYears: string | null;
+    experienceYearsRaw: string | null;
+    educationType: string | null;
+    educationTypeRaw: string | null;
+    goal: string | null;
+    goalRaw: string | null;
+  };
+}
+
 interface OpenAIMessage {
   role: "system" | "user" | "assistant";
   content: string;
@@ -79,6 +93,42 @@ const BASE_SYSTEM_PROMPT = `Ты AI-консультант ИНОБР — инс
 
 Диагностика: строго 4 вопроса (опыт → стаж → образование → цель).
 Отвечай на русском языке.`;
+
+const DIAGNOSIS_SYSTEM_PROMPT = `Ты консультант ИНОБР — института дополнительного профессионального образования по строительной экспертизе.
+
+Твоя задача: на основе 4 ответов пользователя сформировать краткий структурированный предварительный результат диагностики.
+
+ЗАПРЕЩЕНО:
+- обещать заработок, трудоустройство, конкретный судебный результат;
+- обещать скидки, акции, гарантии трудоустройства;
+- использовать агрессивный продажный тон;
+- предлагать ССТЭ или ДПО, если education_type = school_only.
+
+ПРАВИЛО ДЛЯ school_only:
+Если у пользователя education_type = school_only, в пункте "2. Образование" обязательно напиши:
+"Для программы ДПО потребуется высшее или среднее профессиональное образование. Если у вас пока только аттестат, можно рассмотреть прикладной курс по приёмке квартир."
+В пункте "4. Рекомендация" предлагай только прикладной курс по приёмке квартир — не ССТЭ, не ДПО.
+
+ФОРМАТ ОТВЕТА — строго следовать структуре:
+Ваш предварительный результат:
+
+1. Опыт
+[1–2 предложения об опыте пользователя и его связи с профессией строительного эксперта]
+
+2. Образование
+[1–2 предложения. Если school_only — обязательно добавить ограничение ДПО]
+
+3. Цель
+[1 предложение о значении выбранной цели в контексте обучения]
+
+4. Рекомендация
+[Одно конкретное направление. Не перечислять несколько вариантов]
+
+5. Следующий шаг
+[Мягкое предложение: специалист ИНОБР может уточнить детали, условия и документы]
+
+Пиши кратко — 2–3 предложения на пункт максимум. Профессионально, без лишних вводных фраз.
+Ответ строго на русском языке.`;
 
 const QUALIFICATION_SYSTEM_PROMPT = `Ты AI-квалификатор лида для ИНОБР.
 
@@ -203,6 +253,44 @@ class OpenAIService {
 
     logger.debug({ rawLen: raw.length }, "OpenAI qualify response received");
     return raw;
+  }
+
+  /**
+   * Generate a structured plain-text diagnostic result from the user's 4 answers.
+   * Uses DIAGNOSIS_SYSTEM_PROMPT with school_only safeguard.
+   * Returns plain text in the numbered format — caller handles fallback on throw.
+   */
+  async diagnose(options: DiagnoseOptions): Promise<string> {
+    const { knowledgeBase, answers } = options;
+
+    const systemContent = `${DIAGNOSIS_SYSTEM_PROMPT}\n\n---\nБАЗА ЗНАНИЙ:\n${knowledgeBase}`;
+
+    const answersText = [
+      `- Сфера опыта: ${answers.experienceAreaRaw ?? "не указано"} (код: ${answers.experienceArea ?? "—"})`,
+      `- Стаж: ${answers.experienceYearsRaw ?? "не указано"} (код: ${answers.experienceYears ?? "—"})`,
+      `- Образование: ${answers.educationTypeRaw ?? "не указано"} (код: ${answers.educationType ?? "—"})`,
+      `- Цель: ${answers.goalRaw ?? "не указано"} (код: ${answers.goal ?? "—"})`,
+    ].join("\n");
+
+    const messages: OpenAIMessage[] = [
+      { role: "system", content: systemContent },
+      {
+        role: "user",
+        content: `Ответы пользователя:\n${answersText}\n\nСформируй предварительный результат диагностики.`,
+      },
+    ];
+
+    logger.debug({ educationType: answers.educationType }, "OpenAI diagnose request");
+
+    const result = await callOpenAI({
+      model: "gpt-4o-mini",
+      messages,
+      max_tokens: 700,
+      temperature: 0.3,
+    });
+
+    logger.debug({ resultLen: result.length }, "OpenAI diagnose response received");
+    return result;
   }
 }
 

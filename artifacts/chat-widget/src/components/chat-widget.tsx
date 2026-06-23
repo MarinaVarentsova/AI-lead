@@ -30,22 +30,10 @@ type DiagnosticAnswer = {
   raw: string;
 };
 
-type QualifyResult = {
-  leadId: string;
-  leadScore: number;
-  leadTemperature: string;
-  qualification: {
-    education_type: string;
-    recommended_track: string;
-    recommended_tariff: string;
-    main_question: string;
-    main_objection: string;
-    installment_interest: boolean;
-    start_readiness: string;
-    contact_channel: string;
-    manager_note: string;
-  };
-  aiBrief: string;
+type DiagnoseResult = {
+  result: string;
+  isAI: boolean;
+  educationType: string | null;
 };
 
 type ContactPhase = "channel" | "details" | "submitted";
@@ -98,15 +86,6 @@ const QUESTION_TEXTS = [
   "Какая цель вам ближе?",
 ];
 
-// Рекомендуемые направления по коду трека
-const TRACK_NAMES: Record<string, string> = {
-  sste: "Судебная строительно-техническая экспертиза",
-  apartment_acceptance: "Приемка квартир",
-  sste_plus_acceptance: "ССТЭ + Приемка квартир",
-  ijs: "ИЖС (Индивидуальное жилищное строительство)",
-  need_manager_review: "Индивидуальный подбор программы",
-};
-
 const CONTACT_CHANNELS = [
   { code: "call", label: "Звонок", placeholder: "Ваш номер телефона", type: "tel" },
   { code: "whatsapp", label: "WhatsApp", placeholder: "Номер WhatsApp", type: "tel" },
@@ -118,14 +97,23 @@ const CONTACT_CHANNELS = [
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
 
-async function apiQualify(conversationId: string) {
-  const res = await fetch("/api/qualify", {
+async function apiDiagnose(conversationId: string) {
+  const res = await fetch("/api/diagnose", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ conversationId }),
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json() as Promise<QualifyResult>;
+  return res.json() as Promise<DiagnoseResult>;
+}
+
+// fire-and-forget CRM qualification (result not shown to user)
+function fireQualify(conversationId: string) {
+  fetch("/api/qualify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ conversationId }),
+  }).catch(() => {});
 }
 
 async function apiContact(payload: {
@@ -169,40 +157,22 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
 }
 
 function ResultCard({
-  result,
+  resultText,
   onGetConsultation,
 }: {
-  result: QualifyResult;
+  resultText: string;
   onGetConsultation: () => void;
 }) {
-  const { recommended_track, education_type } = result.qualification;
-  const isSchoolOnly = education_type === "school_only";
-  const trackName = TRACK_NAMES[recommended_track] ?? "Индивидуальный подбор программы";
-
   return (
     <div className="rounded-xl border border-border bg-white shadow-sm p-4 space-y-3">
       <div className="flex items-center gap-2">
         <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
-        <span className="font-semibold text-[15px] text-foreground">Предварительный результат</span>
+        <span className="font-semibold text-[15px] text-foreground">Диагностика завершена</span>
       </div>
 
-      <p className="text-sm text-muted-foreground leading-relaxed">
-        На основе ваших ответов сформирована предварительная рекомендация по обучению.
-      </p>
-
-      <div className="rounded-lg bg-secondary/60 px-3 py-2.5">
-        <p className="text-xs text-muted-foreground mb-0.5 font-medium uppercase tracking-wide">
-          Рекомендуемое направление
-        </p>
-        <p className="text-sm font-semibold text-foreground">{trackName}</p>
+      <div className="text-sm text-foreground leading-[1.6] whitespace-pre-wrap">
+        {resultText}
       </div>
-
-      {isSchoolOnly && (
-        <p className="text-xs text-muted-foreground leading-relaxed border-l-2 border-border pl-3">
-          Для программы ДПО необходим диплом о высшем или среднем профессиональном образовании.
-          Если у вас пока только аттестат — можно рассмотреть прикладной курс по приемке квартир.
-        </p>
-      )}
 
       <Button
         data-testid="button-get-consultation"
@@ -210,28 +180,6 @@ function ResultCard({
         className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium"
       >
         Получить консультацию
-        <ChevronRight className="w-4 h-4 ml-1" />
-      </Button>
-    </div>
-  );
-}
-
-function SimpleResultCard({ onGetConsultation }: { onGetConsultation: () => void }) {
-  return (
-    <div className="rounded-xl border border-border bg-white shadow-sm p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
-        <span className="font-semibold text-[15px] text-foreground">Диагностика завершена</span>
-      </div>
-      <p className="text-sm text-muted-foreground leading-relaxed">
-        Ваши ответы сохранены. Специалист ИНОБР подберёт подходящую программу и свяжется с вами.
-      </p>
-      <Button
-        data-testid="button-get-consultation"
-        onClick={onGetConsultation}
-        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium"
-      >
-        Оставить контакт
         <ChevronRight className="w-4 h-4 ml-1" />
       </Button>
     </div>
@@ -247,9 +195,6 @@ export function ChatWidget() {
   const [answers, setAnswers] = useState<DiagnosticAnswer[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [qualifyResult, setQualifyResult] = useState<QualifyResult | null>(null);
-  const [qualifyFailed, setQualifyFailed] = useState(false);
-
   const [customInput, setCustomInput] = useState("");
   const [activeCustomQ, setActiveCustomQ] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState(false);
@@ -293,7 +238,7 @@ export function ChatWidget() {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }
-  }, [messages, isTyping, currentDictionary, activeCustomQ, qualifyResult, qualifyFailed, contactPhase]);
+  }, [messages, isTyping, currentDictionary, activeCustomQ, contactPhase]);
 
   const uid = () => Date.now().toString() + Math.random().toString(36).slice(2);
 
@@ -392,26 +337,38 @@ export function ChatWidget() {
         { data: diagnosticData },
         {
           onSuccess: async () => {
+            // fire-and-forget CRM qualification in background
+            fireQualify(convId);
             try {
-              const result = await apiQualify(convId);
+              const diagnose = await apiDiagnose(convId);
               setIsTyping(false);
-              setQualifyResult(result);
               addBotMessage(
-                <ResultCard result={result} onGetConsultation={() => setContactPhase("channel")} />
+                <ResultCard
+                  resultText={diagnose.result}
+                  onGetConsultation={() => setContactPhase("channel")}
+                />
               );
             } catch {
               setIsTyping(false);
-              setQualifyFailed(true);
               addBotMessage(
-                <SimpleResultCard onGetConsultation={() => setContactPhase("channel")} />
+                <ResultCard
+                  resultText={
+                    "Спасибо за ответы. На основании диагностики специалист ИНОБР сможет подобрать подходящее направление обучения. Чтобы получить персональную консультацию, оставьте удобный способ связи."
+                  }
+                  onGetConsultation={() => setContactPhase("channel")}
+                />
               );
             }
           },
           onError: () => {
             setIsTyping(false);
-            setQualifyFailed(true);
             addBotMessage(
-              <SimpleResultCard onGetConsultation={() => setContactPhase("channel")} />
+              <ResultCard
+                resultText={
+                  "Спасибо за ответы. На основании диагностики специалист ИНОБР сможет подобрать подходящее направление обучения. Чтобы получить персональную консультацию, оставьте удобный способ связи."
+                }
+                onGetConsultation={() => setContactPhase("channel")}
+              />
             );
           },
         }

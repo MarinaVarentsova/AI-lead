@@ -8,6 +8,7 @@ import diagnosticAnswersRouter from "./diagnostic-answers";
 import knowledgeBaseRouter from "./knowledge-base";
 import chatRouter from "./chat";
 import qualifyRouter from "./qualify";
+import diagnoseRouter from "./diagnose";
 import contactsRouter from "./contacts";
 
 const router: IRouter = Router();
@@ -21,6 +22,7 @@ router.use(diagnosticAnswersRouter);
 router.use(knowledgeBaseRouter);
 router.use(chatRouter);
 router.use(qualifyRouter);
+router.use(diagnoseRouter);
 router.use(contactsRouter);
 
 export default router;
