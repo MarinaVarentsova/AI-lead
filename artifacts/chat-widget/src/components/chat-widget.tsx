@@ -90,8 +90,8 @@ const DISPLAY_LABELS: Record<string, string> = {
   research_only: "Пока изучаю",
 };
 
-// Резервные тексты вопросов (если AI не ответил)
-const FALLBACK_QUESTIONS = [
+// Фиксированные тексты вопросов диагностики (только вопрос, без вариантов)
+const QUESTION_TEXTS = [
   "С какой сферой связан ваш опыт?",
   "Какой у вас стаж?",
   "Какое у вас образование?",
@@ -117,18 +117,6 @@ const CONTACT_CHANNELS = [
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
-async function apiChat(conversationId: string, message: string) {
-  const res = await fetch("/api/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ conversationId, message }),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
-  }
-  return res.json() as Promise<{ reply: string; messageId: string }>;
-}
 
 async function apiQualify(conversationId: string) {
   const res = await fetch("/api/qualify", {
@@ -313,24 +301,12 @@ export function ChatWidget() {
     setMessages((prev) => [...prev, { id: uid(), role: "bot", content }]);
   };
 
-  const sendToAI = async (convId: string, userText: string, fallback?: string): Promise<void> => {
-    setIsTyping(true);
-    try {
-      const { reply } = await apiChat(convId, userText);
-      setIsTyping(false);
-      addBotMessage(reply);
-    } catch {
-      setIsTyping(false);
-      if (fallback) addBotMessage(fallback);
-    }
-  };
-
   // ─── Launch screen → Welcome ────────────────────────────────────────────────
 
   const handleStart = () => {
     setStep(1);
     addBotMessage(
-      "Здравствуйте.\n\nПомогу подобрать подходящее направление обучения.\n\nДиагностика состоит из 4 вопросов и занимает около 2 минут."
+      "Здравствуйте.\n\nЯ помогу понять, подходит ли вам обучение по строительной экспертизе и какой вариант стоит рассмотреть.\n\nСначала задам 4 коротких вопроса.\n\nЭто займет около 2 минут."
     );
   };
 
@@ -343,15 +319,17 @@ export function ChatWidget() {
     createConversation.mutate(
       { data: { sessionId } },
       {
-        onSuccess: async (data) => {
+        onSuccess: (data) => {
           const convId = data.conversationId;
           setConversationId(convId);
-          setStep(2);
           setMessages((prev) => [
             ...prev,
             { id: uid(), role: "user", content: "Начать" },
           ]);
-          await sendToAI(convId, "Начать", FALLBACK_QUESTIONS[0]);
+          setIsTyping(false);
+          // Показываем Q1 напрямую — без вызова OpenAI
+          addBotMessage(QUESTION_TEXTS[0]);
+          setStep(2);
         },
         onError: () => {
           setIsTyping(false);
@@ -392,7 +370,8 @@ export function ChatWidget() {
     const convId = conversationId;
 
     if (qIndex < QUESTIONS.length - 1) {
-      sendToAI(convId, raw, FALLBACK_QUESTIONS[qIndex + 1]).catch(() => {});
+      // Показываем следующий вопрос напрямую — без вызова OpenAI
+      addBotMessage(QUESTION_TEXTS[qIndex + 1]);
     } else {
       // 4th answer — save and qualify
       setIsTyping(true);
