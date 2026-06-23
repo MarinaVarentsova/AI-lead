@@ -1,14 +1,5 @@
 /**
  * POST /api/diagnose
- *
- * Generates a structured AI diagnostic result after the user completes 4 questions.
- * 1. Reads saved answers from ai_diagnostic_answers.
- * 2. Loads the knowledge base.
- * 3. Calls OpenAI to produce a plain-text structured result.
- * 4. Saves the result to ai_messages (role: assistant, step: diagnostic_result).
- * 5. Returns { result, isAI, educationType } to the client.
- *
- * Fallback: if OpenAI is unavailable, returns a safe generic message.
  */
 import { Router, type IRouter } from "express";
 import { db, aiDiagnosticAnswers, aiMessages, aiConversations } from "@workspace/db";
@@ -22,6 +13,24 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const FALLBACK_RESULT =
   "Спасибо за ответы. На основании диагностики специалист ИНОБР сможет подобрать подходящее направление обучения. Чтобы получить персональную консультацию, оставьте удобный способ связи.";
+
+export type DiagnoseDebugInfo = {
+  step: string;
+  answersFound: boolean;
+  knowledgeBaseFound: boolean;
+  knowledgeBaseLength: number;
+  knowledgeBaseChunks: number;
+  promptLengthApprox: number;
+  apiKeyPresent: boolean;
+  openAICalled: boolean;
+  openAIResponseLength: number;
+  openAIPreview: string;
+  fallbackUsed: boolean;
+  fallbackReason: string | null;
+  savedToDb: boolean;
+  messageId: string | null;
+  error: string | null;
+};
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function diagLog(line: string, data?: Record<string, any>) {
@@ -43,25 +52,41 @@ router.post("/diagnose", async (req, res): Promise<void> => {
     return;
   }
 
+  const debug: DiagnoseDebugInfo = {
+    step: "start",
+    answersFound: false,
+    knowledgeBaseFound: false,
+    knowledgeBaseLength: 0,
+    knowledgeBaseChunks: 0,
+    promptLengthApprox: 0,
+    apiKeyPresent: false,
+    openAICalled: false,
+    openAIResponseLength: 0,
+    openAIPreview: "",
+    fallbackUsed: false,
+    fallbackReason: null,
+    savedToDb: false,
+    messageId: null,
+    error: null,
+  };
+
   diagLog("====================");
   diagLog("DIAGNOSTIC RESULT START");
   diagLog("====================");
 
-  // Look up sessionId for the log
   let sessionId = "unknown";
   try {
     const [conv] = await db
       .select({ sessionId: aiConversations.sessionId })
       .from(aiConversations)
       .where(eq(aiConversations.id, conversationId));
-    if (conv) sessionId = conv.sessionId;
-  } catch {
-    // non-critical
-  }
+    if (conv) sessionId = conv.sessionId ?? "unknown";
+  } catch { /* non-critical */ }
 
   diagLog("", { conversationId, sessionId });
 
-  // ── 1. Load answers ─────────────────────────────────────────────────────────
+  // ── 1. Load answers ──────────────────────────────────────────────────────────
+  debug.step = "loading_answers";
   diagLog("1. Загрузка ответов");
 
   const [answers] = await db
@@ -75,10 +100,15 @@ router.post("/diagnose", async (req, res): Promise<void> => {
     diagLog("====================");
     diagLog("DIAGNOSTIC RESULT FINISH");
     diagLog("====================");
+
+    debug.answersFound = false;
+    debug.fallbackUsed = true;
+    debug.fallbackReason = "no_answers";
     res.status(404).json({ error: "Diagnostic answers not found for this conversation." });
     return;
   }
 
+  debug.answersFound = true;
   diagLog("ANSWERS LOADED: true");
   diagLog("", {
     experience_area: answers.experienceArea ?? "null",
@@ -88,31 +118,31 @@ router.post("/diagnose", async (req, res): Promise<void> => {
   });
 
   // ── 2. Load knowledge base ───────────────────────────────────────────────────
+  debug.step = "loading_knowledge_base";
   diagLog("2. Загрузка базы знаний");
   diagLog("KNOWLEDGE BASE LOAD START");
 
-  let kbEntries: Awaited<ReturnType<typeof knowledgeBaseService.loadAll>> = [];
   let knowledgeBase = "";
 
   try {
-    kbEntries = await knowledgeBaseService.loadAll();
+    const kbEntries = await knowledgeBaseService.loadAll();
     knowledgeBase = kbEntries.map((e) => e.content).join("\n\n---\n\n");
 
-    const kbFound = kbEntries.length > 0;
-    diagLog(`KNOWLEDGE BASE FOUND: ${kbFound}`);
+    debug.knowledgeBaseFound = kbEntries.length > 0;
+    debug.knowledgeBaseLength = knowledgeBase.length;
+    debug.knowledgeBaseChunks = kbEntries.length;
 
-    // Try to expose the file path if available
-    const anyEntry = kbEntries[0] as (typeof kbEntries[0] & { filePath?: string }) | undefined;
-    const kbPath = anyEntry?.filePath ?? "(path not exposed by service)";
-    diagLog("", {
-      "knowledge file path": kbPath,
-    });
-
+    diagLog(`KNOWLEDGE BASE FOUND: ${debug.knowledgeBaseFound}`);
     diagLog("", {
       "knowledge length": `${knowledgeBase.length} symbols`,
       "knowledge chunks": kbEntries.length,
     });
   } catch (err) {
+    debug.knowledgeBaseFound = false;
+    debug.fallbackUsed = true;
+    debug.fallbackReason = "knowledge_not_found";
+    debug.error = String(err);
+
     diagLog("KNOWLEDGE BASE FOUND: false");
     diagLog("", { error: String(err) });
     diagLog("FALLBACK USED", { reason: "knowledge_not_found" });
@@ -121,54 +151,51 @@ router.post("/diagnose", async (req, res): Promise<void> => {
     diagLog("DIAGNOSTIC RESULT FINISH");
     diagLog("====================");
 
-    res.status(200).json({ result: FALLBACK_RESULT, isAI: false, educationType: answers.educationType ?? null });
+    res.status(200).json({ result: FALLBACK_RESULT, isAI: false, educationType: answers.educationType ?? null, debug });
     return;
   }
 
   diagLog("KNOWLEDGE BASE LOAD END");
 
-  // ── 3. Build prompt (delegated to OpenAIService, log size here) ─────────────
+  // ── 3. Prompt size estimate ──────────────────────────────────────────────────
+  debug.step = "building_prompt";
   diagLog("3. Формирование промпта");
-  diagLog("PROMPT BUILD START");
-
-  // Approximate prompt length: system prompt + KB + answers message
   const answersText = [
     `- Сфера опыта: ${answers.experienceAreaRaw ?? "не указано"} (код: ${answers.experienceArea ?? "—"})`,
     `- Стаж: ${answers.experienceYearsRaw ?? "не указано"} (код: ${answers.experienceYears ?? "—"})`,
     `- Образование: ${answers.educationTypeRaw ?? "не указано"} (код: ${answers.educationType ?? "—"})`,
     `- Цель: ${answers.goalRaw ?? "не указано"} (код: ${answers.goal ?? "—"})`,
   ].join("\n");
-  const promptLength = knowledgeBase.length + answersText.length;
-
-  diagLog("", { "prompt length (approx)": `${promptLength} symbols` });
-  diagLog("PROMPT BUILD END");
+  debug.promptLengthApprox = knowledgeBase.length + answersText.length;
+  diagLog("", { "prompt length (approx)": `${debug.promptLengthApprox} symbols` });
 
   // ── 4. Call OpenAI ───────────────────────────────────────────────────────────
+  debug.step = "calling_openai";
+  debug.apiKeyPresent = Boolean(process.env.OPENAI_API_KEY);
   diagLog("4. Вызов OpenAI");
   diagLog("OPENAI CALL START");
-
-  const apiKeyPresent = Boolean(process.env.OPENAI_API_KEY);
-  diagLog("", {
-    model: "gpt-4o-mini",
-    "api key present": apiKeyPresent,
-  });
+  diagLog("", { model: "gpt-4o-mini", "api key present": debug.apiKeyPresent });
 
   let result = FALLBACK_RESULT;
   let isAI = false;
 
   try {
+    debug.openAICalled = true;
     result = await openAIService.diagnose({ knowledgeBase, answers });
 
     diagLog("OPENAI CALL END");
-
-    // ── 5. OpenAI response ───────────────────────────────────────────────────
     diagLog("5. Ответ OpenAI");
     diagLog("OPENAI RESPONSE RECEIVED");
     diagLog("", { "response length": `${result.length} symbols` });
     diagLog("response preview:");
     process.stdout.write(result.slice(0, 1000) + "\n");
 
+    debug.openAIResponseLength = result.length;
+    debug.openAIPreview = result.slice(0, 500);
+
     if (!result || result.trim().length === 0) {
+      debug.fallbackUsed = true;
+      debug.fallbackReason = "openai_empty_response";
       diagLog("FALLBACK USED", { reason: "openai_empty_response" });
       result = FALLBACK_RESULT;
     } else {
@@ -177,45 +204,42 @@ router.post("/diagnose", async (req, res): Promise<void> => {
     }
   } catch (err) {
     diagLog("OPENAI CALL END");
+    debug.fallbackUsed = true;
+    debug.fallbackReason = "openai_error";
+    debug.error = String(err);
     diagLog("FALLBACK USED", { reason: "openai_error", error: String(err) });
     req.log.warn({ err }, "OpenAI diagnose unavailable, using fallback");
   }
 
-  // ── 6. Save result ───────────────────────────────────────────────────────────
+  // ── 5. Save result ───────────────────────────────────────────────────────────
+  debug.step = "saving";
   diagLog("6. Сохранение результата");
   diagLog("SAVE DIAGNOSTIC RESULT START");
 
   try {
     const [saved] = await db
       .insert(aiMessages)
-      .values({
-        conversationId,
-        role: "assistant",
-        message: result,
-        step: "diagnostic_result",
-      })
+      .values({ conversationId, role: "assistant", message: result, step: "diagnostic_result" })
       .returning({ id: aiMessages.id });
 
-    diagLog("", {
-      "saved to ai_messages": true,
-      "message id": saved?.id ?? "unknown",
-    });
+    debug.savedToDb = true;
+    debug.messageId = saved?.id ?? null;
+    diagLog("", { "saved to ai_messages": true, "message id": saved?.id ?? "unknown" });
   } catch (err) {
+    debug.savedToDb = false;
+    debug.error = String(err);
     diagLog("", { "saved to ai_messages": false, error: String(err) });
     diagLog("FALLBACK USED", { reason: "save_error" });
     req.log.error({ err }, "Failed to save diagnostic result message");
   }
 
+  debug.step = "done";
   diagLog("SAVE DIAGNOSTIC RESULT END");
   diagLog("====================");
   diagLog("DIAGNOSTIC RESULT FINISH");
   diagLog("====================");
 
-  res.status(200).json({
-    result,
-    isAI,
-    educationType: answers.educationType ?? null,
-  });
+  res.status(200).json({ result, isAI, educationType: answers.educationType ?? null, debug });
 });
 
 export default router;

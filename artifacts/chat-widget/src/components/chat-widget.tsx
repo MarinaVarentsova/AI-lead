@@ -30,10 +30,29 @@ type DiagnosticAnswer = {
   raw: string;
 };
 
+type DiagnoseDebugInfo = {
+  step: string;
+  answersFound: boolean;
+  knowledgeBaseFound: boolean;
+  knowledgeBaseLength: number;
+  knowledgeBaseChunks: number;
+  promptLengthApprox: number;
+  apiKeyPresent: boolean;
+  openAICalled: boolean;
+  openAIResponseLength: number;
+  openAIPreview: string;
+  fallbackUsed: boolean;
+  fallbackReason: string | null;
+  savedToDb: boolean;
+  messageId: string | null;
+  error: string | null;
+};
+
 type DiagnoseResult = {
   result: string;
   isAI: boolean;
   educationType: string | null;
+  debug?: DiagnoseDebugInfo;
 };
 
 type ContactPhase = "channel" | "details" | "submitted";
@@ -156,11 +175,65 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
   );
 }
 
+function DebugRow({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
+  const color =
+    ok === true ? "text-green-700" : ok === false ? "text-red-600" : "text-gray-600";
+  return (
+    <div className="flex justify-between gap-2 text-[11px] font-mono py-0.5 border-b border-gray-100 last:border-0">
+      <span className="text-gray-400 shrink-0">{label}</span>
+      <span className={`${color} text-right break-all`}>{value}</span>
+    </div>
+  );
+}
+
+function DiagDebugPanel({ d }: { d: DiagnoseDebugInfo }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-lg border border-yellow-300 bg-yellow-50 text-xs overflow-hidden mt-1">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-3 py-2 text-yellow-800 font-semibold text-[11px] hover:bg-yellow-100"
+      >
+        <span>🛠 DEBUG — {d.fallbackUsed ? "⚠️ FALLBACK" : "✅ AI ответил"}</span>
+        <span>{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div className="px-3 pb-3 space-y-0.5">
+          <DebugRow label="answersFound" value={String(d.answersFound)} ok={d.answersFound} />
+          <DebugRow label="knowledgeBaseFound" value={String(d.knowledgeBaseFound)} ok={d.knowledgeBaseFound} />
+          <DebugRow label="kbLength" value={`${d.knowledgeBaseLength} chars / ${d.knowledgeBaseChunks} chunks`} />
+          <DebugRow label="promptLength (approx)" value={`${d.promptLengthApprox} chars`} />
+          <DebugRow label="apiKeyPresent" value={String(d.apiKeyPresent)} ok={d.apiKeyPresent} />
+          <DebugRow label="openAICalled" value={String(d.openAICalled)} ok={d.openAICalled} />
+          <DebugRow label="openAIResponseLength" value={`${d.openAIResponseLength} chars`} ok={d.openAIResponseLength > 0} />
+          <DebugRow label="fallbackUsed" value={String(d.fallbackUsed)} ok={!d.fallbackUsed} />
+          {d.fallbackReason && (
+            <DebugRow label="fallbackReason" value={d.fallbackReason} ok={false} />
+          )}
+          <DebugRow label="savedToDb" value={String(d.savedToDb)} ok={d.savedToDb} />
+          {d.messageId && <DebugRow label="messageId" value={d.messageId} />}
+          {d.error && <DebugRow label="error" value={d.error} ok={false} />}
+          {d.openAIPreview && (
+            <div className="mt-2">
+              <p className="text-[10px] text-gray-400 mb-1">OpenAI preview (500 chars):</p>
+              <pre className="text-[10px] text-gray-700 whitespace-pre-wrap break-all bg-white rounded p-2 border border-gray-200 max-h-40 overflow-y-auto">
+                {d.openAIPreview}
+              </pre>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ResultCard({
   resultText,
+  debug,
   onGetConsultation,
 }: {
   resultText: string;
+  debug?: DiagnoseDebugInfo;
   onGetConsultation: () => void;
 }) {
   return (
@@ -173,6 +246,8 @@ function ResultCard({
       <div className="text-sm text-foreground leading-[1.6] whitespace-pre-wrap">
         {resultText}
       </div>
+
+      {debug && <DiagDebugPanel d={debug} />}
 
       <Button
         data-testid="button-get-consultation"
@@ -345,6 +420,7 @@ export function ChatWidget() {
               addBotMessage(
                 <ResultCard
                   resultText={diagnose.result}
+                  debug={diagnose.debug}
                   onGetConsultation={() => setContactPhase("channel")}
                 />
               );
