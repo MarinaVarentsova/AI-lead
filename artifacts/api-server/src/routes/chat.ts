@@ -16,32 +16,37 @@ import { openAIService } from "../services/OpenAIService";
 
 const router: IRouter = Router();
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 router.post("/chat", async (req, res): Promise<void> => {
-  const { conversationId, content } = req.body as {
+  const { conversationId, message, step } = req.body as {
     conversationId?: unknown;
-    content?: unknown;
+    message?: unknown;
+    step?: unknown;
   };
 
-  if (typeof conversationId !== "number" || !Number.isInteger(conversationId) || conversationId <= 0) {
-    res.status(400).json({ error: "conversationId must be a positive integer" });
+  if (typeof conversationId !== "string" || !UUID_RE.test(conversationId)) {
+    res.status(400).json({ error: "conversationId must be a valid UUID" });
     return;
   }
-  if (typeof content !== "string" || content.trim().length === 0) {
-    res.status(400).json({ error: "content must be a non-empty string" });
+  if (typeof message !== "string" || message.trim().length === 0) {
+    res.status(400).json({ error: "message must be a non-empty string" });
     return;
   }
-  if (content.length > 4000) {
-    res.status(400).json({ error: "content too long (max 4000 chars)" });
+  if (message.length > 4000) {
+    res.status(400).json({ error: "message too long (max 4000 chars)" });
     return;
   }
 
-  const trimmedContent = content.trim();
+  const trimmedMessage = message.trim();
+  const stepValue = typeof step === "string" ? step : null;
 
   // 1. Save user message
   await db.insert(aiMessages).values({
     conversationId,
     role: "user",
-    content: trimmedContent,
+    message: trimmedMessage,
+    step: stepValue,
   });
 
   // 2. Load conversation history (all prior messages)
@@ -54,7 +59,7 @@ router.post("/chat", async (req, res): Promise<void> => {
   // Exclude last message (just inserted) for clean handoff to AI
   const historyForAI = history.slice(0, -1).map((m) => ({
     role: m.role as "user" | "assistant",
-    content: m.content,
+    content: m.message,
   }));
 
   // 3. Load knowledge base
@@ -67,7 +72,7 @@ router.post("/chat", async (req, res): Promise<void> => {
     reply = await openAIService.chat({
       knowledgeBase,
       history: historyForAI,
-      userMessage: trimmedContent,
+      userMessage: trimmedMessage,
     });
   } catch (err) {
     req.log.error({ err }, "OpenAI chat error");
@@ -78,7 +83,7 @@ router.post("/chat", async (req, res): Promise<void> => {
   // 5. Save AI response
   const [savedReply] = await db
     .insert(aiMessages)
-    .values({ conversationId, role: "assistant", content: reply })
+    .values({ conversationId, role: "assistant", message: reply, step: stepValue })
     .returning();
 
   res.status(200).json({

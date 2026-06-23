@@ -1,122 +1,63 @@
-import { pgTable, serial, text, timestamp, integer, boolean } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, timestamp, integer, boolean, jsonb } from "drizzle-orm/pg-core";
 
 export const aiSessions = pgTable("ai_sessions", {
-  id: serial("id").primaryKey(),
-  sessionKey: text("session_key"),
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionKey: text("session_key").notNull().unique(),
   firstPageUrl: text("first_page_url"),
   utmSource: text("utm_source"),
   utmMedium: text("utm_medium"),
   utmCampaign: text("utm_campaign"),
   utmContent: text("utm_content"),
   utmTerm: text("utm_term"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 export const aiConversations = pgTable("ai_conversations", {
-  id: serial("id").primaryKey(),
-  sessionId: integer("session_id")
-    .notNull()
-    .references(() => aiSessions.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: uuid("session_id").references(() => aiSessions.id, { onDelete: "cascade" }),
+  status: text("status").default("started"),
+  startedAt: timestamp("started_at", { withTimezone: true }).defaultNow(),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
+  currentStep: text("current_step"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 export const aiMessages = pgTable("ai_messages", {
-  id: serial("id").primaryKey(),
-  conversationId: integer("conversation_id")
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id")
     .notNull()
-    .references(() => aiConversations.id),
+    .references(() => aiConversations.id, { onDelete: "cascade" }),
   role: text("role").notNull(),
-  content: text("content").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  message: text("message").notNull(),
+  step: text("step"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 export const aiDiagnosticAnswers = pgTable("ai_diagnostic_answers", {
-  id: serial("id").primaryKey(),
-  conversationId: integer("conversation_id")
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id")
     .notNull()
-    .references(() => aiConversations.id),
-  questionNumber: integer("question_number").notNull(),
-  questionKey: text("question_key").notNull(),
-  answerText: text("answer_text").notNull(),
-  dictId: integer("dict_id"),
-  isCustom: boolean("is_custom").notNull().default(false),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const aiUsers = pgTable("ai_users", {
-  id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => aiSessions.id),
-  name: text("name"),
-  phone: text("phone"),
-  email: text("email"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const aiLeads = pgTable("ai_leads", {
-  id: serial("id").primaryKey(),
-  sessionId: integer("session_id")
-    .notNull()
-    .references(() => aiSessions.id),
-  conversationId: integer("conversation_id").references(() => aiConversations.id),
-  contactId: integer("contact_id"),
-  // Qualification fields
-  educationType: text("education_type"),
+    .unique()
+    .references(() => aiConversations.id, { onDelete: "cascade" }),
   experienceArea: text("experience_area"),
+  experienceAreaRaw: text("experience_area_raw"),
   experienceYears: text("experience_years"),
+  experienceYearsRaw: text("experience_years_raw"),
+  educationType: text("education_type"),
+  educationTypeRaw: text("education_type_raw"),
   goal: text("goal"),
-  recommendedTrack: text("recommended_track"),
-  recommendedTariff: text("recommended_tariff"),
-  mainQuestion: text("main_question"),
-  mainObjection: text("main_objection"),
-  installmentInterest: boolean("installment_interest").default(false),
-  startReadiness: text("start_readiness"),
-  contactChannel: text("contact_channel"),
-  managerNote: text("manager_note"),
-  aiBrief: text("ai_brief"),
-  qualificationJson: text("qualification_json"),
-  // Scoring
-  leadScore: integer("lead_score"),
-  leadTemperature: text("lead_temperature"),
-  status: text("status").notNull().default("new"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const aiEvents = pgTable("ai_events", {
-  id: serial("id").primaryKey(),
-  sessionId: integer("session_id").references(() => aiSessions.id),
-  conversationId: integer("conversation_id").references(() => aiConversations.id),
-  eventType: text("event_type").notNull(),
-  payload: text("payload"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const aiKnowledge = pgTable("ai_knowledge", {
-  id: serial("id").primaryKey(),
-  categoryId: integer("category_id"),
-  title: text("title").notNull(),
-  content: text("content").notNull(),
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-export const aiBitrixLogs = pgTable("ai_bitrix_logs", {
-  id: serial("id").primaryKey(),
-  leadId: integer("lead_id").references(() => aiLeads.id),
-  bitrixLeadId: text("bitrix_lead_id"),
-  status: text("status").notNull().default("pending"),
-  errorMessage: text("error_message"),
-  payload: text("payload"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  goalRaw: text("goal_raw"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });
 
 export const aiContacts = pgTable("ai_contacts", {
-  id: serial("id").primaryKey(),
-  leadId: integer("lead_id").references(() => aiLeads.id),
-  conversationId: integer("conversation_id").references(() => aiConversations.id),
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id").references(() => aiConversations.id, {
+    onDelete: "cascade",
+  }),
   name: text("name"),
   phone: text("phone"),
   email: text("email"),
@@ -124,5 +65,65 @@ export const aiContacts = pgTable("ai_contacts", {
   contactChannel: text("contact_channel"),
   preferredTime: text("preferred_time"),
   comment: text("comment"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const aiLeads = pgTable("ai_leads", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id").references(() => aiConversations.id, {
+    onDelete: "cascade",
+  }),
+  contactId: uuid("contact_id").references(() => aiContacts.id, { onDelete: "set null" }),
+  leadScore: integer("lead_score"),
+  leadTemperature: text("lead_temperature"),
+  recommendedTrack: text("recommended_track"),
+  recommendedTariff: text("recommended_tariff"),
+  mainQuestion: text("main_question"),
+  mainObjection: text("main_objection"),
+  aiBrief: text("ai_brief"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const aiEvents = pgTable("ai_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: uuid("session_id").references(() => aiSessions.id, { onDelete: "cascade" }),
+  conversationId: uuid("conversation_id").references(() => aiConversations.id, {
+    onDelete: "cascade",
+  }),
+  eventName: text("event_name").notNull(),
+  payload: jsonb("payload"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const aiKnowledge = pgTable("ai_knowledge", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  category: text("category").notNull(),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+});
+
+export const aiBitrixLogs = pgTable("ai_bitrix_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  leadId: uuid("lead_id").references(() => aiLeads.id, { onDelete: "cascade" }),
+  bitrixLeadId: text("bitrix_lead_id"),
+  requestPayload: jsonb("request_payload"),
+  responsePayload: jsonb("response_payload"),
+  status: text("status"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const aiUsers = pgTable("ai_users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  authUserId: uuid("auth_user_id"),
+  roleCode: text("role_code"),
+  fullName: text("full_name"),
+  email: text("email").unique(),
+  phone: text("phone"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
 });

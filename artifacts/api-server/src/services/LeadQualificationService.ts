@@ -6,7 +6,6 @@
  * generates ai_brief, and writes the result to ai_leads.
  */
 import { db, aiLeads } from "@workspace/db";
-import { eq } from "drizzle-orm";
 import { logger } from "../lib/logger";
 
 // ─── Allowed enum values ───────────────────────────────────────────────────────
@@ -71,7 +70,7 @@ export interface QualificationData {
 }
 
 export interface ScoredLead {
-  leadId: number;
+  leadId: string;
   leadScore: number;
   leadTemperature: string;
   qualification: QualificationData;
@@ -130,61 +129,34 @@ function parseQualification(raw: string): QualificationData {
 function calculateScore(q: QualificationData): { score: number; temperature: string } {
   let score = 0;
 
-  // +20 if has higher or secondary professional education (any type)
   if (["higher_technical", "secondary_technical", "non_profile"].includes(q.education_type)) {
     score += 20;
   }
-
-  // +20 if profiled education
   if (["higher_technical", "secondary_technical"].includes(q.education_type)) {
     score += 20;
   }
-
-  // +20 if significant work experience
   if (["from_3_to_10", "more_than_10"].includes(q.experience_years)) {
     score += 20;
   }
-
-  // +20 if goal is actionable
-  if (
-    ["extra_income", "new_profession", "expand_services", "construction_expertise"].includes(
-      q.goal
-    )
-  ) {
+  if (["extra_income", "new_profession", "expand_services", "construction_expertise"].includes(q.goal)) {
     score += 20;
   }
-
-  // +20 if interested in installment OR main_question is about price/installment
-  if (
-    q.installment_interest ||
-    /рассрочк|стоимост|цен|договор|документ/i.test(q.main_question)
-  ) {
+  if (q.installment_interest || /рассрочк|стоимост|цен|договор|документ/i.test(q.main_question)) {
     score += 20;
   }
-
-  // +20 if ready to start soon
   if (["now", "this_month"].includes(q.start_readiness)) {
     score += 20;
   }
-
-  // +10 for preferred contact channel
   if (["phone", "whatsapp", "telegram", "max"].includes(q.contact_channel)) {
     score += 10;
   }
 
-  // Hard cap for school_only
   if (q.education_type === "school_only") {
     score = Math.min(score, 30);
   }
 
   const temperature =
-    score >= 90
-      ? "hot"
-      : score >= 60
-      ? "warm"
-      : score >= 30
-      ? "cold"
-      : "info";
+    score >= 90 ? "hot" : score >= 60 ? "warm" : score >= 30 ? "cold" : "info";
 
   return { score, temperature };
 }
@@ -254,40 +226,40 @@ function buildAiBrief(q: QualificationData, score: number, temperature: string):
   const lines: string[] = [
     "═══════════════ AI-БРИФ ИНОБР ═══════════════",
     "",
-    `📋 ПРОФИЛЬ`,
+    "📋 ПРОФИЛЬ",
     `   Опыт: ${EXPERIENCE_LABELS[q.experience_area] ?? q.experience_area}`,
     `   Стаж: ${YEARS_LABELS[q.experience_years] ?? q.experience_years}`,
     `   Образование: ${EDUCATION_LABELS[q.education_type] ?? q.education_type}`,
     "",
-    `🎯 ЦЕЛЬ`,
+    "🎯 ЦЕЛЬ",
     `   ${GOAL_LABELS[q.goal] ?? q.goal}`,
     "",
-    `📚 ОГРАНИЧЕНИЕ ПО ОБРАЗОВАНИЮ`,
+    "📚 ОГРАНИЧЕНИЕ ПО ОБРАЗОВАНИЮ",
     q.education_type === "school_only"
       ? "   ⚠️ Только аттестат — ССТЭ / ДПО недоступны"
       : q.education_type === "need_clarification"
       ? "   ❓ Образование требует уточнения"
       : "   ✅ Образование позволяет рассматривать программы ДПО",
     "",
-    `🏆 ПРЕДВАРИТЕЛЬНАЯ РЕКОМЕНДАЦИЯ`,
+    "🏆 ПРЕДВАРИТЕЛЬНАЯ РЕКОМЕНДАЦИЯ",
     `   Трек: ${TRACK_LABELS[q.recommended_track] ?? q.recommended_track}`,
     `   Тариф: ${TARIFF_LABELS[q.recommended_tariff] ?? q.recommended_tariff}`,
     `   Рассрочка: ${q.installment_interest ? "Интересует" : "Не уточнялось"}`,
     "",
-    `❓ ГЛАВНЫЙ ВОПРОС`,
+    "❓ ГЛАВНЫЙ ВОПРОС",
     `   ${q.main_question || "Не зафиксирован"}`,
     "",
-    `🚧 ГЛАВНОЕ ВОЗРАЖЕНИЕ`,
+    "🚧 ГЛАВНОЕ ВОЗРАЖЕНИЕ",
     `   ${q.main_objection === "none" ? "Явного возражения нет" : q.main_objection}`,
     "",
-    `📱 СВЯЗЬ`,
+    "📱 СВЯЗЬ",
     `   Канал: ${q.contact_channel}`,
     `   Готовность: ${q.start_readiness}`,
     "",
-    `🌡️ ТЕМПЕРАТУРА ЛИДА`,
+    "🌡️ ТЕМПЕРАТУРА ЛИДА",
     `   ${TEMPERATURE_LABELS[temperature] ?? temperature} (score: ${score})`,
     "",
-    `👤 РЕКОМЕНДАЦИЯ МЕНЕДЖЕРУ`,
+    "👤 РЕКОМЕНДАЦИЯ МЕНЕДЖЕРУ",
     `   ${q.manager_note || "—"}`,
     "",
     "═════════════════════════════════════════════",
@@ -299,53 +271,34 @@ function buildAiBrief(q: QualificationData, score: number, temperature: string):
 // ─── Service ──────────────────────────────────────────────────────────────────
 
 class LeadQualificationService {
-  /**
-   * Process raw AI qualification JSON:
-   * 1. Parse and validate field values
-   * 2. Calculate lead_score on backend
-   * 3. Generate ai_brief
-   * 4. Write to ai_leads
-   */
   async processAndSave(params: {
     rawJson: string;
-    sessionId: number;
-    conversationId: number;
-    contactId?: number;
+    conversationId: string;
+    contactId?: string;
   }): Promise<ScoredLead> {
-    const { rawJson, sessionId, conversationId, contactId } = params;
+    const { rawJson, conversationId, contactId } = params;
 
     const qualification = parseQualification(rawJson);
     const { score, temperature } = calculateScore(qualification);
     const aiBrief = buildAiBrief(qualification, score, temperature);
 
     logger.info(
-      { sessionId, conversationId, score, temperature, track: qualification.recommended_track },
+      { conversationId, score, temperature, track: qualification.recommended_track },
       "Lead qualified"
     );
 
     const [lead] = await db
       .insert(aiLeads)
       .values({
-        sessionId,
         conversationId,
         contactId: contactId ?? null,
-        educationType: qualification.education_type,
-        experienceArea: qualification.experience_area,
-        experienceYears: qualification.experience_years,
-        goal: qualification.goal,
+        leadScore: score,
+        leadTemperature: temperature,
         recommendedTrack: qualification.recommended_track,
         recommendedTariff: qualification.recommended_tariff,
         mainQuestion: qualification.main_question,
         mainObjection: qualification.main_objection,
-        installmentInterest: qualification.installment_interest,
-        startReadiness: qualification.start_readiness,
-        contactChannel: qualification.contact_channel,
-        managerNote: qualification.manager_note,
         aiBrief,
-        qualificationJson: rawJson,
-        leadScore: score,
-        leadTemperature: temperature,
-        status: "new",
       })
       .returning();
 
@@ -356,16 +309,6 @@ class LeadQualificationService {
       qualification,
       aiBrief,
     };
-  }
-
-  /**
-   * Attach a contact to an existing lead.
-   */
-  async attachContact(leadId: number, contactId: number): Promise<void> {
-    await db
-      .update(aiLeads)
-      .set({ contactId, updatedAt: new Date() })
-      .where(eq(aiLeads.id, leadId));
   }
 }
 

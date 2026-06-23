@@ -3,11 +3,17 @@
  * Do not edit manually.
  * Api
  * API specification for AI Квалификатор ИНОБР
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
-import type { DiagnosticAnswerItem } from './diagnosticAnswerItem';
 
 export interface DiagnosticAnswersInput {
-  conversationId: number;
-  answers: DiagnosticAnswerItem[];
+  conversationId: string;
+  experienceArea?: string;
+  experienceAreaRaw?: string;
+  experienceYears?: string;
+  experienceYearsRaw?: string;
+  educationType?: string;
+  educationTypeRaw?: string;
+  goal?: string;
+  goalRaw?: string;
 }

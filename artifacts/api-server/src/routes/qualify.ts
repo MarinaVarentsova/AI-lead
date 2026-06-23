@@ -7,7 +7,7 @@
  * 3. Validates values (no unknown enums).
  * 4. Calculates lead_score on the backend (not by AI).
  * 5. Writes to ai_leads.
- * 6. Returns lead_id, score, temperature, brief to the client.
+ * 6. Returns leadId, score, temperature, brief to the client.
  */
 import { Router, type IRouter } from "express";
 import { db, aiMessages } from "@workspace/db";
@@ -18,18 +18,13 @@ import { leadQualificationService } from "../services/LeadQualificationService";
 
 const router: IRouter = Router();
 
-router.post("/qualify", async (req, res): Promise<void> => {
-  const { conversationId, sessionId } = req.body as {
-    conversationId?: unknown;
-    sessionId?: unknown;
-  };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  if (typeof conversationId !== "number" || !Number.isInteger(conversationId) || conversationId <= 0) {
-    res.status(400).json({ error: "conversationId must be a positive integer" });
-    return;
-  }
-  if (typeof sessionId !== "number" || !Number.isInteger(sessionId) || sessionId <= 0) {
-    res.status(400).json({ error: "sessionId must be a positive integer" });
+router.post("/qualify", async (req, res): Promise<void> => {
+  const { conversationId } = req.body as { conversationId?: unknown };
+
+  if (typeof conversationId !== "string" || !UUID_RE.test(conversationId)) {
+    res.status(400).json({ error: "conversationId must be a valid UUID" });
     return;
   }
 
@@ -42,7 +37,7 @@ router.post("/qualify", async (req, res): Promise<void> => {
 
   const historyForAI = history.map((m) => ({
     role: m.role as "user" | "assistant",
-    content: m.content,
+    content: m.message,
   }));
 
   // Load knowledge base
@@ -62,11 +57,7 @@ router.post("/qualify", async (req, res): Promise<void> => {
   // Score, validate, save to ai_leads
   let result;
   try {
-    result = await leadQualificationService.processAndSave({
-      rawJson,
-      sessionId,
-      conversationId,
-    });
+    result = await leadQualificationService.processAndSave({ rawJson, conversationId });
   } catch (err) {
     req.log.error({ err }, "Lead qualification save error");
     res.status(500).json({ error: "Failed to save lead qualification." });

@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * API specification for AI Квалификатор ИНОБР
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 export interface HealthStatus {
   status: string;
@@ -14,61 +14,60 @@ export interface ErrorResponse {
 }
 
 export interface DictionaryItem {
-  id: number;
-  label: string;
-  sortOrder: number;
+  code: string;
+  name: string;
 }
 
 export interface SessionResult {
-  sessionId: number;
-  sessionToken: string;
+  sessionId: string;
+  sessionKey: string;
 }
 
 export interface ConversationInput {
-  sessionId: number;
+  sessionId: string;
 }
 
 export interface ConversationResult {
-  conversationId: number;
-  sessionId: number;
+  conversationId: string;
+  sessionId: string;
+  currentStep: string;
 }
 
 export type MessageInputRole = typeof MessageInputRole[keyof typeof MessageInputRole];
 
 
 export const MessageInputRole = {
-  bot: 'bot',
   user: 'user',
+  assistant: 'assistant',
+  system: 'system',
 } as const;
 
 export interface MessageInput {
-  conversationId: number;
+  conversationId: string;
   role: MessageInputRole;
-  content: string;
+  message: string;
 }
 
 export interface MessageResult {
-  messageId: number;
-  conversationId: number;
-}
-
-export interface DiagnosticAnswerItem {
-  questionNumber: number;
-  questionKey: string;
-  answerText: string;
-  /** @nullable */
-  dictId?: number | null;
-  isCustom: boolean;
+  messageId: string;
+  conversationId: string;
 }
 
 export interface DiagnosticAnswersInput {
-  conversationId: number;
-  answers: DiagnosticAnswerItem[];
+  conversationId: string;
+  experienceArea?: string;
+  experienceAreaRaw?: string;
+  experienceYears?: string;
+  experienceYearsRaw?: string;
+  educationType?: string;
+  educationTypeRaw?: string;
+  goal?: string;
+  goalRaw?: string;
 }
 
 export interface DiagnosticAnswersResult {
-  saved: number;
-  conversationId: number;
+  saved: boolean;
+  conversationId: string;
 }
 
 export type GetDictionaryParams = {

@@ -3,12 +3,11 @@
  * Do not edit manually.
  * Api
  * API specification for AI Квалификатор ИНОБР
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 
 export * from './conversationInput';
 export * from './conversationResult';
-export * from './diagnosticAnswerItem';
 export * from './diagnosticAnswersInput';
 export * from './diagnosticAnswersResult';
 export * from './dictionaryItem';

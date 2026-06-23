@@ -3,10 +3,10 @@
  * Do not edit manually.
  * Api
  * API specification for AI Квалификатор ИНОБР
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 
 export interface SessionResult {
-  sessionId: number;
-  sessionToken: string;
+  sessionId: string;
+  sessionKey: string;
 }

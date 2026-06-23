@@ -1,88 +1,100 @@
-import { pgTable, serial, text, integer, boolean } from "drizzle-orm/pg-core";
-
-export const aiDictExperienceArea = pgTable("ai_dict_experience_area", {
-  id: serial("id").primaryKey(),
-  label: text("label").notNull(),
-  sortOrder: integer("sort_order").notNull().default(0),
-  isActive: boolean("is_active").notNull().default(true),
-});
-
-export const aiDictExperienceYears = pgTable("ai_dict_experience_years", {
-  id: serial("id").primaryKey(),
-  label: text("label").notNull(),
-  sortOrder: integer("sort_order").notNull().default(0),
-  isActive: boolean("is_active").notNull().default(true),
-});
-
-export const aiDictEducation = pgTable("ai_dict_education", {
-  id: serial("id").primaryKey(),
-  label: text("label").notNull(),
-  sortOrder: integer("sort_order").notNull().default(0),
-  isActive: boolean("is_active").notNull().default(true),
-});
-
-export const aiDictGoals = pgTable("ai_dict_goals", {
-  id: serial("id").primaryKey(),
-  label: text("label").notNull(),
-  sortOrder: integer("sort_order").notNull().default(0),
-  isActive: boolean("is_active").notNull().default(true),
-});
+import { pgTable, text, integer, boolean, timestamp, numeric } from "drizzle-orm/pg-core";
 
 export const aiDictRoles = pgTable("ai_dict_roles", {
-  id: serial("id").primaryKey(),
-  label: text("label").notNull(),
-  sortOrder: integer("sort_order").notNull().default(0),
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 export const aiDictStatuses = pgTable("ai_dict_statuses", {
-  id: serial("id").primaryKey(),
-  label: text("label").notNull(),
-  code: text("code").notNull().unique(),
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const aiDictEducation = pgTable("ai_dict_education", {
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const aiDictExperienceArea = pgTable("ai_dict_experience_area", {
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const aiDictExperienceYears = pgTable("ai_dict_experience_years", {
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  sortOrder: integer("sort_order"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const aiDictGoals = pgTable("ai_dict_goals", {
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 export const aiDictChannels = pgTable("ai_dict_channels", {
-  id: serial("id").primaryKey(),
-  label: text("label").notNull(),
-  code: text("code").notNull().unique(),
-  sortOrder: integer("sort_order").notNull().default(0),
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 export const aiDictTariffs = pgTable("ai_dict_tariffs", {
-  id: serial("id").primaryKey(),
-  label: text("label").notNull(),
-  code: text("code").notNull().unique(),
-  sortOrder: integer("sort_order").notNull().default(0),
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  price: numeric("price"),
+  installment: numeric("installment"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 export const aiDictTracks = pgTable("ai_dict_tracks", {
-  id: serial("id").primaryKey(),
-  label: text("label").notNull(),
-  code: text("code").notNull().unique(),
-  sortOrder: integer("sort_order").notNull().default(0),
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 export const aiDictLeadTemperature = pgTable("ai_dict_lead_temperature", {
-  id: serial("id").primaryKey(),
-  label: text("label").notNull(),
-  code: text("code").notNull().unique(),
-  sortOrder: integer("sort_order").notNull().default(0),
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  minScore: integer("min_score"),
+  maxScore: integer("max_score"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 export const aiDictObjections = pgTable("ai_dict_objections", {
-  id: serial("id").primaryKey(),
-  label: text("label").notNull(),
-  sortOrder: integer("sort_order").notNull().default(0),
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
 export const aiDictKnowledgeCategories = pgTable("ai_dict_knowledge_categories", {
-  id: serial("id").primaryKey(),
-  label: text("label").notNull(),
-  code: text("code").notNull().unique(),
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
 });
 
-export type DictItem = {
-  id: number;
-  label: string;
-  sortOrder: number;
-  isActive: boolean;
-};
+export const aiDictStartReadiness = pgTable("ai_dict_start_readiness", {
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});

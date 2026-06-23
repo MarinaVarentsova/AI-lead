@@ -1,0 +1,653 @@
+Стоп. Текущая логика БД взята из шаблона и НЕ соответствует нашему ТЗ.
+
+Нельзя подгонять Supabase под шаблонные таблицы.
+Нельзя пересоздавать нашу БД под serial/id integer.
+Нельзя добавлять поля из шаблона.
+Нельзя использовать свою схему Drizzle, если она расходится с фактической структурой Supabase.
+
+Нужно переработать проект под утвержденную архитектуру БД.
+
+Можно оставить:
+- frontend UI;
+- chat-widget;
+- api-server;
+- Vercel Function wrapper;
+- KnowledgeBaseService;
+- OpenAIService;
+- общую структуру проекта.
+
+Нужно снести/переписать:
+- шаблонную Drizzle schema;
+- шаблонную логику записи sessions/conversations/messages/diagnostic/leads;
+- любые ожидания serial integer id;
+- любые поля session_token, content, event_type, question_number, dict_id, is_custom, qualification_json, если их нет в утвержденной БД.
+
+ВАЖНО:
+Источник правды — существующая структура Supabase, созданная по нашему ТЗ.
+Код должен подстроиться под БД, а не БД под код.
+
+--------------------------------------------------
+1. УТВЕРЖДЕННАЯ СТРУКТУРА БД
+--------------------------------------------------
+
+Все id — uuid.
+
+Использовать только эти таблицы и поля.
+
+--------------------------------------------------
+ai_sessions
+--------------------------------------------------
+
+id uuid primary key default gen_random_uuid()
+session_key text unique not null
+first_page_url text
+utm_source text
+utm_medium text
+utm_campaign text
+utm_content text
+utm_term text
+created_at timestamptz default now()
+updated_at timestamptz default now()
+
+Назначение:
+анонимная сессия посетителя сайта.
+
+--------------------------------------------------
+ai_conversations
+--------------------------------------------------
+
+id uuid primary key default gen_random_uuid()
+session_id uuid references ai_sessions(id) on delete cascade
+status text default 'started'
+started_at timestamptz default now()
+completed_at timestamptz
+current_step text
+created_at timestamptz default now()
+updated_at timestamptz default now()
+
+Назначение:
+один диалог пользователя с AI.
+
+--------------------------------------------------
+ai_messages
+--------------------------------------------------
+
+id uuid primary key default gen_random_uuid()
+conversation_id uuid references ai_conversations(id) on delete cascade
+role text not null
+message text not null
+step text
+created_at timestamptz default now()
+
+Назначение:
+вся переписка пользователя и ассистента.
+
+ВАЖНО:
+поле называется message, не content.
+
+role:
+- user
+- assistant
+- system
+
+--------------------------------------------------
+ai_diagnostic_answers
+--------------------------------------------------
+
+id uuid primary key default gen_random_uuid()
+conversation_id uuid references ai_conversations(id) on delete cascade
+
+experience_area text
+experience_area_raw text
+
+experience_years text
+experience_years_raw text
+
+education_type text
+education_type_raw text
+
+goal text
+goal_raw text
+
+created_at timestamptz default now()
+updated_at timestamptz default now()
+
+Назначение:
+итоговые ответы диагностики одной записью на conversation_id.
+
+ВАЖНО:
+не хранить диагностику построчно через question_number.
+У нас 4 ключевых ответа в одной строке.
+
+--------------------------------------------------
+ai_contacts
+--------------------------------------------------
+
+id uuid primary key default gen_random_uuid()
+conversation_id uuid references ai_conversations(id) on delete cascade
+
+name text
+phone text
+email text
+telegram text
+contact_channel text
+preferred_time text
+comment text
+
+created_at timestamptz default now()
+
+Назначение:
+контактные данные клиента после диагностики.
+
+--------------------------------------------------
+ai_leads
+--------------------------------------------------
+
+id uuid primary key default gen_random_uuid()
+conversation_id uuid references ai_conversations(id) on delete cascade
+contact_id uuid references ai_contacts(id) on delete set null
+
+lead_score integer
+lead_temperature text
+recommended_track text
+recommended_tariff text
+main_question text
+main_objection text
+ai_brief text
+
+created_at timestamptz default now()
+
+Назначение:
+квалифицированный лид после диагностики / консультации.
+
+ВАЖНО:
+не использовать session_id в ai_leads.
+Связь идет через conversation_id.
+Если нужен session_id — получать через ai_conversations.session_id.
+
+--------------------------------------------------
+ai_bitrix_logs
+--------------------------------------------------
+
+id uuid primary key default gen_random_uuid()
+lead_id uuid references ai_leads(id) on delete cascade
+
+bitrix_lead_id text
+request_payload jsonb
+response_payload jsonb
+status text
+error_message text
+
+created_at timestamptz default now()
+
+Назначение:
+лог будущей передачи в Битрикс.
+
+На текущем этапе Bitrix не отправлять.
+
+--------------------------------------------------
+ai_events
+--------------------------------------------------
+
+id uuid primary key default gen_random_uuid()
+session_id uuid references ai_sessions(id) on delete cascade
+conversation_id uuid references ai_conversations(id) on delete cascade
+
+event_name text not null
+payload jsonb
+
+created_at timestamptz default now()
+
+Назначение:
+события аналитики.
+
+ВАЖНО:
+поле называется event_name, не event_type.
+payload должен быть jsonb, не text.
+
+--------------------------------------------------
+ai_knowledge
+--------------------------------------------------
+
+id uuid primary key default gen_random_uuid()
+category text not null
+title text not null
+content text not null
+is_active boolean default true
+created_at timestamptz default now()
+updated_at timestamptz default now()
+
+Назначение:
+будущая база знаний в Supabase.
+На текущем этапе база знаний читается из файла knowledge_base_inobr_ai_consultant_v2.md.
+
+--------------------------------------------------
+ai_users
+--------------------------------------------------
+
+id uuid primary key default gen_random_uuid()
+auth_user_id uuid
+role_code text references ai_dict_roles(code)
+full_name text
+email text unique
+phone text
+is_active boolean default true
+created_at timestamptz default now()
+updated_at timestamptz default now()
+
+Назначение:
+пользователи системы — менеджер, админ, редактор.
+
+--------------------------------------------------
+2. СПРАВОЧНИКИ
+--------------------------------------------------
+
+Использовать существующие справочники.
+
+ai_dict_roles:
+code text primary key
+name text
+description text
+is_active boolean
+created_at timestamptz
+
+ai_dict_statuses:
+code text primary key
+name text
+sort_order integer
+is_active boolean
+created_at timestamptz
+
+ai_dict_education:
+code text primary key
+name text
+is_active boolean
+created_at timestamptz
+
+ai_dict_experience_area:
+code text primary key
+name text
+is_active boolean
+created_at timestamptz
+
+ai_dict_experience_years:
+code text primary key
+name text
+sort_order integer
+is_active boolean
+created_at timestamptz
+
+ai_dict_goals:
+code text primary key
+name text
+is_active boolean
+created_at timestamptz
+
+ai_dict_channels:
+code text primary key
+name text
+is_active boolean
+created_at timestamptz
+
+ai_dict_tariffs:
+code text primary key
+name text
+price numeric
+installment numeric
+is_active boolean
+created_at timestamptz
+
+ai_dict_tracks:
+code text primary key
+name text
+is_active boolean
+created_at timestamptz
+
+ai_dict_lead_temperature:
+code text primary key
+name text
+min_score integer
+max_score integer
+created_at timestamptz
+
+ai_dict_objections:
+code text primary key
+name text
+is_active boolean
+created_at timestamptz
+
+ai_dict_knowledge_categories:
+code text primary key
+name text
+description text
+sort_order integer
+is_active boolean
+created_at timestamptz
+
+ai_dict_start_readiness:
+code text primary key
+name text
+is_active boolean
+created_at timestamptz
+
+--------------------------------------------------
+3. ОБЯЗАТЕЛЬНАЯ ЛОГИКА ЗАПИСИ ДАННЫХ
+--------------------------------------------------
+
+Сценарий должен работать так:
+
+Шаг 1. Открытие виджета
+
+При первом открытии или нажатии "Начать диагностику":
+
+1. Создать ai_sessions:
+- session_key = uuid/random token
+- first_page_url = текущий URL, если доступен
+- UTM поля, если есть
+
+2. Вернуть frontend:
+{
+  sessionId: ai_sessions.id,
+  sessionKey: ai_sessions.session_key
+}
+
+Не использовать session_token.
+
+--------------------------------------------------
+Шаг 2. Старт диагностики
+
+После создания сессии создать ai_conversations:
+
+- session_id = ai_sessions.id
+- status = 'diagnostic_in_progress'
+- current_step = 'experience_area'
+
+Вернуть frontend:
+{
+  conversationId: ai_conversations.id,
+  currentStep: 'experience_area'
+}
+
+--------------------------------------------------
+Шаг 3. Сообщения
+
+Каждый вопрос ассистента и каждый ответ пользователя писать в ai_messages:
+
+- conversation_id
+- role = 'assistant' или 'user'
+- message = текст
+- step = текущий шаг
+
+Не использовать поле content.
+
+--------------------------------------------------
+Шаг 4. Ответы диагностики
+
+Диагностика состоит из 4 вопросов:
+
+1. experience_area
+2. experience_years
+3. education_type
+4. goal
+
+Ответы сохранять в ai_diagnostic_answers одной записью на conversation_id.
+
+При выборе из справочника:
+- основное поле = code справочника
+- raw поле = отображаемый текст или исходный ввод пользователя
+
+Пример:
+
+experience_area = 'construction'
+experience_area_raw = 'строительство / ремонт'
+
+Если пользователь ввел свой текст:
+- основное поле = 'other' или 'need_clarification' по смыслу
+- raw поле = точный текст пользователя
+
+После каждого ответа:
+- обновлять текущую запись ai_diagnostic_answers
+- обновлять ai_conversations.current_step
+
+После 4-го ответа:
+- ai_conversations.status = 'diagnostic_completed'
+- current_step = 'diagnostic_completed'
+
+--------------------------------------------------
+Шаг 5. Предварительная рекомендация
+
+После завершения 4 вопросов:
+
+1. Использовать knowledge_base_inobr_ai_consultant_v2.md.
+2. Сформировать предварительный вывод пользователю.
+3. Не обещать заработок, трудоустройство, судебный результат, скидку.
+4. Если education_type = 'school_only':
+   - не предлагать ССТЭ / ДПО
+   - рекомендовать приемку квартир
+   - в будущий ai_brief добавить пометку:
+     "У клиента только аттестат. ССТЭ / ДПО не предлагать как основной вариант."
+
+--------------------------------------------------
+Шаг 6. AI-консультация
+
+После диагностики пользователь может задавать вопросы.
+
+Каждое сообщение писать в ai_messages.
+
+AI отвечает только по базе знаний:
+knowledge_base_inobr_ai_consultant_v2.md
+
+Если ответа нет:
+"В моей базе нет точной информации по этому вопросу. Я передам его менеджеру, чтобы он ответил корректно."
+
+--------------------------------------------------
+Шаг 7. Сбор контакта
+
+Контакт не собирать сразу.
+
+Контакт собирать после:
+- диагностики;
+- предварительного вывода;
+- 2–4 ответов на вопросы пользователя.
+
+Когда пользователь выбрал канал связи и оставил данные:
+
+создать ai_contacts:
+
+- conversation_id
+- name
+- phone
+- email
+- telegram
+- contact_channel
+- preferred_time
+- comment
+
+--------------------------------------------------
+Шаг 8. Квалификация лида
+
+После контакта или завершения консультации создать ai_leads.
+
+AI возвращает смысловую классификацию:
+
+education_type
+experience_area
+experience_years
+goal
+recommended_track
+recommended_tariff
+main_question
+main_objection
+installment_interest
+start_readiness
+contact_channel
+manager_note
+
+Backend должен:
+
+1. Проверить значения по справочникам.
+2. Рассчитать lead_score.
+3. Определить lead_temperature.
+4. Сформировать ai_brief.
+5. Записать ai_leads:
+
+- conversation_id
+- contact_id
+- lead_score
+- lead_temperature
+- recommended_track
+- recommended_tariff
+- main_question
+- main_objection
+- ai_brief
+
+--------------------------------------------------
+4. LEAD SCORE
+--------------------------------------------------
+
+OpenAI не считает итоговый lead_score.
+Lead score считает backend.
+
+Правила:
+
++20 если education_type = higher_technical, secondary_technical, non_profile
+
++20 если education_type = higher_technical или secondary_technical
+
++20 если experience_years = from_3_to_10 или more_than_10
+
++20 если goal = extra_income, new_profession, expand_services, construction_expertise
+
++20 если installment_interest = true
+или main_question связан со стоимостью / рассрочкой / договором / документами
+
++20 если start_readiness = now или this_month
+
++10 если contact_channel = phone, whatsapp, telegram, max
+
+Ограничение:
+если education_type = school_only:
+- recommended_track = apartment_acceptance
+- recommended_tariff = not_defined
+- lead_score не выше 30
+- ai_brief должен содержать пометку про аттестат
+
+lead_temperature:
+
+90+ = hot
+60–89 = warm
+30–59 = cold
+0–29 = info
+
+--------------------------------------------------
+5. ЧТО НУЖНО ПЕРЕПИСАТЬ В КОДЕ
+--------------------------------------------------
+
+1. Drizzle schema должна полностью соответствовать таблицам выше.
+2. Все serial/integer id заменить на uuid.
+3. Все FK заменить на uuid.
+4. Убрать шаблонные поля:
+- session_token
+- content
+- event_type
+- question_number
+- question_key
+- answer_text
+- dict_id
+- is_custom
+- qualification_json
+- category_id в ai_knowledge
+- session_id в ai_leads
+
+5. Использовать:
+- session_key
+- message
+- event_name
+- payload jsonb
+- category text
+- ai_diagnostic_answers одной строкой
+
+6. Переписать API endpoints:
+- /api/sessions
+- /api/conversations
+- /api/messages
+- /api/diagnostic
+- /api/contacts
+- /api/leads
+
+7. Не создавать новые таблицы.
+8. Не менять Supabase руками.
+9. Не использовать supabase-schema.sql из шаблона.
+10. Не просить удалить и пересоздать БД.
+
+--------------------------------------------------
+6. ТЕСТЫ
+--------------------------------------------------
+
+После переработки выполнить:
+
+1. pnpm run typecheck
+2. pnpm run build
+
+Затем проверить production:
+
+Тест 1:
+Нажать "Начать диагностику".
+
+Ожидаемый результат:
+- создается ai_sessions
+- создается ai_conversations
+- пользователь видит первый вопрос
+
+Тест 2:
+Ответить на 4 вопроса.
+
+Ожидаемый результат:
+- ai_messages содержит вопросы и ответы
+- ai_diagnostic_answers содержит одну строку по conversation_id
+- заполнены experience_area, experience_years, education_type, goal
+- ai_conversations.status = diagnostic_completed
+
+Тест 3:
+Пользователь с education_type = school_only.
+
+Ожидаемый результат:
+- AI не предлагает ССТЭ / ДПО
+- предлагает приемку квартир
+- будущий ai_brief содержит ограничение по аттестату
+
+Тест 4:
+Пользователь оставляет контакт.
+
+Ожидаемый результат:
+- создается ai_contacts
+- создается ai_leads
+- contact_id связан с ai_contacts.id
+- conversation_id связан с ai_conversations.id
+
+Тест 5:
+Проверить Vercel Logs.
+
+Ожидаемый результат:
+- POST /api/sessions = 201
+- ошибки 500 нет
+- нет обращения к session_token
+- нет обращения к content вместо message
+
+--------------------------------------------------
+7. РЕЗУЛЬТАТ
+--------------------------------------------------
+
+После выполнения покажи:
+
+1. Какие файлы изменены.
+2. Новую Drizzle schema.
+3. Код POST /api/sessions.
+4. Код сохранения диагностики.
+5. Код расчета lead_score.
+6. Результат pnpm run typecheck.
+7. Результат pnpm run build.
+8. Что именно теперь пишется в Supabase по шагам.
+
+Главная цель:
+проект должен работать по нашему ТЗ и нашей БД, а не по шаблону AI Lead Assistant.

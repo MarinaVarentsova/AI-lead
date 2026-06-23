@@ -23,9 +23,8 @@ type Message = {
 type DiagnosticAnswer = {
   questionNumber: number;
   questionKey: string;
-  answerText: string;
-  dictId: number | null;
-  isCustom: boolean;
+  code: string;
+  raw: string;
 };
 
 const QUESTIONS = [
@@ -35,41 +34,40 @@ const QUESTIONS = [
   { id: "q4", key: "goals" },
 ] as const;
 
-// ─── API helpers (native fetch, no SDK needed) ─────────────────────────────
+// ─── API helpers (native fetch) ────────────────────────────────────────────────
 
 async function apiChat(
-  conversationId: number,
-  content: string
-): Promise<{ reply: string; messageId: number }> {
+  conversationId: string,
+  message: string
+): Promise<{ reply: string; messageId: string }> {
   const res = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ conversationId, content }),
+    body: JSON.stringify({ conversationId, message }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error((err as any).error ?? `HTTP ${res.status}`);
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
   }
   return res.json();
 }
 
 async function apiQualify(
-  conversationId: number,
-  sessionId: number
-): Promise<{ leadId: number; leadScore: number; leadTemperature: string; qualification: any; aiBrief: string }> {
+  conversationId: string
+): Promise<{ leadId: string; leadScore: number; leadTemperature: string; qualification: unknown; aiBrief: string }> {
   const res = await fetch("/api/qualify", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ conversationId, sessionId }),
+    body: JSON.stringify({ conversationId }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error((err as any).error ?? `HTTP ${res.status}`);
+    throw new Error((err as { error?: string }).error ?? `HTTP ${res.status}`);
   }
   return res.json();
 }
 
-// ─── Component ─────────────────────────────────────────────────────────────
+// ─── Component ─────────────────────────────────────────────────────────────────
 
 export function ChatWidget() {
   const [step, setStep] = useState<number>(0);
@@ -78,9 +76,9 @@ export function ChatWidget() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const [answers, setAnswers] = useState<DiagnosticAnswer[]>([]);
-  const [sessionId, setSessionId] = useState<number | null>(null);
-  const [conversationId, setConversationId] = useState<number | null>(null);
-  const [leadId, setLeadId] = useState<number | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [leadId, setLeadId] = useState<string | null>(null);
 
   const [customInput, setCustomInput] = useState("");
   const [activeCustomQ, setActiveCustomQ] = useState<string | null>(null);
@@ -120,8 +118,6 @@ export function ChatWidget() {
     scrollToBottom();
   }, [messages, isTyping, activeCustomQ, currentDictionary]);
 
-  // ─── Add bot message (from AI or local) ──────────────────────────────────
-
   const addBotMessage = (content: string | React.ReactNode) => {
     setMessages((prev) => [
       ...prev,
@@ -129,9 +125,7 @@ export function ChatWidget() {
     ]);
   };
 
-  // ─── Call AI and show reply ───────────────────────────────────────────────
-
-  const sendToAI = async (convId: number, userText: string): Promise<string> => {
+  const sendToAI = async (convId: string, userText: string): Promise<string> => {
     setIsTyping(true);
     try {
       const { reply } = await apiChat(convId, userText);
@@ -145,17 +139,16 @@ export function ChatWidget() {
     }
   };
 
-  // ─── Step 0 → Step 1: "Начать диагностику" ───────────────────────────────
+  // ─── Step 0 → Step 1: "Начать диагностику" ─────────────────────────────────
 
   const handleStart = () => {
     setStep(1);
-    // Show the fixed welcome message from the knowledge base (no API call needed yet — no conv_id)
     addBotMessage(
       "Здравствуйте.\n\nЯ помогу понять, подходит ли вам обучение по строительной экспертизе и какой вариант стоит рассмотреть.\n\nСначала задам 4 коротких вопроса.\n\nЭто займёт около 2 минут."
     );
   };
 
-  // ─── Step 1 → Step 2: "Начать" button ────────────────────────────────────
+  // ─── Step 1 → Step 2: "Начать" button ──────────────────────────────────────
 
   const handleBeginQuestions = () => {
     if (!sessionId) return;
@@ -169,16 +162,15 @@ export function ChatWidget() {
           setConversationId(convId);
           setStep(2);
 
-          const userMsg = "Начать";
           setMessages((prev) => [
             ...prev,
-            { id: Date.now().toString(), role: "user", content: userMsg },
+            { id: Date.now().toString(), role: "user", content: "Начать" },
           ]);
 
           try {
-            await sendToAI(convId, userMsg);
+            await sendToAI(convId, "Начать");
           } catch {
-            // error already shown by sendToAI
+            // error shown by sendToAI
           }
         },
         onError: () => {
@@ -189,36 +181,30 @@ export function ChatWidget() {
     );
   };
 
-  // ─── Handle chip / answer selection ──────────────────────────────────────
+  // ─── Handle chip / answer selection ────────────────────────────────────────
 
-  const handleOptionSelect = (qIndex: number, dictItem: any, isCustom: boolean) => {
+  const handleOptionSelect = (qIndex: number, dictItem: { code: string; name: string }, isCustom: boolean) => {
     if (isCustom) {
       setActiveCustomQ(QUESTIONS[qIndex].id);
       setCustomInput("");
       return;
     }
-    submitAnswer(qIndex, dictItem.label, dictItem.id, false);
+    submitAnswer(qIndex, dictItem.code, dictItem.name);
   };
 
   const submitCustomAnswer = (qIndex: number) => {
     if (!customInput.trim()) return;
-    submitAnswer(qIndex, customInput.trim(), null, true);
+    submitAnswer(qIndex, "other", customInput.trim());
     setActiveCustomQ(null);
   };
 
-  const submitAnswer = (
-    qIndex: number,
-    answerText: string,
-    dictId: number | null,
-    isCustom: boolean
-  ) => {
+  const submitAnswer = (qIndex: number, code: string, raw: string) => {
     const q = QUESTIONS[qIndex];
     const newAnswer: DiagnosticAnswer = {
       questionNumber: qIndex + 1,
       questionKey: q.key,
-      answerText,
-      dictId,
-      isCustom,
+      code,
+      raw,
     };
 
     const allAnswers = [...answers, newAnswer];
@@ -226,35 +212,44 @@ export function ChatWidget() {
 
     setMessages((prev) => [
       ...prev,
-      { id: Date.now().toString(), role: "user", content: answerText },
+      { id: Date.now().toString(), role: "user", content: raw },
     ]);
 
     const nextStep = step + 1;
     setStep(nextStep);
 
-    if (!conversationId || !sessionId) return;
+    if (!conversationId) return;
     const convId = conversationId;
-    const sessId = sessionId;
 
     if (qIndex < QUESTIONS.length - 1) {
-      // More questions — send to AI, it will ask next question
-      sendToAI(convId, answerText).catch(() => {});
+      sendToAI(convId, raw).catch(() => {});
     } else {
-      // Last answer — save diagnostic answers, then qualify
       setIsTyping(true);
+
+      const diagnosticData = {
+        conversationId: convId,
+        experienceArea: allAnswers[0]?.code,
+        experienceAreaRaw: allAnswers[0]?.raw,
+        experienceYears: allAnswers[1]?.code,
+        experienceYearsRaw: allAnswers[1]?.raw,
+        educationType: allAnswers[2]?.code,
+        educationTypeRaw: allAnswers[2]?.raw,
+        goal: allAnswers[3]?.code,
+        goalRaw: allAnswers[3]?.raw,
+      };
+
       saveDiagnosticAnswers.mutate(
-        { data: { conversationId: convId, answers: allAnswers } },
+        { data: diagnosticData },
         {
           onSuccess: async () => {
             try {
-              await sendToAI(convId, answerText);
+              await sendToAI(convId, raw);
             } catch {
-              // non-fatal — proceed to qualify
+              // non-fatal
             }
 
-            // Qualify the lead
             try {
-              const result = await apiQualify(convId, sessId);
+              const result = await apiQualify(convId);
               setLeadId(result.leadId);
 
               const tempLabel: Record<string, string> = {
@@ -310,7 +305,7 @@ export function ChatWidget() {
     }
   };
 
-  // ─── Render chips ─────────────────────────────────────────────────────────
+  // ─── Render chips ───────────────────────────────────────────────────────────
 
   const renderChips = (qIndex: number) => {
     const q = QUESTIONS[qIndex];
@@ -341,19 +336,19 @@ export function ChatWidget() {
       >
         {dictItems.map((opt) => (
           <button
-            key={opt.id}
-            data-testid={`chip-${q.id}-${opt.id}`}
+            key={opt.code}
+            data-testid={`chip-${q.id}-${opt.code}`}
             onClick={() => handleOptionSelect(qIndex, opt, false)}
             className="px-3 py-1.5 text-sm rounded-full border transition-all duration-200 bg-white text-foreground border-border hover:border-primary hover:text-primary"
           >
-            {opt.label}
+            {opt.name}
           </button>
         ))}
 
         <button
           key={customId}
-          data-testid={`chip-${q.id}-5`}
-          onClick={() => handleOptionSelect(qIndex, { id: "5", label: "Другое" }, true)}
+          data-testid={`chip-${q.id}-other`}
+          onClick={() => handleOptionSelect(qIndex, { code: "other", name: "Другое" }, true)}
           className={`px-3 py-1.5 text-sm rounded-full border transition-all duration-200 ${
             activeCustomQ === q.id
               ? "bg-primary text-primary-foreground border-primary"
@@ -394,12 +389,11 @@ export function ChatWidget() {
     );
   };
 
-  // ─── Render ───────────────────────────────────────────────────────────────
+  // ─── Render ─────────────────────────────────────────────────────────────────
 
   if (step === 0) {
     return (
       <div className="flex flex-col h-full bg-background">
-        {/* INOBR header */}
         <div className="px-5 py-3 flex items-center gap-3 bg-[#18181E] text-white shrink-0">
           <div className="h-9 w-[78px] overflow-hidden shrink-0 rounded">
             <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
@@ -410,7 +404,6 @@ export function ChatWidget() {
           </div>
         </div>
 
-        {/* Launch screen body */}
         <div className="flex flex-col items-center justify-center flex-1 p-8 text-center space-y-6 animate-in fade-in zoom-in duration-500">
           <div className="h-16 w-[140px] overflow-hidden rounded-lg mb-2">
             <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
@@ -464,7 +457,6 @@ export function ChatWidget() {
 
   return (
     <div className="flex flex-col h-full bg-background relative overflow-hidden">
-      {/* Header */}
       <div className="px-5 py-3 flex items-center gap-3 bg-[#18181E] text-white z-10 shrink-0">
         <div className="h-9 w-[78px] overflow-hidden shrink-0 rounded">
           <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
@@ -478,7 +470,6 @@ export function ChatWidget() {
         </div>
       </div>
 
-      {/* Messages */}
       <ScrollArea className="flex-1 px-4 py-6 bg-muted/30" ref={scrollRef}>
         <div className="space-y-6 pb-20">
           <AnimatePresence initial={false}>

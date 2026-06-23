@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * API specification for AI Квалификатор ИНОБР
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 import {
   useMutation,
@@ -427,7 +427,7 @@ export const getSaveDiagnosticAnswersUrl = () => {
 }
 
 /**
- * @summary Save all diagnostic answers after completion
+ * @summary Save diagnostic answers as a single flat record
  */
 export const saveDiagnosticAnswers = async (diagnosticAnswersInput: DiagnosticAnswersInput, options?: RequestInit): Promise<DiagnosticAnswersResult> => {
 
@@ -476,7 +476,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type SaveDiagnosticAnswersMutationError = ErrorType<ErrorResponse>
 
     /**
- * @summary Save all diagnostic answers after completion
+ * @summary Save diagnostic answers as a single flat record
  */
 export const useSaveDiagnosticAnswers = <TError = ErrorType<ErrorResponse>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveDiagnosticAnswers>>, TError,{data: BodyType<DiagnosticAnswersInput>}, TContext>, request?: SecondParameter<typeof customFetch>}

@@ -17,16 +17,14 @@ router.post("/sessions", async (req, res): Promise<void> => {
     res.status(201).json({
       sessionId: session.id,
       sessionKey: session.sessionKey,
-      sessionToken: session.sessionKey,
     });
   } catch (err: unknown) {
-    const e = err as Error & { cause?: Error & { code?: string; detail?: string; message?: string } };
-    req.log.error({ pgCode: e.cause?.code, pgMessage: e.cause?.message, msg: e.message }, "Session insert failed");
-    res.status(500).json({
-      error: e.message,
-      pgCode: e.cause?.code,
-      pgMessage: e.cause?.message,
-    });
+    const e = err as Error & { cause?: Error & { code?: string; message?: string } };
+    req.log.error(
+      { pgCode: e.cause?.code, pgMessage: e.cause?.message, msg: e.message },
+      "Session insert failed"
+    );
+    res.status(500).json({ error: e.message, pgCode: e.cause?.code, pgMessage: e.cause?.message });
   }
 });
 

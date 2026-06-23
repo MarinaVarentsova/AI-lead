@@ -1,4 +1,6 @@
 - [OpenAI via native fetch](openai-native-fetch.md) — openai npm package fails to install in this environment; use Node 24 built-in fetch to call the Chat Completions API directly.
 - [Zod in api-server routes](zod-api-server.md) — zod is NOT a direct dependency of @workspace/api-server; existing routes import schemas from @workspace/api-zod. New routes must use manual validation or add zod explicitly.
-- [DB schema push](db-schema-push.md) — drizzle-kit push times out in this environment; use psql with ALTER TABLE ... ADD COLUMN IF NOT EXISTS instead.
+- [DB schema push](db-schema-push.md) — drizzle-kit push --force does NOT bypass TTY column-rename prompt; drop all AI tables first (reset:ai-tables script), then push to get clean CREATE with no conflicts.
 - [pnpm install timeouts](pnpm-install-timeouts.md) — pnpm install and pnpm add both time out or fail silently in this environment for large packages. Add to package.json manually then run pnpm install at root, or use psql/native approaches to avoid large dependencies.
+- [Dict schema code-based](dict-schema.md) — all ai_dict_* tables use code text primaryKey + name text (NOT serial id + label). Frontend uses opt.code / opt.name.
+- [UUID schema](uuid-schema.md) — all operational AI tables use uuid().primaryKey().defaultRandom(), not serial. ai_messages uses `message` (not `content`). ai_leads has no sessionId, no educationType/experienceArea (those go in ai_diagnostic_answers).

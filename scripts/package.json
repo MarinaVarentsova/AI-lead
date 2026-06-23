@@ -6,6 +6,7 @@
   "scripts": {
     "hello": "tsx ./src/hello.ts",
     "seed:dictionaries": "tsx ./src/seed-dictionaries.ts",
+    "reset:ai-tables": "tsx ./src/reset-ai-tables.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {

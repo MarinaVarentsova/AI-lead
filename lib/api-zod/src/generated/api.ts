@@ -3,7 +3,7 @@
  * Do not edit manually.
  * Api
  * API specification for AI Квалификатор ИНОБР
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 import * as zod from 'zod';
 
@@ -24,9 +24,8 @@ export const GetDictionaryQueryParams = zod.object({
 })
 
 export const GetDictionaryResponseItem = zod.object({
-  "id": zod.number(),
-  "label": zod.string(),
-  "sortOrder": zod.number()
+  "code": zod.string(),
+  "name": zod.string()
 })
 export const GetDictionaryResponse = zod.array(GetDictionaryResponseItem)
 
@@ -35,7 +34,7 @@ export const GetDictionaryResponse = zod.array(GetDictionaryResponseItem)
  * @summary Create a new conversation when diagnostic starts
  */
 export const CreateConversationBody = zod.object({
-  "sessionId": zod.number()
+  "sessionId": zod.string().uuid()
 })
 
 
@@ -43,24 +42,25 @@ export const CreateConversationBody = zod.object({
  * @summary Save a single chat message
  */
 export const SaveMessageBody = zod.object({
-  "conversationId": zod.number(),
-  "role": zod.enum(['bot', 'user']),
-  "content": zod.string()
+  "conversationId": zod.string().uuid(),
+  "role": zod.enum(['user', 'assistant', 'system']),
+  "message": zod.string()
 })
 
 
 /**
- * @summary Save all diagnostic answers after completion
+ * @summary Save diagnostic answers as a single flat record
  */
 export const SaveDiagnosticAnswersBody = zod.object({
-  "conversationId": zod.number(),
-  "answers": zod.array(zod.object({
-  "questionNumber": zod.number(),
-  "questionKey": zod.string(),
-  "answerText": zod.string(),
-  "dictId": zod.number().nullish(),
-  "isCustom": zod.boolean()
-}))
+  "conversationId": zod.string().uuid(),
+  "experienceArea": zod.string().optional(),
+  "experienceAreaRaw": zod.string().optional(),
+  "experienceYears": zod.string().optional(),
+  "experienceYearsRaw": zod.string().optional(),
+  "educationType": zod.string().optional(),
+  "educationTypeRaw": zod.string().optional(),
+  "goal": zod.string().optional(),
+  "goalRaw": zod.string().optional()
 })
 
 

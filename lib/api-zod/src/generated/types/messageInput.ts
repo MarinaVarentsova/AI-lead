@@ -3,12 +3,12 @@
  * Do not edit manually.
  * Api
  * API specification for AI Квалификатор ИНОБР
- * OpenAPI spec version: 0.2.0
+ * OpenAPI spec version: 0.3.0
  */
 import type { MessageInputRole } from './messageInputRole';
 
 export interface MessageInput {
-  conversationId: number;
+  conversationId: string;
   role: MessageInputRole;
-  content: string;
+  message: string;
 }

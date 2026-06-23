@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
-  version: 0.2.0
+  version: 0.3.0
   description: API specification for AI Квалификатор ИНОБР
 servers:
   - url: /api
@@ -133,7 +133,7 @@ paths:
     post:
       operationId: saveDiagnosticAnswers
       tags: [diagnostic]
-      summary: Save all diagnostic answers after completion
+      summary: Save diagnostic answers as a single flat record
       requestBody:
         required: true
         content:
@@ -172,22 +172,21 @@ components:
 
     DictionaryItem:
       type: object
-      required: [id, label, sortOrder]
+      required: [code, name]
       properties:
-        id:
-          type: integer
-        label:
+        code:
           type: string
-        sortOrder:
-          type: integer
+        name:
+          type: string
 
     SessionResult:
       type: object
-      required: [sessionId, sessionToken]
+      required: [sessionId, sessionKey]
       properties:
         sessionId:
-          type: integer
-        sessionToken:
+          type: string
+          format: uuid
+        sessionKey:
           type: string
 
     ConversationInput:
@@ -195,27 +194,33 @@ components:
       required: [sessionId]
       properties:
         sessionId:
-          type: integer
+          type: string
+          format: uuid
 
     ConversationResult:
       type: object
-      required: [conversationId, sessionId]
+      required: [conversationId, sessionId, currentStep]
       properties:
         conversationId:
-          type: integer
+          type: string
+          format: uuid
         sessionId:
-          type: integer
+          type: string
+          format: uuid
+        currentStep:
+          type: string
 
     MessageInput:
       type: object
-      required: [conversationId, role, content]
+      required: [conversationId, role, message]
       properties:
         conversationId:
-          type: integer
+          type: string
+          format: uuid
         role:
           type: string
-          enum: [bot, user]
-        content:
+          enum: [user, assistant, system]
+        message:
           type: string
 
     MessageResult:
@@ -223,41 +228,42 @@ components:
       required: [messageId, conversationId]
       properties:
         messageId:
-          type: integer
+          type: string
+          format: uuid
         conversationId:
-          type: integer
-
-    DiagnosticAnswerItem:
-      type: object
-      required: [questionNumber, questionKey, answerText, isCustom]
-      properties:
-        questionNumber:
-          type: integer
-        questionKey:
           type: string
-        answerText:
-          type: string
-        dictId:
-          type: ["integer", "null"]
-        isCustom:
-          type: boolean
+          format: uuid
 
     DiagnosticAnswersInput:
       type: object
-      required: [conversationId, answers]
+      required: [conversationId]
       properties:
         conversationId:
-          type: integer
-        answers:
-          type: array
-          items:
-            $ref: "#/components/schemas/DiagnosticAnswerItem"
+          type: string
+          format: uuid
+        experienceArea:
+          type: string
+        experienceAreaRaw:
+          type: string
+        experienceYears:
+          type: string
+        experienceYearsRaw:
+          type: string
+        educationType:
+          type: string
+        educationTypeRaw:
+          type: string
+        goal:
+          type: string
+        goalRaw:
+          type: string
 
     DiagnosticAnswersResult:
       type: object
       required: [saved, conversationId]
       properties:
         saved:
-          type: integer
+          type: boolean
         conversationId:
-          type: integer
+          type: string
+          format: uuid
