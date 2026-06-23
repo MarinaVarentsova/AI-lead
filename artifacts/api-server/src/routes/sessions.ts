@@ -5,22 +5,31 @@ import { randomUUID } from "crypto";
 const router: IRouter = Router();
 
 router.post("/sessions", async (req, res): Promise<void> => {
-  const sessionToken = randomUUID();
+  console.log("SESSION START");
 
   try {
+    console.log("STEP 1 — generating token");
+    const sessionToken = randomUUID();
+
+    console.log("STEP 2 — inserting into db, token:", sessionToken);
     const [session] = await db
       .insert(aiSessions)
       .values({ sessionToken })
       .returning();
 
+    console.log("STEP 3 — insert OK, session id:", session?.id);
     req.log.info({ sessionId: session.id }, "Session created");
     res.status(201).json({
       sessionId: session.id,
       sessionToken: session.sessionToken,
     });
-  } catch (err: unknown) {
-    const e = err as Error & { cause?: Error & { code?: string; detail?: string; message?: string } };
-    req.log.error({ pgCode: e.cause?.code, pgDetail: e.cause?.detail, pgMessage: e.cause?.message, msg: e.message }, "Session insert failed");
+  } catch (error: unknown) {
+    console.error("SESSION ERROR:", error);
+    console.error("STACK:", error instanceof Error ? error.stack : String(error));
+
+    const e = error as Error & {
+      cause?: Error & { code?: string; detail?: string; message?: string };
+    };
     res.status(500).json({
       error: e.message,
       pgCode: e.cause?.code,
