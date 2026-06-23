@@ -14,11 +14,9 @@
 
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
-  --color-card-border: hsl(var(--card-border));
 
   --color-popover: hsl(var(--popover));
   --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-popover-border: hsl(var(--popover-border));
 
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
@@ -44,71 +42,43 @@
 }
 
 :root {
-  /* #EEEEE8 — тёплый светло-бежевый фон (как на сайте ИНОБР) */
-  --background: 60 8% 92%;
-  /* #1A1A1A — почти чёрный текст */
-  --foreground: 0 0% 10%;
+  /* #F7F8FA — официальный светлый фон */
+  --background: 220 17% 97%;
+  /* #1F2933 — тёмный графитовый текст */
+  --foreground: 211 25% 16%;
 
-  /* cards = white */
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 10%;
+  --card-foreground: 211 25% 16%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 10%;
+  --popover-foreground: 211 25% 16%;
 
-  /* #3BB244 — зелёный акцент ИНОБР */
-  --primary: 122 52% 45%;
+  /* #35B44A — фирменный зелёный ИНОБР */
+  --primary: 130 53% 46%;
   --primary-foreground: 0 0% 100%;
 
-  /* светло-зелёный фон для bot-пузырей */
-  --secondary: 122 40% 95%;
-  --secondary-foreground: 0 0% 10%;
+  /* светло-зелёный оттенок для hover */
+  --secondary: 130 40% 95%;
+  --secondary-foreground: 130 53% 36%;
 
-  /* #F5F5EF — приглушённый тёплый фон */
-  --muted: 60 8% 96%;
-  --muted-foreground: 0 0% 40%;
+  /* #F7F8FA — нейтральный фон */
+  --muted: 220 17% 96%;
+  /* #5B6773 — вторичный текст */
+  --muted-foreground: 211 12% 40%;
 
-  /* accent = лёгкий зелёный */
-  --accent: 122 40% 95%;
-  --accent-foreground: 122 52% 35%;
+  --accent: 130 40% 94%;
+  --accent-foreground: 130 53% 36%;
 
-  --destructive: 0 84% 60%;
+  /* #D93025 — ошибки */
+  --destructive: 3 67% 50%;
   --destructive-foreground: 0 0% 100%;
 
-  /* #DDDDD7 — тёплая граница */
-  --border: 60 6% 84%;
-  --input: 60 6% 84%;
-  --ring: 122 52% 45%;
+  /* #E4E7EB — бордеры */
+  --border: 213 14% 87%;
+  --input: 213 14% 87%;
+  --ring: 130 53% 46%;
 
   --radius: 0.5rem;
-
-  --chart-1: 122 52% 45%;
-  --chart-2: 0 0% 10%;
-  --chart-3: 60 8% 92%;
-  --chart-4: 60 6% 84%;
-  --chart-5: 0 0% 40%;
-}
-
-.dark {
-  --background: 0 0% 8%;
-  --foreground: 60 5% 95%;
-  --card: 0 0% 11%;
-  --card-foreground: 60 5% 95%;
-  --popover: 0 0% 11%;
-  --popover-foreground: 60 5% 95%;
-  --primary: 122 52% 48%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 15%;
-  --secondary-foreground: 60 5% 95%;
-  --muted: 0 0% 14%;
-  --muted-foreground: 0 0% 55%;
-  --accent: 0 0% 15%;
-  --accent-foreground: 122 52% 65%;
-  --destructive: 0 84% 60%;
-  --destructive-foreground: 0 0% 100%;
-  --border: 0 0% 20%;
-  --input: 0 0% 20%;
-  --ring: 122 52% 48%;
 }
 
 @layer base {
