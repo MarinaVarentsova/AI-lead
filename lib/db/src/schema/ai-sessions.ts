@@ -2,8 +2,13 @@ import { pgTable, serial, text, timestamp, integer, boolean } from "drizzle-orm/
 
 export const aiSessions = pgTable("ai_sessions", {
   id: serial("id").primaryKey(),
-  sessionToken: text("session_token").notNull().unique(),
-  status: text("status").notNull().default("active"),
+  sessionKey: text("session_key"),
+  firstPageUrl: text("first_page_url"),
+  utmSource: text("utm_source"),
+  utmMedium: text("utm_medium"),
+  utmCampaign: text("utm_campaign"),
+  utmContent: text("utm_content"),
+  utmTerm: text("utm_term"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
