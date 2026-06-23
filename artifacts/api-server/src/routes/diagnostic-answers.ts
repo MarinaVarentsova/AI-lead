@@ -25,11 +25,6 @@ router.post("/diagnostic-answers", async (req, res): Promise<void> => {
 
   await db.insert(aiDiagnosticAnswers).values(rows);
 
-  await db
-    .update(aiConversations)
-    .set({ status: "completed" })
-    .where(eq(aiConversations.id, conversationId));
-
   req.log.info({ conversationId, count: rows.length }, "Diagnostic answers saved");
   res.status(201).json({ saved: rows.length, conversationId });
 });

@@ -18,7 +18,6 @@ export const aiConversations = pgTable("ai_conversations", {
   sessionId: integer("session_id")
     .notNull()
     .references(() => aiSessions.id),
-  status: text("status").notNull().default("in_progress"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
