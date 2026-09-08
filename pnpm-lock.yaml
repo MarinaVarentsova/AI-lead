@@ -78,6 +78,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@workspace/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@workspace/api-zod':
         specifier: workspace:*
         version: link:../../packages/api-zod
