@@ -1,0 +1,10 @@
+[
+  { "question": "Сколько стоит обучение?", "expected": ["prices"] },
+  { "question": "Можно ли поступить с экономическим дипломом?", "expected": ["admission", "non_profile", "stroyexpert"] },
+  { "question": "У меня только аттестат", "expected": ["school_restriction", "apartment_acceptance"], "excluded": ["stroyexpert"] },
+  { "question": "Можно потом работать судебным экспертом?", "expected": ["judicial", "legal_limits"] },
+  { "question": "Где брать заказы?", "expected": ["orders", "guarantees"] },
+  { "question": "Чем отличается приемка квартир от стройэксперта?", "expected": ["apartment_acceptance", "stroyexpert", "comparison"] },
+  { "question": "Мне нужен строительный контроль ИЖС", "expected": ["house_control"] },
+  { "question": "Какие документы нужны?", "expected": ["documents"] }
+]
