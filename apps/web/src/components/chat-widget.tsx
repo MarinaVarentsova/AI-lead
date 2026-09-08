@@ -14,6 +14,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  completeDiagnostic, DIAGNOSTIC_ERROR,
+  type DiagnosticPayload, type DiagnoseResponse, type StructuredDiagnosticResult,
+} from "@/lib/diagnostic-result";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -28,12 +32,6 @@ type DiagnosticAnswer = {
   questionKey: string;
   code: string;
   raw: string;
-};
-
-type DiagnoseResult = {
-  result: string;
-  isAI: boolean;
-  educationType: string | null;
 };
 
 type ContactPhase = "channel" | "details" | "submitted";
@@ -97,25 +95,6 @@ const CONTACT_CHANNELS = [
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
 
-async function apiDiagnose(conversationId: string) {
-  const res = await fetch("/api/diagnose", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ conversationId }),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json() as Promise<DiagnoseResult>;
-}
-
-// fire-and-forget CRM qualification (result not shown to user)
-function fireQualify(conversationId: string) {
-  fetch("/api/qualify", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ conversationId }),
-  }).catch(() => {});
-}
-
 async function apiContact(payload: {
   conversationId: string;
   contactChannel: string;
@@ -157,10 +136,12 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
 }
 
 function ResultCard({
-  resultText,
+  result,
+  onAskQuestion,
   onGetConsultation,
 }: {
-  resultText: string;
+  result: StructuredDiagnosticResult;
+  onAskQuestion: () => void;
   onGetConsultation: () => void;
 }) {
   return (
@@ -171,16 +152,44 @@ function ResultCard({
       </div>
 
       <div className="text-sm text-foreground leading-[1.6] whitespace-pre-wrap">
-        {resultText}
+        <p>{result.summary}</p>
+        <dl className="space-y-2 mt-3">
+          {([
+            ["Опыт", result.experience],
+            ["Стаж", result.experienceYears],
+            ["Образование", result.education],
+            ["Цель", result.goal],
+            ["Рекомендация", result.recommendation],
+          ] as const).map(([label, value]) => (
+            <div key={label}>
+              <dt className="font-semibold">{label}:</dt>
+              <dd>{value}</dd>
+            </div>
+          ))}
+        </dl>
+        {result.importantNote !== null && (
+          <div className="rounded-lg bg-secondary p-3 mt-3">
+            <p className="font-semibold">Важно</p>
+            <p>{result.importantNote}</p>
+          </div>
+        )}
       </div>
 
 
+      <Button
+        data-testid="button-ask-question"
+        variant="outline"
+        onClick={onAskQuestion}
+        className="w-full rounded-lg text-sm font-medium border-primary text-primary"
+      >
+        Задать вопрос
+      </Button>
       <Button
         data-testid="button-get-consultation"
         onClick={onGetConsultation}
         className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium"
       >
-        Получить консультацию
+        Связаться с менеджером
         <ChevronRight className="w-4 h-4 ml-1" />
       </Button>
     </div>
@@ -199,6 +208,14 @@ export function ChatWidget() {
   const [customInput, setCustomInput] = useState("");
   const [activeCustomQ, setActiveCustomQ] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState(false);
+
+  const [diagnosticStatus, setDiagnosticStatus] = useState<"idle" | "loading" | "error" | "success">("idle");
+  const [diagnosticResult, setDiagnosticResult] = useState<DiagnoseResponse | null>(null);
+  const [postDiagnosticState, setPostDiagnosticState] = useState<"result" | "post-diagnostic-ready">("result");
+  const [questionDraft, setQuestionDraft] = useState("");
+  const diagnosticBusy = useRef(false);
+  const pendingDiagnostic = useRef<DiagnosticPayload | null>(null);
+  const answeredCount = useRef(0);
 
   // Contact form
   const [contactPhase, setContactPhase] = useState<ContactPhase | null>(null);
@@ -239,7 +256,7 @@ export function ChatWidget() {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }
-  }, [messages, isTyping, currentDictionary, activeCustomQ, contactPhase]);
+  }, [messages, isTyping, currentDictionary, activeCustomQ, contactPhase, diagnosticStatus, postDiagnosticState]);
 
   const uid = () => Date.now().toString() + Math.random().toString(36).slice(2);
 
@@ -302,78 +319,49 @@ export function ChatWidget() {
     submitAnswer(qIndex, "other", customInput.trim());
   };
 
+  const generateResult = async (payload: DiagnosticPayload) => {
+    if (diagnosticBusy.current) return;
+    diagnosticBusy.current = true;
+    pendingDiagnostic.current = payload;
+    setDiagnosticStatus("loading");
+    try {
+      const response = await completeDiagnostic(payload, (data) =>
+        saveDiagnosticAnswers.mutateAsync({ data }),
+      );
+      setDiagnosticResult(response);
+      setDiagnosticStatus("success");
+    } catch {
+      setDiagnosticStatus("error");
+    } finally {
+      diagnosticBusy.current = false;
+    }
+  };
+
   const submitAnswer = (qIndex: number, code: string, raw: string) => {
+    // Synchronous guards also cover repeated clicks before React re-renders.
+    if (!conversationId || diagnosticBusy.current || qIndex !== answeredCount.current) return;
+    answeredCount.current++;
     const q = QUESTIONS[qIndex];
     const newAnswer: DiagnosticAnswer = { questionNumber: qIndex + 1, questionKey: q.key, code, raw };
     const allAnswers = [...answers, newAnswer];
     setAnswers(allAnswers);
-
     setMessages((prev) => [...prev, { id: uid(), role: "user", content: raw }]);
-    const nextStep = qIndex + 3;
-    setStep(nextStep);
-
-    if (!conversationId) return;
-    const convId = conversationId;
+    setStep(qIndex + 3);
 
     if (qIndex < QUESTIONS.length - 1) {
-      // Показываем следующий вопрос напрямую — без вызова OpenAI
       addBotMessage(QUESTION_TEXTS[qIndex + 1]);
     } else {
-      // 4th answer — save and qualify
-      setIsTyping(true);
-
-      const diagnosticData = {
-        conversationId: convId,
-        experienceArea: allAnswers[0]?.code,
-        experienceAreaRaw: allAnswers[0]?.raw,
-        experienceYears: allAnswers[1]?.code,
-        experienceYearsRaw: allAnswers[1]?.raw,
-        educationType: allAnswers[2]?.code,
-        educationTypeRaw: allAnswers[2]?.raw,
-        goal: allAnswers[3]?.code,
-        goalRaw: allAnswers[3]?.raw,
-      };
-
-      saveDiagnosticAnswers.mutate(
-        { data: diagnosticData },
-        {
-          onSuccess: async () => {
-            // fire-and-forget CRM qualification in background
-            fireQualify(convId);
-            try {
-              const diagnose = await apiDiagnose(convId);
-              setIsTyping(false);
-              addBotMessage(
-                <ResultCard
-                  resultText={diagnose.result}
-                  onGetConsultation={() => setContactPhase("channel")}
-                />
-              );
-            } catch {
-              setIsTyping(false);
-              addBotMessage(
-                <ResultCard
-                  resultText={
-                    "Спасибо за ответы. На основании диагностики специалист ИНОБР сможет подобрать подходящее направление обучения. Чтобы получить персональную консультацию, оставьте удобный способ связи."
-                  }
-                  onGetConsultation={() => setContactPhase("channel")}
-                />
-              );
-            }
-          },
-          onError: () => {
-            setIsTyping(false);
-            addBotMessage(
-              <ResultCard
-                resultText={
-                  "Спасибо за ответы. На основании диагностики специалист ИНОБР сможет подобрать подходящее направление обучения. Чтобы получить персональную консультацию, оставьте удобный способ связи."
-                }
-                onGetConsultation={() => setContactPhase("channel")}
-              />
-            );
-          },
-        }
-      );
+      void generateResult({
+        conversationId,
+        experienceArea: allAnswers[0].code,
+        experienceAreaRaw: allAnswers[0].raw,
+        experienceYears: allAnswers[1].code,
+        experienceYearsRaw: allAnswers[1].raw,
+        educationType: allAnswers[2].code,
+        educationTypeRaw: allAnswers[2].raw,
+        goal: allAnswers[3].code,
+        goalRaw: allAnswers[3].raw,
+      });
     }
   };
 
@@ -772,6 +760,43 @@ export function ChatWidget() {
               </motion.div>
             )}
           </AnimatePresence>
+
+          {diagnosticStatus === "loading" && (
+            <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground px-4">
+              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+              Формируем результат диагностики...
+            </div>
+          )}
+          {diagnosticStatus === "error" && (
+            <div role="alert" className="rounded-xl border border-border bg-white p-4 space-y-3">
+              <p className="text-sm">{DIAGNOSTIC_ERROR}</p>
+              <Button onClick={() => {
+                if (pendingDiagnostic.current) void generateResult(pendingDiagnostic.current);
+              }} className="rounded-lg" data-testid="button-retry-diagnostic">
+                Повторить
+              </Button>
+            </div>
+          )}
+          {diagnosticStatus === "success" && diagnosticResult && (
+            <ResultCard
+              result={diagnosticResult.structuredResult}
+              onAskQuestion={() => setPostDiagnosticState("post-diagnostic-ready")}
+              onGetConsultation={() => setContactPhase((phase) => phase ?? "channel")}
+            />
+          )}
+          {postDiagnosticState === "post-diagnostic-ready" && (
+            <div className="rounded-xl border border-border bg-white p-4 space-y-2">
+              <Textarea
+                value={questionDraft}
+                onChange={(event) => setQuestionDraft(event.target.value)}
+                placeholder="Что хотите уточнить?"
+                aria-label="Что хотите уточнить?"
+                className="min-h-[80px] text-sm resize-none rounded-xl"
+              />
+              <Button disabled className="rounded-lg text-sm">Отправить</Button>
+              <p className="text-xs text-muted-foreground">Отправка вопросов пока недоступна.</p>
+            </div>
+          )}
 
           {/* "Начать" button (step 1) */}
           {step === 1 && !isTyping && (
