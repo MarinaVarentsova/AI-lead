@@ -8,7 +8,7 @@ import {
 
 export function generateDiagnosticFallback(facts: DiagnosticFactsPacket): DiagnosticAIResult {
   const schoolGuard = hasSchoolGuard(facts);
-  let recommendedTrack = facts.recommendedTrackHint ?? "not_defined";
+  let recommendedTrack: DiagnosticAIResult["recommendedTrack"] = facts.recommendedTrackHint ?? "not_defined";
   if (schoolGuard && recommendedTrack === "construction_expertise") recommendedTrack = "not_defined";
   const recommendation = recommendedTrack === "apartment_acceptance"
     ? "Рекомендуем рассмотреть направление приёмки квартир с учётом вашего опыта, образования и цели."

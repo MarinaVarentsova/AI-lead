@@ -1,8 +1,30 @@
 # POST /api/diagnose — stage 3B cases
 
-No test runner is configured. These are specifications for isolated route tests,
-not a claim of executed tests. Mock DB reads/inserts and provider responses; never
-use production PostgreSQL or the real Yandex endpoint.
+No external test runner is configured or installed. Stage 3C adds a standalone
+Node assertion script using the existing TypeScript dependency for in-memory
+module loading. Run with Node 22.15+:
+
+```sh
+node tests/unit/diagnose-route.check.mjs
+# Or from apps/api using its check:diagnose package script.
+```
+
+The script invokes the actual Express route handler with substituted DB reads,
+inserts and request/response objects. It runs the real resolver, result service,
+formatter and missing-configuration path of YandexAIProvider. A global fetch trap
+asserts zero network calls. The AI success/guard cases use a stub provider result.
+It does not verify a live HTTP server or PostgreSQL deployment.
+
+Stage 3C verification: both domain and API typechecks pass. 25 route cases plus
+fenced-JSON/invalid-JSON parser assertions pass. Route cases cover the scenarios
+below, persistence before HTTP success, log ordering and private-data exclusion.
+
+Workspace wiring: apps/api already declares @workspace/domain as workspace:*,
+the domain export is ./diagnostic, and pnpm-workspace.yaml includes packages/*.
+The missing local apps/api/node_modules/@workspace/domain junction was restored
+to packages/domain. No dependency or lockfile changes were needed. The assertion
+script resolves the domain from apps/api and fails if this local link is missing;
+it does not substitute an alias to conceal a wiring failure.
 
 Use conversationId `11111111-1111-4111-8111-111111111111` and the corresponding
 fixture row in `diagnose-route.fixtures.json`. Drizzle properties are camelCase;
