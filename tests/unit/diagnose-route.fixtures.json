@@ -1,0 +1,25 @@
+{
+  "conversationId": "11111111-1111-4111-8111-111111111111",
+  "row": {
+    "experienceArea": "construction",
+    "experienceAreaRaw": "Строительство",
+    "experienceYears": "more_than_10",
+    "experienceYearsRaw": "Более 10 лет",
+    "educationType": "non_profile",
+    "educationTypeRaw": "Непрофильное высшее образование",
+    "goal": "construction_expertise",
+    "goalRaw": "Строительная экспертиза"
+  },
+  "validResult": {
+    "summary": "Вы рассматриваете строительную экспертизу с опытом работы в строительстве.",
+    "experience": "У вас есть практический опыт в строительстве.",
+    "experienceYears": "Ваш стаж превышает десять лет.",
+    "education": "Непрофильное высшее образование не препятствует поступлению на программу «Стройэксперт».",
+    "goal": "Ваша цель — строительная экспертиза.",
+    "recommendation": "Рекомендуем рассмотреть программу «Стройэксперт» с учётом практического опыта и цели.",
+    "recommendedTrack": "construction_expertise",
+    "importantNote": null
+  },
+  "factsPacketKeys": ["sourceVersion", "experience", "experienceYears", "education", "goal", "rawAnswers", "guards", "recommendedTrackHint"],
+  "expectedSourceVersion": "inobr-diagnostic-rules-v1"
+}

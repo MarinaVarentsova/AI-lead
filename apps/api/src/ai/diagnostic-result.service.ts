@@ -1,5 +1,6 @@
 import { DiagnosticKnowledgeResolver, type DiagnosticAnswers } from "@workspace/domain/diagnostic";
 import type { AIProvider } from "./provider";
+import { selectDiagnosticFacts } from "./diagnostic-result.prompt";
 import {
   DiagnosticAIError, hasSchoolGuard, validateDiagnosticResult,
   type DiagnosticAIErrorCode, type DiagnosticAIResult, type DiagnosticFactsPacket,
@@ -43,9 +44,15 @@ export class DiagnosticResultService {
     // Invalid answers are domain errors, not provider failures to hide with fallback.
     const resolved = DiagnosticKnowledgeResolver.resolve(answers);
     const facts = DiagnosticKnowledgeResolver.buildFactsPacket(resolved);
+    return this.generate(facts);
+  }
+
+  /** Accepts the verified packet produced by DiagnosticKnowledgeResolver. */
+  async generate(input: DiagnosticFactsPacket): Promise<DiagnosticResultOutcome> {
+    const facts = selectDiagnosticFacts(input);
     try {
       const result = await this.provider.generateDiagnosticResult(
-        DiagnosticKnowledgeResolver.buildFactsPacket(resolved),
+        selectDiagnosticFacts(facts),
       );
       return { result: validateDiagnosticResult(result, facts), source: "ai" };
     } catch (error) {
