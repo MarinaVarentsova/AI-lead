@@ -1,0 +1,478 @@
+[
+  {
+    "id": "case-1-technical-expertise",
+    "input": {
+      "experienceArea": "construction",
+      "experienceYears": "from_3_to_10",
+      "educationType": "higher_technical",
+      "goal": "construction_expertise"
+    },
+    "expected": {
+      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "ruleKeys": [
+        "experience",
+        "experienceYears",
+        "education",
+        "goal"
+      ],
+      "ruleCount": 4,
+      "guards": [],
+      "recommendedTrackHint": "construction_expertise"
+    }
+  },
+  {
+    "id": "case-2-school-apartment",
+    "input": {
+      "experienceArea": "no_experience",
+      "experienceYears": "none",
+      "educationType": "school_only",
+      "goal": "apartment_acceptance"
+    },
+    "expected": {
+      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "ruleKeys": [
+        "experience",
+        "experienceYears",
+        "education",
+        "goal"
+      ],
+      "ruleCount": 4,
+      "guards": [
+        {
+          "code": "school_only_no_dpo",
+          "severity": "hard",
+          "rule": "Do not recommend SSTE/DPO as the primary training path."
+        }
+      ],
+      "recommendedTrackHint": "apartment_acceptance"
+    }
+  },
+  {
+    "id": "case-3-school-expertise",
+    "input": {
+      "experienceArea": "construction",
+      "experienceYears": "more_than_10",
+      "educationType": "school_only",
+      "goal": "construction_expertise"
+    },
+    "expected": {
+      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "ruleKeys": [
+        "experience",
+        "experienceYears",
+        "education",
+        "goal"
+      ],
+      "ruleCount": 4,
+      "guards": [
+        {
+          "code": "school_only_no_dpo",
+          "severity": "hard",
+          "rule": "Do not recommend SSTE/DPO as the primary training path."
+        }
+      ],
+      "recommendedTrackHint": null
+    }
+  },
+  {
+    "id": "case-4-other-raw",
+    "input": {
+      "experienceArea": "other",
+      "experienceAreaRaw": "Управление строительными проектами",
+      "experienceYears": "related_experience",
+      "educationType": "non_profile",
+      "goal": "expand_services"
+    },
+    "expected": {
+      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "ruleKeys": [
+        "experience",
+        "experienceYears",
+        "education",
+        "goal"
+      ],
+      "ruleCount": 4,
+      "guards": [],
+      "recommendedTrackHint": null,
+      "answerRaw": {
+        "experienceArea": "Управление строительными проектами"
+      },
+      "factsPacketRaw": {
+        "experienceArea": "Управление строительными проектами"
+      }
+    }
+  },
+  {
+    "id": "case-5-unknown-code",
+    "input": {
+      "experienceArea": "constructon",
+      "experienceYears": "from_3_to_10",
+      "educationType": "higher_technical",
+      "goal": "construction_expertise"
+    },
+    "expectedError": {
+      "name": "DiagnosticValidationError",
+      "code": "DIAGNOSTIC_VALIDATION_ERROR",
+      "issues": [
+        {
+          "field": "experienceArea",
+          "code": "unknown_code"
+        }
+      ],
+      "noResolvedResult": true
+    }
+  },
+  {
+    "id": "clarification-raw",
+    "input": {
+      "experienceArea": "construction",
+      "experienceYears": "need_clarification",
+      "educationType": "need_clarification",
+      "goal": "construction_expertise",
+      "experienceYearsRaw": "Работал периодически",
+      "educationTypeRaw": "Иностранный диплом"
+    },
+    "expected": {
+      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "ruleKeys": [
+        "experience",
+        "experienceYears",
+        "education",
+        "goal"
+      ],
+      "ruleCount": 4,
+      "guards": [],
+      "recommendedTrackHint": null,
+      "answerRaw": {
+        "experienceYears": "Работал периодически",
+        "educationType": "Иностранный диплом"
+      },
+      "factsPacketRaw": {
+        "experienceYears": "Работал периодически",
+        "educationType": "Иностранный диплом"
+      }
+    }
+  },
+  {
+    "id": "secondary-technical",
+    "input": {
+      "experienceArea": "construction",
+      "experienceYears": "from_3_to_10",
+      "educationType": "secondary_technical",
+      "goal": "construction_expertise"
+    },
+    "expected": {
+      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "ruleKeys": [
+        "experience",
+        "experienceYears",
+        "education",
+        "goal"
+      ],
+      "ruleCount": 4,
+      "guards": [],
+      "recommendedTrackHint": "construction_expertise"
+    }
+  },
+  {
+    "id": "apartment-goal-priority",
+    "input": {
+      "experienceArea": "construction",
+      "experienceYears": "from_3_to_10",
+      "educationType": "higher_technical",
+      "goal": "apartment_acceptance"
+    },
+    "expected": {
+      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "ruleKeys": [
+        "experience",
+        "experienceYears",
+        "education",
+        "goal"
+      ],
+      "ruleCount": 4,
+      "guards": [],
+      "recommendedTrackHint": "apartment_acceptance"
+    }
+  },
+  {
+    "id": "unconfirmed-diploma-no-hint",
+    "input": {
+      "experienceArea": "construction",
+      "experienceYears": "from_3_to_10",
+      "educationType": "diploma_not_available",
+      "goal": "construction_expertise"
+    },
+    "expected": {
+      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "ruleKeys": [
+        "experience",
+        "experienceYears",
+        "education",
+        "goal"
+      ],
+      "ruleCount": 4,
+      "guards": [],
+      "recommendedTrackHint": null
+    }
+  },
+  {
+    "id": "non-profile-no-expertise-hint",
+    "input": {
+      "experienceArea": "construction",
+      "experienceYears": "from_3_to_10",
+      "educationType": "non_profile",
+      "goal": "construction_expertise"
+    },
+    "expected": {
+      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "ruleKeys": [
+        "experience",
+        "experienceYears",
+        "education",
+        "goal"
+      ],
+      "ruleCount": 4,
+      "guards": [],
+      "recommendedTrackHint": null
+    }
+  },
+  {
+    "id": "missing-all",
+    "input": {},
+    "expectedError": {
+      "name": "DiagnosticValidationError",
+      "code": "DIAGNOSTIC_VALIDATION_ERROR",
+      "issues": [
+        {
+          "field": "experienceArea",
+          "code": "required"
+        },
+        {
+          "field": "experienceYears",
+          "code": "required"
+        },
+        {
+          "field": "educationType",
+          "code": "required"
+        },
+        {
+          "field": "goal",
+          "code": "required"
+        }
+      ],
+      "noResolvedResult": true
+    }
+  },
+  {
+    "id": "null-input",
+    "input": null,
+    "expectedError": {
+      "name": "DiagnosticValidationError",
+      "code": "DIAGNOSTIC_VALIDATION_ERROR",
+      "issues": [
+        {
+          "field": "answers",
+          "code": "invalid_input"
+        }
+      ],
+      "noResolvedResult": true
+    }
+  },
+  {
+    "id": "no-code-normalization",
+    "input": {
+      "experienceArea": "construction",
+      "experienceYears": "from_3_to_10",
+      "educationType": "higher_technical",
+      "goal": " construction_expertise "
+    },
+    "expectedError": {
+      "name": "DiagnosticValidationError",
+      "code": "DIAGNOSTIC_VALIDATION_ERROR",
+      "issues": [
+        {
+          "field": "goal",
+          "code": "unknown_code"
+        }
+      ],
+      "noResolvedResult": true
+    }
+  },
+  {
+    "id": "prototype-key-rejected",
+    "input": {
+      "experienceArea": "construction",
+      "experienceYears": "from_3_to_10",
+      "educationType": "toString",
+      "goal": "construction_expertise"
+    },
+    "expectedError": {
+      "name": "DiagnosticValidationError",
+      "code": "DIAGNOSTIC_VALIDATION_ERROR",
+      "issues": [
+        {
+          "field": "educationType",
+          "code": "unknown_code"
+        }
+      ],
+      "noResolvedResult": true
+    }
+  },
+  {
+    "id": "invalid-raw-object",
+    "input": {
+      "experienceArea": "construction",
+      "experienceYears": "from_3_to_10",
+      "educationType": "higher_technical",
+      "goal": "construction_expertise",
+      "experienceAreaRaw": {
+        "phone": "DO_NOT_COPY"
+      }
+    },
+    "expectedError": {
+      "name": "DiagnosticValidationError",
+      "code": "DIAGNOSTIC_VALIDATION_ERROR",
+      "issues": [
+        {
+          "field": "experienceAreaRaw",
+          "code": "invalid_raw"
+        }
+      ],
+      "noResolvedResult": true
+    }
+  },
+  {
+    "id": "contact-fields-excluded",
+    "input": {
+      "experienceArea": "construction",
+      "experienceYears": "from_3_to_10",
+      "educationType": "higher_technical",
+      "goal": "construction_expertise",
+      "phone": "DO_NOT_COPY_PHONE",
+      "email": "DO_NOT_COPY_EMAIL",
+      "telegram": "DO_NOT_COPY_TELEGRAM",
+      "name": "DO_NOT_COPY_NAME"
+    },
+    "expected": {
+      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "ruleKeys": [
+        "experience",
+        "experienceYears",
+        "education",
+        "goal"
+      ],
+      "ruleCount": 4,
+      "guards": [],
+      "recommendedTrackHint": "construction_expertise",
+      "factsPacketKeys": [
+        "sourceVersion",
+        "experience",
+        "experienceYears",
+        "education",
+        "goal",
+        "rawAnswers",
+        "guards",
+        "recommendedTrackHint"
+      ],
+      "factsPacketRaw": {
+        "experienceArea": null,
+        "experienceYears": null,
+        "educationType": null,
+        "goal": null
+      },
+      "forbiddenKeysAtAnyDepth": [
+        "phone",
+        "email",
+        "telegram",
+        "name"
+      ],
+      "forbiddenValues": [
+        "DO_NOT_COPY_PHONE",
+        "DO_NOT_COPY_EMAIL",
+        "DO_NOT_COPY_TELEGRAM",
+        "DO_NOT_COPY_NAME"
+      ]
+    }
+  },
+  {
+    "id": "unknown-experienceArea",
+    "input": {
+      "experienceArea": "unknown",
+      "experienceYears": "from_3_to_10",
+      "educationType": "higher_technical",
+      "goal": "construction_expertise"
+    },
+    "expectedError": {
+      "name": "DiagnosticValidationError",
+      "code": "DIAGNOSTIC_VALIDATION_ERROR",
+      "issues": [
+        {
+          "field": "experienceArea",
+          "code": "unknown_code"
+        }
+      ],
+      "noResolvedResult": true
+    }
+  },
+  {
+    "id": "unknown-experienceYears",
+    "input": {
+      "experienceArea": "construction",
+      "experienceYears": "unknown",
+      "educationType": "higher_technical",
+      "goal": "construction_expertise"
+    },
+    "expectedError": {
+      "name": "DiagnosticValidationError",
+      "code": "DIAGNOSTIC_VALIDATION_ERROR",
+      "issues": [
+        {
+          "field": "experienceYears",
+          "code": "unknown_code"
+        }
+      ],
+      "noResolvedResult": true
+    }
+  },
+  {
+    "id": "unknown-educationType",
+    "input": {
+      "experienceArea": "construction",
+      "experienceYears": "from_3_to_10",
+      "educationType": "unknown",
+      "goal": "construction_expertise"
+    },
+    "expectedError": {
+      "name": "DiagnosticValidationError",
+      "code": "DIAGNOSTIC_VALIDATION_ERROR",
+      "issues": [
+        {
+          "field": "educationType",
+          "code": "unknown_code"
+        }
+      ],
+      "noResolvedResult": true
+    }
+  },
+  {
+    "id": "unknown-goal",
+    "input": {
+      "experienceArea": "construction",
+      "experienceYears": "from_3_to_10",
+      "educationType": "higher_technical",
+      "goal": "unknown"
+    },
+    "expectedError": {
+      "name": "DiagnosticValidationError",
+      "code": "DIAGNOSTIC_VALIDATION_ERROR",
+      "issues": [
+        {
+          "field": "goal",
+          "code": "unknown_code"
+        }
+      ],
+      "noResolvedResult": true
+    }
+  }
+]

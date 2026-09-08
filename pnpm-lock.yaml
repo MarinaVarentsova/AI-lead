@@ -360,6 +360,8 @@ importers:
         specifier: ^0.31.10
         version: 0.31.10
 
+  packages/domain: {}
+
   scripts:
     dependencies:
       '@workspace/db':
