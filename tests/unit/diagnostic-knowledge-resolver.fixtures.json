@@ -217,10 +217,10 @@
     }
   },
   {
-    "id": "non-profile-no-expertise-hint",
+    "id": "non-profile-eligible-for-expertise",
     "input": {
       "experienceArea": "construction",
-      "experienceYears": "from_3_to_10",
+      "experienceYears": "more_than_10",
       "educationType": "non_profile",
       "goal": "construction_expertise"
     },
@@ -234,7 +234,7 @@
       ],
       "ruleCount": 4,
       "guards": [],
-      "recommendedTrackHint": null
+      "recommendedTrackHint": "construction_expertise"
     }
   },
   {
