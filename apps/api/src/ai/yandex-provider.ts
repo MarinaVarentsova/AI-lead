@@ -1,4 +1,6 @@
 import type { AIProvider } from "./provider";
+import type { ConsultantAIProvider, ConsultantProviderInput } from "./consultant-chat.types";
+import { CONSULTANT_CHAT_PROMPT, selectConsultantInput } from "./consultant-chat.prompt";
 import { DIAGNOSTIC_RESULT_SYSTEM_PROMPT, selectDiagnosticFacts } from "./diagnostic-result.prompt";
 import {
   DiagnosticAIError, parseDiagnosticResult,
@@ -29,8 +31,38 @@ function readConfiguration(env: YandexEnvironment) {
   return { apiKey, model, folderId, url, timeoutMs };
 }
 
-export class YandexAIProvider implements AIProvider {
+export class YandexAIProvider implements AIProvider, ConsultantAIProvider {
   constructor(private readonly env: YandexEnvironment = process.env) {}
+
+  async generateConsultantReply(input: ConsultantProviderInput): Promise<string> {
+    const config = readConfiguration(this.env);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+    try {
+      const response = await fetch(config.url, {
+        method: "POST", redirect: "error", signal: controller.signal,
+        headers: { "Content-Type": "application/json", Authorization: `Api-Key ${config.apiKey}`, "OpenAI-Project": config.folderId },
+        body: JSON.stringify({ model: config.model, temperature: 0.2, max_tokens: 1200,
+          response_format: { type: "json_object" }, messages: [
+            { role: "system", content: CONSULTANT_CHAT_PROMPT },
+            { role: "user", content: JSON.stringify(selectConsultantInput(input)) },
+          ] }),
+      });
+      if (!response.ok) throw new DiagnosticAIError("AI_REQUEST_FAILED");
+      const payload = await response.json() as { choices?: { finish_reason?: string; message?: { content?: unknown } }[] } | null;
+      const choice = payload?.choices?.[0];
+      if (choice?.finish_reason !== "stop" || typeof choice.message?.content !== "string") throw new DiagnosticAIError("AI_INVALID_RESULT");
+      const content = choice.message.content.trim().replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i, "$1");
+      const result: unknown = JSON.parse(content);
+      const message = result && typeof result === "object" ? (result as { message?: unknown }).message : undefined;
+      if (typeof message !== "string" || !message.trim() || message.length > 6000) throw new DiagnosticAIError("AI_INVALID_RESULT");
+      return message.trim();
+    } catch (error) {
+      if (controller.signal.aborted) throw new DiagnosticAIError("AI_REQUEST_TIMEOUT");
+      if (error instanceof DiagnosticAIError) throw error;
+      throw new DiagnosticAIError("AI_REQUEST_FAILED");
+    } finally { clearTimeout(timer); }
+  }
 
   async generateDiagnosticResult(input: DiagnosticFactsPacket): Promise<DiagnosticAIResult> {
     // Deferred validation lets the service handle missing configuration via fallback.
