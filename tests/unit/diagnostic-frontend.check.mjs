@@ -5,7 +5,14 @@ import { createRequire } from "node:module";
 const root = new URL("../../", import.meta.url);
 const require = createRequire(new URL("package.json", root));
 const ts = require("typescript");
-const source = readFileSync(new URL("apps/web/src/lib/diagnostic-result.ts", root), "utf8");
+const apiSource = readFileSync(new URL("apps/web/src/lib/api.ts", root), "utf8")
+  .replace("import.meta.env.VITE_API_BASE_URL", '""');
+const apiCode = ts.transpileModule(apiSource, { compilerOptions: {
+  module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022,
+} }).outputText;
+const apiModule = "data:text/javascript;base64," + Buffer.from(apiCode).toString("base64");
+const source = readFileSync(new URL("apps/web/src/lib/diagnostic-result.ts", root), "utf8")
+  .replace('"./api"', JSON.stringify(apiModule));
 const compiled = ts.transpileModule(source, { compilerOptions: {
   module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022,
 } }).outputText;

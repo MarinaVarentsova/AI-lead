@@ -1,3 +1,5 @@
+import { apiFetch } from "./api";
+
 export interface StructuredDiagnosticResult {
   summary: string;
   experience: string;
@@ -73,7 +75,7 @@ export async function completeDiagnostic(
   saveAnswers: (payload: DiagnosticPayload) => Promise<unknown>,
 ): Promise<DiagnoseResponse> {
   await saveAnswers(payload);
-  const response = await fetch("/api/diagnose", {
+  const response = await apiFetch("/api/diagnose", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ conversationId: payload.conversationId }),

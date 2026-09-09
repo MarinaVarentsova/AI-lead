@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { apiFetch } from "@/lib/api";
 import {
   completeDiagnostic, DIAGNOSTIC_ERROR,
   type DiagnosticPayload, type DiagnoseResponse, type StructuredDiagnosticResult,
@@ -102,7 +103,7 @@ async function apiContact(payload: {
   telegram?: string;
   email?: string;
 }) {
-  const res = await fetch("/api/contacts", {
+  const res = await apiFetch("/api/contacts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
