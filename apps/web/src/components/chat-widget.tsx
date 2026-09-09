@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { apiFetch } from "@/lib/api";
+import { submitContact, CONTACT_ERROR, type ContactPayload } from "@/lib/contact";
 import {
   completeDiagnostic, DIAGNOSTIC_ERROR,
   type DiagnosticPayload, type DiagnoseResponse, type StructuredDiagnosticResult,
@@ -95,22 +95,6 @@ const CONTACT_CHANNELS = [
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
-
-async function apiContact(payload: {
-  conversationId: string;
-  contactChannel: string;
-  phone?: string;
-  telegram?: string;
-  email?: string;
-}) {
-  const res = await apiFetch("/api/contacts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -223,6 +207,8 @@ export function ChatWidget() {
   const [selectedChannel, setSelectedChannel] = useState("");
   const [contactInput, setContactInput] = useState("");
   const [contactSubmitting, setContactSubmitting] = useState(false);
+  const [contactError, setContactError] = useState(false);
+  const contactBusy = useRef(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -369,17 +355,20 @@ export function ChatWidget() {
   // ─── Contact form ────────────────────────────────────────────────────────────
 
   const handleSelectChannel = (code: string) => {
+    setContactError(false);
     setSelectedChannel(code);
     setContactInput("");
     setContactPhase("details");
   };
 
   const handleSubmitContact = async () => {
-    if (!conversationId || !selectedChannel || !contactInput.trim()) return;
+    if (contactBusy.current || !conversationId || !selectedChannel || !contactInput.trim()) return;
+    contactBusy.current = true;
+    setContactError(false);
     setContactSubmitting(true);
 
     const channelCode = selectedChannel;
-    const payload: Parameters<typeof apiContact>[0] = {
+    const payload: ContactPayload = {
       conversationId,
       contactChannel: channelCode,
     };
@@ -389,13 +378,13 @@ export function ChatWidget() {
     else payload.phone = contactInput.trim();
 
     try {
-      await apiContact(payload);
+      await submitContact(payload, () => setContactPhase("submitted"));
     } catch {
-      // non-fatal, still show thank you
+      setContactError(true);
+    } finally {
+      contactBusy.current = false;
+      setContactSubmitting(false);
     }
-
-    setContactSubmitting(false);
-    setContactPhase("submitted");
   };
 
   // ─── Chips renderer ─────────────────────────────────────────────────────────
@@ -561,6 +550,7 @@ export function ChatWidget() {
             </label>
             <Input
               type={ch.type}
+              disabled={contactSubmitting}
               value={contactInput}
               onChange={(e) => setContactInput(e.target.value)}
               placeholder={ch.placeholder}
@@ -569,6 +559,7 @@ export function ChatWidget() {
               autoFocus
             />
           </div>
+          {contactError && <p role="alert" className="text-sm text-destructive">{CONTACT_ERROR}</p>}
           <div className="flex gap-2">
             <Button
               variant="outline"
