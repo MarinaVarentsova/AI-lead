@@ -45,7 +45,7 @@ export class ConsultantKnowledgeResolver {
     // Stable content fingerprint, not a security hash. Changes invalidate the source version.
     let hash = 2166136261;
     for (const char of markdown.replace(/\r\n/g, "\n")) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-    this.sourceVersion = `inobr-consultant-v1-stage5a-${(hash >>> 0).toString(16)}`;
+    this.sourceVersion = `inobr-artem-final-v1-${(hash >>> 0).toString(16)}`;
   }
 
   resolve(input: ConsultantInput): ConsultantRetrievalPacket {
@@ -54,14 +54,19 @@ export class ConsultantKnowledgeResolver {
     }
     const diagnostic = context(input.diagnosticContext);
     const question = normalize(input.question);
+    const houseAcceptance = ["приемк ижс", "проверять частн дом", "дом перед покупк", "готовые дом", "разов проверк"].some(term => matches(question, term));
+    const houseControl = ["вести стройк", "по этап", "сопровожден строительств", "строительн контрол ижс"].some(term => matches(question, term));
+    const hasTopic = !/погод|гороскоп/.test(question) && this.sections.some(section => section.keywords.some(keyword => matches(question, keyword)));
     const school = diagnostic.educationType === "school_only" || matches(question, "у меня только аттестат") || matches(question, "у меня только школа");
     const professional = ["higher_technical", "secondary_technical", "non_profile"].includes(diagnostic.educationType ?? "");
     const explicitApartment = matches(question, "хочу приемку квартир") || matches(question, "нужна приемка квартир");
     const explicitHouse = matches(question, "ижс") && (matches(question, "мне нужен") || matches(question, "хочу")) &&
       ["контрол", "надзор", "приемк"].some(term => matches(question, term));
-    const stroyPriority = !school && !explicitApartment && !explicitHouse && professional &&
+    const stroyPriority = !school && !explicitApartment && !explicitHouse && !houseAcceptance && !houseControl && professional &&
       (diagnostic.goal === "construction_expertise" || diagnostic.recommendedTrack === "construction_expertise" || matches(question, "стройэксперт"));
     const required = new Set<string>();
+    if (houseAcceptance) required.add("house_acceptance");
+    if (houseControl) required.add("house_control");
     if (school) { required.add("school_restriction"); required.add("apartment_acceptance"); }
     const nonProfileQuestion = ["экономическ", "экономист", "непрофиль", "гуманитар", "педагог", "медицин"].some(term => matches(question, term));
     if (nonProfileQuestion && !school) {
@@ -88,7 +93,9 @@ export class ConsultantKnowledgeResolver {
       if ((diagnostic.goal === "apartment_acceptance" || diagnostic.recommendedTrack === "apartment_acceptance") && section.id === "apartment_acceptance") { score += 5; reason.push("known_track"); }
       return { section, score, reason, index };
     }).sort((a, b) => b.score - a.score || a.index - b.index);
-    const selected = ranked.filter(item => item.score > 0).slice(0, 5);
+    const selected = hasTopic ? ranked.filter(item => item.score > 0 &&
+      !(item.section.id === "prices" && (houseAcceptance || houseControl || matches(question, "квартир"))))
+      .slice(0, 5) : [];
     for (const id of ["faq", "manager"]) {
       if (selected.length >= 2) break;
       if (!selected.some(item => item.section.id === id)) {

@@ -14,6 +14,7 @@ const apiRequire = createRequire(new URL("apps/api/package.json", root));
 assert.ok(apiRequire.resolve("@workspace/domain/diagnostic").endsWith("index.ts"));
 
 let state;
+const persisted = [];
 let schema;
 let fetchCalls = 0;
 const originalFetch = globalThis.fetch;
@@ -47,6 +48,7 @@ const db = {
       return { async returning() {
         if (state.saveFailure) throw new Error("private database detail");
         state.saved = true;
+        persisted.push(value);
         return [{ id: "22222222-2222-4222-8222-222222222222" }];
       } };
     } };
@@ -120,7 +122,8 @@ try {
         { conversationId, role: "user", step: "post_diagnostic_chat", message: message.trim() },
         { conversationId, role: "assistant", step: "post_diagnostic_chat", message: res.body.message },
       ]);
-      assert.deepEqual(res.body.matchedSectionIds, captured.matchedSections.map(s => s.id));
+      if (captured) assert.deepEqual(res.body.matchedSectionIds, captured.matchedSections.map(s => s.id));
+      else assert.equal(res.body.fallbackReason, "INSUFFICIENT_KNOWLEDGE");
       assert.deepEqual(events, ["CONSULTANT_CHAT_START", "CONSULTANT_CONTEXT_LOADED", "CONSULTANT_KNOWLEDGE_RESOLVED", "CONSULTANT_AI_CALL_START",
         ...(res.body.isAI ? ["CONSULTANT_AI_CALL_SUCCESS"] : ["CONSULTANT_AI_CALL_FAILED", "CONSULTANT_FALLBACK_USED"]),
         "CONSULTANT_MESSAGES_SAVED", "CONSULTANT_CHAT_FINISH"]);
@@ -135,12 +138,12 @@ try {
     assert.equal(result.fallbackReason, "AI_CONFIGURATION_ERROR");
     examples.push({ question: message, answer: result.message });
   }
-  assert.ok(examples[0].answer.includes("14 900"));
-  assert.ok(examples[1].answer.includes("любое среднее профессиональное"));
-  assert.ok(examples[2].answer.includes("гарантировать судебный результат нельзя"));
-  assert.ok(examples[3].answer.includes("не могу гарантировать"));
+  assert.ok(examples[0].answer.includes("14 880"));
+  assert.ok(examples[1].answer.includes("Профиль базового образования значения не имеет"));
+  assert.ok(examples[2].answer.includes("не означает автоматического назначения"));
+  assert.ok(examples[3].answer.includes("Гарантировать определённое количество заказов нельзя"));
   const school = await run({ row: { ...fixture.row, educationType: "school_only" } });
-  assert.ok(school.message.includes("одного аттестата недостаточно"));
+  assert.ok(school.message.includes("Стройэксперт недоступен"));
   for (const message of ["", " ", null, "a".repeat(4001)]) await run({ message, status: 400 });
   await run({ conversationId: "invalid", status: 400 });
   await run({ row: null, status: 404 });
@@ -155,6 +158,15 @@ try {
   }
   await run({ saveFailure: true, status: 500 });
   assert.equal(captured, undefined);
+  const unknownReply = await run({ message: "Какая погода завтра?", aiReply: "Завтра будет солнечно" });
+  assert.equal(captured, undefined);
+  assert.ok(unknownReply.message.includes("недостаточно информации"));
+  assert.ok(!unknownReply.message.includes("солнечно"));
+  await run({ message: "Паспорт 1234 567890. Сколько стоит Стройэксперт?" });
+  assert.ok(!JSON.stringify(captured).includes("567890"));
+  assert.ok(persisted.length >= 8);
+  assert.deepEqual(persisted.slice(0, 8).map(row => row.role), ["user", "assistant", "user", "assistant", "user", "assistant", "user", "assistant"]);
+  assert.ok(persisted.slice(0, 8).every(row => row.conversationId === fixture.conversationId && row.step === "post_diagnostic_chat"));
   assert.equal(fetchCalls, 0);
   // Inspect the actual Yandex request with fake configuration and an in-memory fetch.
   let outbound;

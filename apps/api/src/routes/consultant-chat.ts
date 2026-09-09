@@ -13,7 +13,7 @@ async function getService(): Promise<ConsultantChatService> {
   if (service) return service;
   const cwd = process.cwd();
   const root = cwd.endsWith(path.join("apps", "api")) ? path.resolve(cwd, "../..") : cwd;
-  const markdown = await readFile(path.join(root, "knowledge/inobr/knowledge_base_inobr_ai_consultant_v1.md"), "utf8");
+  const markdown = await readFile(path.join(root, "knowledge/inobr/artem-expertovich-final.md"), "utf8");
   service = new ConsultantChatService(new ConsultantKnowledgeResolver(markdown), new YandexAIProvider());
   return service;
 }

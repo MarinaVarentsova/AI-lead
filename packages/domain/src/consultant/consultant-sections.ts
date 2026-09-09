@@ -1,53 +1,51 @@
 import type { ConsultantSection } from "./consultant-types";
 
-/** User-approved stage 5A corrections supersede legacy sections 6.3, 8.2, 16.5. */
-export const ADMISSION_RULE = "Для программы «Стройэксперт» подходит любое СПО или ВО. Профиль базового образования не обязателен. Опыт строительства не является обязательным условием поступления. При наличии только школьного образования без СПО/ВО рекомендовать «Стройэксперт» нельзя.";
-export const PRIORITY_RULE = "Если пользователь пришёл по «Стройэксперту» и имеет СПО/ВО, это направление остаётся приоритетным, если нет явной причины выбрать другое. Отсутствие строительного опыта или непрофильное СПО/ВО сами по себе не являются такой причиной.";
+export const UNKNOWN_KNOWLEDGE = "В базе знаний недостаточно информации для точного ответа. Этот вопрос лучше уточнить у менеджера.";
 
-/** Pure parser: the future backend composition root supplies the existing KB file.
- * No filesystem, network, model, contact or lead dependencies in domain.
- */
+/** Only the final local document is accepted; behaviour/CRM instructions are not retrieved. */
 export function createConsultantSections(markdown: string): readonly ConsultantSection[] {
-  const bodies = new Map<string, string>();
+  if (!markdown.includes("# ЕДИНАЯ ИНСТРУКЦИЯ АРТЁМА ЭКСПЕРТОВИЧА")) throw new Error("Final consultant knowledge source required");
+  const blocks = new Map<string, string>();
   let current = "";
-  let fenced = false;
   for (const line of markdown.replace(/\r\n/g, "\n").split("\n")) {
-    if (/^```/.test(line)) { fenced = !fenced; continue; }
-    if (fenced) continue; // Legacy classification JSON is not consultation knowledge.
-    const heading = /^#{1,3}\s+(\d+(?:\.\d+)*)\.?(?:\s|$)/.exec(line);
-    if (heading) { current = heading[1]!; bodies.set(current, ""); }
-    else if (current && line !== "---") bodies.set(current, bodies.get(current)! + line + "\n");
+    const heading = /^# (\d+)\. /.exec(line);
+    if (heading) { current = heading[1]!; blocks.set(current, ""); }
+    else if (current && line !== "---") blocks.set(current, blocks.get(current)! + line + "\n");
   }
   const read = (...ids: string[]) => ids.map(id => {
-    const body = bodies.get(id)?.trim();
-    if (!body) throw new Error(`Consultant knowledge section missing: ${id}`);
-    return body;
+    const text = blocks.get(id)?.trim();
+    if (!text) throw new Error(`Missing final knowledge section ${id}`);
+    return text;
   }).join("\n\n");
-  const section = (id: string, title: string, keywords: string[], sources: string[], content?: string): ConsultantSection =>
-    Object.freeze({ id, title, keywords: Object.freeze(keywords), sources: Object.freeze(sources), content: content ?? read(...sources) });
-
+  const part = (id: string, heading: string) => {
+    const text = read(id).split(`## ${heading}\n`)[1]?.split(/\n## /)[0]?.trim();
+    if (!text) throw new Error(`Missing final knowledge subsection ${id}/${heading}`);
+    return text;
+  };
+  const section = (id: string, title: string, keywords: string[], sources: string[], content = read(...sources)): ConsultantSection =>
+    Object.freeze({ id, title, keywords: Object.freeze(keywords), sources: Object.freeze(sources), content });
   return Object.freeze([
-    section("stroyexpert", "Стройэксперт", ["стройэксперт", "сстэ"], ["10", "stage5a"], read("10") + "\n\n" + ADMISSION_RULE + "\n" + PRIORITY_RULE),
-    section("admission", "Требования к поступлению", ["поступ", "образован", "диплом", "спо", "высш", "аттестат"], ["6", "stage5a"], read("6") + "\n" + ADMISSION_RULE),
-    section("non_profile", "Непрофильное образование", ["непрофиль", "экономическ", "экономист", "гуманитар", "педагог", "медицин", "юридическ диплом"], ["stage5a"], ADMISSION_RULE + "\n" + PRIORITY_RULE),
-    section("experience", "Опыт и отсутствие опыта", ["опыт", "нович", "с нуля", "без опыт", "стаж"], ["16.1", "stage5a"], ADMISSION_RULE + "\n\n" + read("16.1")),
-    section("construction_expertise", "Строительная экспертиза", ["строительн экспертиз", "экспертиз", "эксперт"], ["10", "15"]),
-    section("judicial", "Судебная экспертиза", ["судебн", "суд", "заключен"], ["16.4", "17.7"]),
-    section("legal_limits", "Правовые ограничения", ["право", "закон", "сро", "юридическ", "судебн"], ["16.3", "17.7"]),
-    section("school_restriction", "Аттестат: ограничение поступления на ДПО", ["аттестат", "только школ", "без спо"], ["6.5"]),
-    section("apartment_acceptance", "Приёмка квартир", ["приемк квартир", "квартир", "застройщик"], ["6.5", "16.8"], "В базе курс по приёмке квартир с сертификатом указан как прикладная альтернатива для слушателя с аттестатом. Сертификат не является дипломом ДПО.\n\n" + read("16.8")),
-    section("house_acceptance", "Приёмка ИЖС", ["приемк ижс", "приемк дом", "приемк объект ижс"], ["12.4"]),
-    section("house_control", "Строительный контроль ИЖС", ["строительн контрол ижс", "стройконтрол", "контрол ижс", "надзор", "контрол дом"], ["12.3", "12.4"], "В базе упомянуты «Строительный контроль / надзор» и «Приемка объектов ИЖС». Отдельные условия программы «Строительный контроль ИЖС» не описаны. Нельзя приравнивать её к приёмке ИЖС или придумывать отдельную цену; детали нужно уточнить у менеджера.\n\n" + read("12.3", "12.4")),
-    section("prices", "Цены, тарифы и рассрочка", ["сколько стоит", "цен", "стоимост", "тариф", "рассроч", "оплат", "базов", "средн", "премиум"], ["12.1", "12.2", "12.3", "12.4", "16.10"]),
-    section("documents", "Документы для оформления и после обучения", ["документ", "диплом", "сертификат", "оформлен", "удостоверен"], ["11", "17.5"]),
-    section("employment", "Трудоустройство", ["трудоустр", "найти работ", "работать после", "работа после"], ["17.6", "16.1"]),
-    section("income", "Доход", ["доход", "заработ", "окуп", "зарплат"], ["17.2"]),
-    section("orders", "Заказы и поиск клиентов", ["заказ", "клиент", "самозанят", "на себя"], ["16.2", "17.2"], read("16.2", "17.2") + "\nВ базе нет пошаговой методики поиска заказов. Не придумывать каналы привлечения и гарантии клиентов."),
-    section("guarantees", "Ограничения по гарантиям", ["гарант", "обещан", "заказ", "клиент"], ["17.6", "27"]),
-    section("start", "Старт и формат обучения", ["начать", "старт", "длит", "срок", "когда", "групп", "дистанц", "быстрее"], ["16.12", "17.3"]),
-    section("objections", "Возражения и скидки", ["дорого", "скидк", "сомнева", "конкурент", "нет времен"], ["14", "17.1"]),
-    section("manager", "Менеджер и консультация", ["менеджер", "консультац", "связаться", "оформить"], ["26"]),
-    section("comparison", "Сравнение приёмки квартир и Стройэксперта", ["чем отлич", "сравн", "разниц"], ["10", "6.5", "16.8"], "«Стройэксперт» — направление судебной строительно-технической и стоимостной экспертизы. Ветка приёмки квартир с сертификатом — прикладное направление, доступное также при наличии аттестата. Не смешивать сертификат курса с дипломом ДПО; подробности конкретных программ и документов нужно сверять с тарифом.\n" + ADMISSION_RULE),
-    section("faq", "FAQ и границы доступных знаний", ["обучен", "курс", "программ", "учебн", "материал"], ["16.13", "26"]),
+    section("stroyexpert", "Стройэксперт", ["стройэксперт", "сстэ"], ["2"], part("2", "Что это") + "\n\n" + part("2", "Кто может учиться")),
+    section("admission", "Требования к поступлению", ["поступ", "образован", "спо", "высш", "аттестат"], ["2"], part("2", "Кто может учиться")),
+    section("non_profile", "Непрофильное образование", ["непрофиль", "экономическ", "экономист", "педагог", "гуманитар", "медицин"], ["2"], part("2", "Кто может учиться")),
+    section("experience", "Опыт и отсутствие опыта", ["опыт", "стаж", "нович", "с нуля"], ["3", "2"], part("2", "Кто может учиться") + "\n\n" + read("3")),
+    section("construction_expertise", "Строительная экспертиза", ["строительн экспертиз", "эксперт", "дефект"], ["4"]),
+    section("judicial", "Судебная экспертиза", ["судебн", "суд", "заключен"], ["6"], part("6", "Можно ли работать с судебными экспертизами")),
+    section("legal_limits", "Правовые ограничения", ["юридическ", "право", "сро", "нострой", "ноприз", "нок", "минстрой"], ["6", "7", "8"], part("6", "Суд обязан принять диплом?") + "\n\n" + read("7", "8")),
+    section("school_restriction", "Без СПО/ВО: ограничение поступления", ["аттестат", "только школ", "без спо"], ["2"], part("2", "Если нет СПО или ВО")),
+    section("apartment_acceptance", "Приёмка квартир", ["квартир", "застройщик"], ["17"]),
+    section("house_acceptance", "Приёмка ИЖС", ["приемк ижс", "проверять частн дом", "дом перед покупк", "готовые дом", "разов проверк"], ["19"]),
+    section("house_control", "Строительный контроль ИЖС", ["строительн контрол ижс", "стройконтрол", "вести стройк", "по этап", "сопровожден строительств", "надзор"], ["20"]),
+    section("prices", "Стоимость Стройэксперта и рассрочка", ["цен", "сколько стоит", "стоимост", "тариф", "рассроч", "оплат"], ["16"]),
+    section("documents", "Документы Стройэксперта", ["диплом", "документ", "сертификат", "удостоверен", "фрдо"], ["15"]),
+    section("employment", "Трудоустройство", ["трудоустр", "работа", "найти работ"], ["11", "9"]),
+    section("income", "Доход и ограничения гарантий", ["доход", "заработ", "окуп"], ["10", "59"], "Нельзя обещать заработок, трудоустройство или заказы.\n\n" + part("10", "«А если я начинаю совсем с нуля?»")),
+    section("orders", "Заказы и поиск клиентов", ["заказ", "клиент", "на себя"], ["10"]),
+    section("guarantees", "Ограничения гарантий", ["гарант", "заказ", "клиент"], ["10", "11"], part("10", "«А если я начинаю совсем с нуля?»") + "\n\n" + read("11")),
+    section("start", "Старт и формат обучения", ["старт", "начать", "срок", "групп", "дистанц", "учиться"], ["12", "13", "14"]),
+    section("objections", "Цена и возражения", ["дорого", "скидк", "акци", "сомнева"], ["38", "45"]),
+    section("manager", "Индивидуальное уточнение", [], ["26"], UNKNOWN_KNOWLEDGE),
+    section("comparison", "Сравнение направлений", ["чем отлич", "сравн", "разниц"], ["18", "22", "23", "24"]),
+    section("faq", "Недостаточно информации", [], ["26"], UNKNOWN_KNOWLEDGE),
   ]);
 }

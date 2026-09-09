@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { sendConsultantMessage, CONSULTANT_ERROR } from "@/lib/consultant-chat";
 import { submitContact, CONTACT_ERROR, type ContactPayload } from "@/lib/contact";
 import {
   completeDiagnostic, DIAGNOSTIC_ERROR,
@@ -198,6 +199,11 @@ export function ChatWidget() {
   const [diagnosticResult, setDiagnosticResult] = useState<DiagnoseResponse | null>(null);
   const [postDiagnosticState, setPostDiagnosticState] = useState<"result" | "post-diagnostic-ready">("result");
   const [questionDraft, setQuestionDraft] = useState("");
+  const [consultantMessages, setConsultantMessages] = useState<Message[]>([]);
+  const [consultantLoading, setConsultantLoading] = useState(false);
+  const [consultantError, setConsultantError] = useState(false);
+  const consultantBusy = useRef(false);
+  const failedQuestion = useRef<string | null>(null);
   const diagnosticBusy = useRef(false);
   const pendingDiagnostic = useRef<DiagnosticPayload | null>(null);
   const answeredCount = useRef(0);
@@ -243,7 +249,7 @@ export function ChatWidget() {
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
     }
-  }, [messages, isTyping, currentDictionary, activeCustomQ, contactPhase, diagnosticStatus, postDiagnosticState]);
+  }, [messages, isTyping, currentDictionary, activeCustomQ, contactPhase, diagnosticStatus, postDiagnosticState, consultantMessages, consultantLoading, consultantError]);
 
   const uid = () => Date.now().toString() + Math.random().toString(36).slice(2);
 
@@ -349,6 +355,29 @@ export function ChatWidget() {
         goal: allAnswers[3].code,
         goalRaw: allAnswers[3].raw,
       });
+    }
+  };
+
+  const handleConsultantSubmit = async () => {
+    const question = questionDraft.trim();
+    if (consultantBusy.current || !conversationId || !question || question.length > 4000) return;
+    consultantBusy.current = true;
+    setConsultantLoading(true);
+    setConsultantError(false);
+    if (failedQuestion.current !== question) {
+      setConsultantMessages((previous) => [...previous, { id: uid(), role: "user", content: question }]);
+    }
+    failedQuestion.current = question;
+    try {
+      const reply = await sendConsultantMessage(conversationId, question);
+      setConsultantMessages((previous) => [...previous, { id: uid(), role: "bot", content: reply }]);
+      setQuestionDraft("");
+      failedQuestion.current = null;
+    } catch {
+      setConsultantError(true);
+    } finally {
+      consultantBusy.current = false;
+      setConsultantLoading(false);
     }
   };
 
@@ -776,17 +805,39 @@ export function ChatWidget() {
               onGetConsultation={() => setContactPhase((phase) => phase ?? "channel")}
             />
           )}
+          {consultantMessages.map((message) => (
+            <div key={message.id} className={`max-w-[88%] px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap rounded-2xl ${
+              message.role === "user" ? "ml-auto bg-primary text-primary-foreground rounded-tr-sm" : "mr-auto bg-white border border-border shadow-sm rounded-tl-sm"
+            }`}>
+              {message.content}
+            </div>
+          ))}
+          {consultantLoading && <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="w-4 h-4 animate-spin" />Готовим ответ...
+          </div>}
           {postDiagnosticState === "post-diagnostic-ready" && (
             <div className="rounded-xl border border-border bg-white p-4 space-y-2">
               <Textarea
                 value={questionDraft}
+                disabled={consultantLoading}
+                maxLength={4000}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                    event.preventDefault();
+                    void handleConsultantSubmit();
+                  }
+                }}
                 onChange={(event) => setQuestionDraft(event.target.value)}
                 placeholder="Что хотите уточнить?"
                 aria-label="Что хотите уточнить?"
                 className="min-h-[80px] text-sm resize-none rounded-xl"
               />
-              <Button disabled className="rounded-lg text-sm">Отправить</Button>
-              <p className="text-xs text-muted-foreground">Отправка вопросов пока недоступна.</p>
+              {consultantError && <p role="alert" className="text-sm text-destructive">{CONSULTANT_ERROR}</p>}
+              <Button onClick={() => void handleConsultantSubmit()}
+                disabled={consultantLoading || !questionDraft.trim() || !conversationId}
+                className="rounded-lg text-sm">
+                {consultantLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : consultantError ? "Повторить" : "Отправить"}
+              </Button>
             </div>
           )}
 
