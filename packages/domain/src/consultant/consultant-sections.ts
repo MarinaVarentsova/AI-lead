@@ -25,7 +25,7 @@ export function createConsultantSections(markdown: string): readonly ConsultantS
   const section = (id: string, title: string, keywords: string[], sources: string[], content = read(...sources)): ConsultantSection =>
     Object.freeze({ id, title, keywords: Object.freeze(keywords), sources: Object.freeze(sources), content });
   return Object.freeze([
-    section("stroyexpert", "Стройэксперт", ["стройэксперт", "сстэ"], ["2"], part("2", "Что это") + "\n\n" + part("2", "Кто может учиться")),
+    section("stroyexpert", "Стройэксперт", ["стройэксперт", "сстэ", "подход", "подойдет", "рекоменд"], ["2"], part("2", "Что это") + "\n\n" + part("2", "Кто может учиться")),
     section("admission", "Требования к поступлению", ["поступ", "образован", "спо", "высш", "аттестат"], ["2"], part("2", "Кто может учиться")),
     section("non_profile", "Непрофильное образование", ["непрофиль", "экономическ", "экономист", "педагог", "гуманитар", "медицин"], ["2"], part("2", "Кто может учиться")),
     section("experience", "Опыт и отсутствие опыта", ["опыт", "стаж", "нович", "с нуля"], ["3", "2"], part("2", "Кто может учиться") + "\n\n" + read("3")),

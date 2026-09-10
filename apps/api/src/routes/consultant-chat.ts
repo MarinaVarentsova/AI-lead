@@ -2,10 +2,12 @@ import { Router, type IRouter } from "express";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { db, aiDiagnosticAnswers, aiMessages } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { DiagnosticKnowledgeResolver, DiagnosticValidationError } from "@workspace/domain/diagnostic";
 import { ConsultantKnowledgeResolver, ConsultantValidationError } from "@workspace/domain/consultant";
 import { ConsultantChatService, YandexAIProvider } from "../ai";
+
+import { applyConsultantFunnel } from "../ai/consultant-funnel";
 
 const router: IRouter = Router();
 let service: ConsultantChatService | undefined;
@@ -49,6 +51,9 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
       recommendedTrack: diagnostic.recommendedTrackHint ?? "not_defined",
     });
     req.log.info({ sectionIds: facts.matchedSections.map(section => section.id) }, "CONSULTANT_KNOWLEDGE_RESOLVED");
+    phase = "load_funnel";
+    const history = await db.select({ role: aiMessages.role, message: aiMessages.message }).from(aiMessages)
+      .where(and(eq(aiMessages.conversationId, conversationId), eq(aiMessages.step, "post_diagnostic_chat")));
     phase = "save_user";
     const [savedUser] = await db.insert(aiMessages).values({ conversationId, role: "user", step: "post_diagnostic_chat", message })
       .returning({ id: aiMessages.id });
@@ -61,6 +66,9 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
       req.log.warn({ reason: response.fallbackReason }, "CONSULTANT_AI_CALL_FAILED");
       req.log.info({ reason: response.fallbackReason }, "CONSULTANT_FALLBACK_USED");
     }
+    response.message = applyConsultantFunnel(response.message, message, history,
+      facts.diagnosticContext.includes("Приоритет — Стройэксперт"),
+      response.fallbackReason === "INSUFFICIENT_KNOWLEDGE");
     phase = "save_assistant";
     const [savedAssistant] = await db.insert(aiMessages).values({ conversationId, role: "assistant", step: "post_diagnostic_chat", message: response.message })
       .returning({ id: aiMessages.id });

@@ -46,6 +46,24 @@ try {
   const alternative = resolver.resolve({ question: "Мне нужен строительный контроль ИЖС", diagnosticContext });
   assert.equal(alternative.matchedSections[0].id, "house_control");
   assert.ok(!alternative.contextSummary.includes("Приоритет — Стройэксперт"));
+  const { DiagnosticKnowledgeResolver } = await import(new URL("packages/domain/src/diagnostic/DiagnosticKnowledgeResolver.ts", root));
+  for (const [experienceArea, experienceYears, educationType, goal] of [
+    ["construction", "related_experience", "higher_technical", "research_only"],
+    ["no_experience", "none", "non_profile", "new_profession"],
+    ["construction", "more_than_10", "non_profile", "expand_services"],
+  ]) assert.equal(DiagnosticKnowledgeResolver.resolve({ experienceArea, experienceYears, educationType, goal }).recommendedTrackHint, "construction_expertise");
+  for (const educationType of ["higher_technical", "secondary_technical", "non_profile"]) {
+    for (const goal of ["extra_income", "new_profession", "expand_services", "research_only", "construction_expertise", "apartment_acceptance"]) {
+      const profile = { experienceArea: "no_experience", experienceYears: "none", educationType, goal };
+      const resolved = DiagnosticKnowledgeResolver.resolve(profile);
+      assert.equal(resolved.recommendedTrackHint, goal === "apartment_acceptance" ? "apartment_acceptance" : "construction_expertise");
+      const recommendation = resolver.resolve({ question: "Что мне подойдет?", diagnosticContext: profile });
+      assert.equal(recommendation.contextSummary.includes("Приоритет — Стройэксперт"), goal !== "apartment_acceptance");
+    }
+  }
+  for (const educationType of ["school_only", "diploma_not_available", "need_clarification"]) {
+    assert.equal(DiagnosticKnowledgeResolver.resolve({ ...diagnosticContext, educationType }).recommendedTrackHint, null);
+  }
   const school = resolver.resolve({ question: "Судебная экспертиза, заказы, клиенты, цены, Стройэксперт", diagnosticContext: { ...diagnosticContext, educationType: "school_only" } });
   assert.ok(school.matchedSections.some(s => s.id === "school_restriction"));
   assert.ok(school.matchedSections.some(s => s.id === "apartment_acceptance"));

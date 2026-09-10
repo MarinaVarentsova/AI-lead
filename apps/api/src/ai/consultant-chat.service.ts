@@ -1,4 +1,4 @@
-import { ConsultantKnowledgeResolver, type ConsultantDiagnosticContext } from "@workspace/domain/consultant";
+import { ConsultantKnowledgeResolver, isConsultantChoiceQuestion, type ConsultantDiagnosticContext } from "@workspace/domain/consultant";
 import { DiagnosticAIError } from "./diagnostic-result.types";
 import { redactConsultantQuestion, selectConsultantInput } from "./consultant-chat.prompt";
 import type { ConsultantAIProvider, ConsultantChatResponse, ConsultantProviderInput } from "./consultant-chat.types";
@@ -12,13 +12,25 @@ export function consultantFallback(input: ConsultantProviderInput): string {
   const sections = input.matchedSections;
   const find = (id: string) => sections.find(section => section.id === id);
   const school = input.diagnosticContext.includes("school_only_no_dpo");
+  if (isConsultantChoiceQuestion(input.question) && !school &&
+    input.diagnosticContext.includes("Приоритет — Стройэксперт") && find("stroyexpert")) {
+    const beginner = /experienceArea=no_experience|experienceYears=none/.test(input.diagnosticContext);
+    return "С учётом Вашего образования основным направлением я бы рекомендовал «Стройэксперт»: любого СПО или ВО достаточно для поступления. " +
+      (beginner ? "Отсутствие строительного опыта не препятствует обучению; начинать стоит с освоения основ, без ожидания готовности сразу работать экспертом. " :
+        "Программу можно использовать для освоения экспертной работы с объектами, дефектами и технической документацией с опорой на Ваш текущий опыт. ") +
+      (/goal=expand_services/.test(input.diagnosticContext) ? "Для расширения услуг это путь к дополнительной экспертной компетенции." :
+       /goal=new_profession/.test(input.diagnosticContext) ? "Для смены профессии это последовательное освоение нового направления." :
+       /goal=extra_income/.test(input.diagnosticContext) ? "Это направление может дополнить текущую деятельность, но доход и заказы не гарантированы." :
+       "Если Вы пока изучаете варианты, начните с сопоставления содержания программы с задачами, которые хотите решать.");
+  }
   const prices = find("prices");
   if (prices && /цен|стоим|стоит|рассроч|тариф/i.test(input.question)) {
     const amounts = prices.content.match(/\d[\d ]* ₽(?: в месяц)?/g) ?? [];
     return `Полная стоимость вариантов Стройэксперта: ${amounts.slice(0, 4).join(", ")}. Рассрочка на 6 месяцев: ${amounts.slice(4, 8).join(", ")}. Состав программы и документы зависят от тарифа; актуальные акции нужно уточнять отдельно.` +
       (school ? " При наличии только аттестата Стройэксперт недоступен." : "");
   }
-  const selected = (school ? find("school_restriction") : undefined) ??
+  const alternative = /Основной маршрут — (house_control|house_acceptance|apartment_acceptance)/.exec(input.diagnosticContext)?.[1];
+  const selected = (isConsultantChoiceQuestion(input.question) && alternative ? find(alternative) : undefined) ?? (school ? find("school_restriction") : undefined) ??
     (["judicial", "orders", "house_control", "house_acceptance", "comparison"].map(find).find(Boolean)) ??
     (find("non_profile") && /эконом|образован|поступ/i.test(input.question) ? find("non_profile") : undefined) ?? sections[0];
   if (!selected) return UNKNOWN_REPLY;

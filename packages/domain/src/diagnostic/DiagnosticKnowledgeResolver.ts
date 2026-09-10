@@ -60,7 +60,6 @@ export class DiagnosticKnowledgeResolver {
     if (goal.code === "apartment_acceptance") {
       recommendedTrackHint = "apartment_acceptance";
     } else if (
-      goal.code === "construction_expertise" &&
       (educationType.code === "higher_technical" ||
         educationType.code === "secondary_technical" ||
         educationType.code === "non_profile")

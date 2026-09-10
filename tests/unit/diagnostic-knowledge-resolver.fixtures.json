@@ -8,7 +8,7 @@
       "goal": "construction_expertise"
     },
     "expected": {
-      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "sourceVersion": "inobr-diagnostic-rules-v2",
       "ruleKeys": [
         "experience",
         "experienceYears",
@@ -29,7 +29,7 @@
       "goal": "apartment_acceptance"
     },
     "expected": {
-      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "sourceVersion": "inobr-diagnostic-rules-v2",
       "ruleKeys": [
         "experience",
         "experienceYears",
@@ -56,7 +56,7 @@
       "goal": "construction_expertise"
     },
     "expected": {
-      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "sourceVersion": "inobr-diagnostic-rules-v2",
       "ruleKeys": [
         "experience",
         "experienceYears",
@@ -84,7 +84,7 @@
       "goal": "expand_services"
     },
     "expected": {
-      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "sourceVersion": "inobr-diagnostic-rules-v2",
       "ruleKeys": [
         "experience",
         "experienceYears",
@@ -93,7 +93,7 @@
       ],
       "ruleCount": 4,
       "guards": [],
-      "recommendedTrackHint": null,
+      "recommendedTrackHint": "construction_expertise",
       "answerRaw": {
         "experienceArea": "Управление строительными проектами"
       },
@@ -133,7 +133,7 @@
       "educationTypeRaw": "Иностранный диплом"
     },
     "expected": {
-      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "sourceVersion": "inobr-diagnostic-rules-v2",
       "ruleKeys": [
         "experience",
         "experienceYears",
@@ -162,7 +162,7 @@
       "goal": "construction_expertise"
     },
     "expected": {
-      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "sourceVersion": "inobr-diagnostic-rules-v2",
       "ruleKeys": [
         "experience",
         "experienceYears",
@@ -183,7 +183,7 @@
       "goal": "apartment_acceptance"
     },
     "expected": {
-      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "sourceVersion": "inobr-diagnostic-rules-v2",
       "ruleKeys": [
         "experience",
         "experienceYears",
@@ -204,7 +204,7 @@
       "goal": "construction_expertise"
     },
     "expected": {
-      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "sourceVersion": "inobr-diagnostic-rules-v2",
       "ruleKeys": [
         "experience",
         "experienceYears",
@@ -225,7 +225,7 @@
       "goal": "construction_expertise"
     },
     "expected": {
-      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "sourceVersion": "inobr-diagnostic-rules-v2",
       "ruleKeys": [
         "experience",
         "experienceYears",
@@ -355,7 +355,7 @@
       "name": "DO_NOT_COPY_NAME"
     },
     "expected": {
-      "sourceVersion": "inobr-diagnostic-rules-v1",
+      "sourceVersion": "inobr-diagnostic-rules-v2",
       "ruleKeys": [
         "experience",
         "experienceYears",

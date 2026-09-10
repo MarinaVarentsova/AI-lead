@@ -41,6 +41,10 @@ export function validateDiagnosticResult(value: unknown, facts: DiagnosticFactsP
     return typeof text === "string" && text.trim() ? text.trim() : invalid();
   };
   const track = record.recommendedTrack;
+  if (facts.recommendedTrackHint === "construction_expertise" && !hasSchoolGuard(facts) && track !== "construction_expertise") {
+    return invalid();
+  }
+  if (facts.recommendedTrackHint === "apartment_acceptance" && track !== "apartment_acceptance") return invalid();
   if (track !== "construction_expertise" && track !== "apartment_acceptance" && track !== "not_defined") {
     return invalid();
   }

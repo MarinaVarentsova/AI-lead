@@ -30,6 +30,7 @@ const db = {
   select() {
     state.reads++;
     return { from(table) {
+      if (table === schema.aiMessages) return { async where(query) { assert.ok(query); return state.history; } };
       assert.equal(table, schema.aiDiagnosticAnswers);
       return { where(query) {
         assert.ok(query);
@@ -95,8 +96,8 @@ try {
   const originalGenerate = YandexAIProvider.prototype.generateConsultantReply;
   let captured;
   async function run({ message = "Сколько стоит обучение?", conversationId = fixture.conversationId,
-    row = fixture.row, status = 200, aiReply, saveFailure = false } = {}) {
-    state = { row, reads: 0, writes: [], logs: [], saved: false, saveFailure };
+    row = fixture.row, status = 200, aiReply, saveFailure = false, history = [] } = {}) {
+    state = { row, reads: 0, writes: [], logs: [], saved: false, saveFailure, history };
     captured = undefined;
     YandexAIProvider.prototype.generateConsultantReply = async function(input) {
       assert.equal(state.writes.length, 1, "Save user before generation");
@@ -167,6 +168,31 @@ try {
   assert.ok(persisted.length >= 8);
   assert.deepEqual(persisted.slice(0, 8).map(row => row.role), ["user", "assistant", "user", "assistant", "user", "assistant", "user", "assistant"]);
   assert.ok(persisted.slice(0, 8).every(row => row.conversationId === fixture.conversationId && row.step === "post_diagnostic_chat"));
+  const qualified = { ...fixture.row, educationType: "non_profile", goal: "research_only" };
+  for (const message of ["что выбрать", "что мне выбрать", "кем быть", "кем стать", "какое направление", "какой курс", "что подходит", "что лучше для меня", "куда идти", "что в итоге выбрать", "кем быть в итоге что выбрать?"]) {
+    const choice = await run({ message, row: qualified });
+    assert.notEqual(choice.fallbackReason, "INSUFFICIENT_KNOWLEDGE");
+    assert.ok(choice.message.includes("рекомендовал «Стройэксперт»"));
+    for (const id of ["stroyexpert", "admission", "comparison"]) assert.ok(choice.matchedSectionIds.includes(id));
+  }
+  const apartmentChoice = await run({ row: { ...qualified, goal: "apartment_acceptance" }, message: "что выбрать" });
+  assert.ok(!apartmentChoice.message.includes("рекомендовал «Стройэксперт»"));
+  assert.ok(apartmentChoice.matchedSectionIds.includes("apartment_acceptance"));
+  const first = await run({ row: qualified });
+  assert.ok(!first.message.includes("Если хотите"));
+  const history = [{ role: "user", message: "Сколько стоит обучение?" }, { role: "assistant", message: first.message }];
+  const second = await run({ row: qualified, history });
+  assert.ok(second.message.includes("Если хотите"));
+  const third = await run({ row: qualified, history: [...history, { role: "assistant", message: second.message }] });
+  assert.ok(!third.message.includes("Если хотите"));
+  const refusal = await run({ row: qualified, history, message: "Не хочу оставлять контакт. Сколько стоит обучение?" });
+  assert.ok(!refusal.message.includes("Если хотите"));
+  const offTopic = await run({ row: qualified, history, message: "Какая погода завтра?" });
+  assert.equal(offTopic.fallbackReason, "INSUFFICIENT_KNOWLEDGE");
+  assert.equal(captured, undefined);
+  const schoolChoice = await run({ row: { ...qualified, educationType: "school_only" }, message: "что выбрать" });
+  assert.ok(!schoolChoice.message.includes("рекомендовал «Стройэксперт»"));
+  assert.ok(schoolChoice.matchedSectionIds.includes("apartment_acceptance"));
   assert.equal(fetchCalls, 0);
   // Inspect the actual Yandex request with fake configuration and an in-memory fetch.
   let outbound;

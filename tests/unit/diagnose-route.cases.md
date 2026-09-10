@@ -32,7 +32,7 @@ the existing SQL columns remain snake_case.
 
 | Case | Setup | Expected |
 | --- | --- | --- |
-| Valid answers → resolver → result | Complete row, provider returns validResult | 200; structuredResult matches provider; isAI=true; provider=yandex; sourceVersion=inobr-diagnostic-rules-v1; fallbackReason=null. Provider receives exactly the eight factsPacket keys and four rawAnswers keys, no conversationId/contact/lead. |
+| Valid answers → resolver → result | Complete row, provider returns validResult | 200; structuredResult matches provider; isAI=true; provider=yandex; sourceVersion=inobr-diagnostic-rules-v2; fallbackReason=null. Provider receives exactly the eight factsPacket keys and four rawAnswers keys, no conversationId/contact/lead. |
 | No diagnostic answers | DB returns [] | 404; no provider call or insert. |
 | Incomplete answers | Set each of the four code fields to null or empty string in turn | 400; error=DIAGNOSTIC_VALIDATION_ERROR; issues identifies required field; no provider call or insert. |
 | Unknown code | Set educationType to unknown_code | 400 with unknown_code issue; no provider call or insert. |

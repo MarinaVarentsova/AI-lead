@@ -29,7 +29,7 @@ export type DiagnosticAnswers = {
   goalRaw?: string | null;
 };
 
-export const SOURCE_VERSION = "inobr-diagnostic-rules-v1" as const;
+export const SOURCE_VERSION = "inobr-diagnostic-rules-v2" as const;
 
 export type DiagnosticGuard = {
   code: "school_only_no_dpo";
