@@ -90,3 +90,18 @@
     @apply font-sans antialiased bg-background text-foreground;
   }
 }
+
+/* Keep the header outside the only scrolling region. dvh follows browser chrome. */
+.chat-page { min-height: 100vh; min-height: var(--chat-viewport-height, 100dvh); padding: 4px; }
+.chat-shell { height: calc(100vh - 8px); height: calc(var(--chat-viewport-height, 100dvh) - 8px); max-height: calc(var(--chat-viewport-height, 100dvh) - 8px); min-width: 0; }
+.chat-dialogue { overflow-anchor: none; scrollbar-gutter: stable; }
+.chat-dialogue > div { min-width: 0; overflow-wrap: anywhere; }
+.chat-widget textarea, .chat-widget input { max-width: 100%; font-size: 16px; }
+.chat-widget button { max-width: 100%; white-space: normal; height: auto; min-height: 40px; }
+@media (min-width: 640px) {
+  .chat-page { padding: 16px; }
+  .chat-shell { height: calc(var(--chat-viewport-height, 100dvh) - 32px); max-height: calc(var(--chat-viewport-height, 100dvh) - 32px); }
+}
+@media (min-width: 1024px) {
+  .chat-shell { width: 100%; max-width: 560px; height: 82dvh; max-height: calc(var(--chat-viewport-height, 100dvh) - 32px); }
+}

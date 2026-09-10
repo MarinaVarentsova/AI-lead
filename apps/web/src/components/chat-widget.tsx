@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { createChatScroll } from "@/lib/chat-scroll";
 import { sendConsultantMessage, CONSULTANT_ERROR } from "@/lib/consultant-chat";
 import { submitContact, CONTACT_ERROR, type ContactPayload } from "@/lib/contact";
 import {
@@ -217,6 +217,12 @@ export function ChatWidget() {
   const contactBusy = useRef(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
+  const consultantInputRef = useRef<HTMLDivElement>(null);
+  const scrollTarget = useRef<"bottom" | "consultant">("bottom");
+  const scrollController = useRef<ReturnType<typeof createChatScroll> | null>(null);
+  const forceScroll = useRef(false);
+  const showNextStep = () => { forceScroll.current = true; };
 
   const createSession = useCreateSession();
   const createConversation = useCreateConversation();
@@ -244,12 +250,21 @@ export function ChatWidget() {
     });
   }, []);
 
-  // Auto-scroll on content changes
+  const chatVisible = step > 0;
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-    }
-  }, [messages, isTyping, currentDictionary, activeCustomQ, contactPhase, diagnosticStatus, postDiagnosticState, consultantMessages, consultantLoading, consultantError]);
+    if (!scrollRef.current || !bottomRef.current) return;
+    const controller = createChatScroll(scrollRef.current, bottomRef.current);
+    scrollController.current = controller;
+    return () => { controller.dispose(); scrollController.current = null; };
+  }, [chatVisible]);
+
+  // Effects run after the new DOM exists; RAF also covers layout/animation updates.
+  useEffect(() => {
+    scrollController.current?.schedule(forceScroll.current,
+      (scrollTarget.current === "consultant" ? consultantInputRef.current : bottomRef.current) ?? undefined);
+    forceScroll.current = false;
+  }, [step, messages, isTyping, currentDictionary, activeCustomQ, contactPhase, contactError,
+    diagnosticStatus, postDiagnosticState, consultantMessages, consultantLoading, consultantError]);
 
   const uid = () => Date.now().toString() + Math.random().toString(36).slice(2);
 
@@ -260,6 +275,7 @@ export function ChatWidget() {
   // ─── Launch screen → Welcome ────────────────────────────────────────────────
 
   const handleStart = () => {
+    showNextStep();
     setStep(1);
     addBotMessage(
       "Здравствуйте.\n\nЯ помогу понять, подходит ли вам обучение по строительной экспертизе и какой вариант стоит рассмотреть.\n\nСначала задам 4 коротких вопроса.\n\nЭто займет около 2 минут."
@@ -270,6 +286,7 @@ export function ChatWidget() {
 
   const handleBeginQuestions = () => {
     if (!sessionId) return;
+    showNextStep();
     setIsTyping(true);
 
     createConversation.mutate(
@@ -298,6 +315,7 @@ export function ChatWidget() {
   // ─── Chip selection ─────────────────────────────────────────────────────────
 
   const handleOptionSelect = (qIndex: number, code: string, displayName: string, isCustom: boolean) => {
+    showNextStep();
     if (isCustom) {
       setActiveCustomQ(QUESTIONS[qIndex].id);
       setCustomInput("");
@@ -333,6 +351,7 @@ export function ChatWidget() {
   const submitAnswer = (qIndex: number, code: string, raw: string) => {
     // Synchronous guards also cover repeated clicks before React re-renders.
     if (!conversationId || diagnosticBusy.current || qIndex !== answeredCount.current) return;
+    showNextStep();
     answeredCount.current++;
     const q = QUESTIONS[qIndex];
     const newAnswer: DiagnosticAnswer = { questionNumber: qIndex + 1, questionKey: q.key, code, raw };
@@ -361,6 +380,8 @@ export function ChatWidget() {
   const handleConsultantSubmit = async () => {
     const question = questionDraft.trim();
     if (consultantBusy.current || !conversationId || !question || question.length > 4000) return;
+    showNextStep();
+    scrollTarget.current = "consultant";
     consultantBusy.current = true;
     setConsultantLoading(true);
     setConsultantError(false);
@@ -384,6 +405,8 @@ export function ChatWidget() {
   // ─── Contact form ────────────────────────────────────────────────────────────
 
   const handleSelectChannel = (code: string) => {
+    scrollTarget.current = "bottom";
+    showNextStep();
     setContactError(false);
     setSelectedChannel(code);
     setContactInput("");
@@ -621,7 +644,7 @@ export function ChatWidget() {
 
   if (step === 0) {
     return (
-      <div className="flex flex-col h-full bg-background">
+      <div className="chat-widget flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
         {/* Header */}
         <header
           className="px-5 flex items-center gap-3 bg-[#24313B] text-white shrink-0"
@@ -637,7 +660,7 @@ export function ChatWidget() {
         </header>
 
         {/* Body */}
-        <div className="flex flex-col items-center justify-center flex-1 px-6 py-10 text-center">
+        <div className="flex flex-col items-center justify-start sm:justify-center flex-1 min-h-0 overflow-y-auto px-6 py-6 text-center">
           <div className="h-14 w-[120px] overflow-hidden rounded-lg mb-6">
             <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
           </div>
@@ -709,7 +732,7 @@ export function ChatWidget() {
   // ─── Chat screen ──────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="chat-widget flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
       {/* Header */}
       <header
         className="px-5 flex items-center gap-3 bg-[#24313B] text-white z-10 shrink-0"
@@ -733,7 +756,7 @@ export function ChatWidget() {
       )}
 
       {/* Messages */}
-      <ScrollArea className="flex-1 px-4 py-5 bg-muted/40" ref={scrollRef}>
+      <div className="chat-dialogue min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-4 sm:py-5 bg-muted/40" ref={scrollRef} tabIndex={0} aria-label="Диалог">
         <div className="space-y-4 pb-4">
           <AnimatePresence initial={false}>
             {messages.map((msg) => (
@@ -801,8 +824,8 @@ export function ChatWidget() {
           {diagnosticStatus === "success" && diagnosticResult && (
             <ResultCard
               result={diagnosticResult.structuredResult}
-              onAskQuestion={() => setPostDiagnosticState("post-diagnostic-ready")}
-              onGetConsultation={() => setContactPhase((phase) => phase ?? "channel")}
+              onAskQuestion={() => { scrollTarget.current = "consultant"; showNextStep(); setPostDiagnosticState("post-diagnostic-ready"); scrollController.current?.schedule(true, consultantInputRef.current ?? undefined); }}
+              onGetConsultation={() => { scrollTarget.current = "bottom"; showNextStep(); setContactPhase((phase) => phase ?? "channel"); scrollController.current?.schedule(true, bottomRef.current ?? undefined); }}
             />
           )}
           {consultantMessages.map((message) => (
@@ -816,7 +839,7 @@ export function ChatWidget() {
             <Loader2 className="w-4 h-4 animate-spin" />Готовим ответ...
           </div>}
           {postDiagnosticState === "post-diagnostic-ready" && (
-            <div className="rounded-xl border border-border bg-white p-4 space-y-2">
+            <div ref={consultantInputRef} className="rounded-xl border border-border bg-white p-4 space-y-2">
               <Textarea
                 value={questionDraft}
                 disabled={consultantLoading}
@@ -864,11 +887,11 @@ export function ChatWidget() {
           {renderChips(1)}
           {renderChips(2)}
           {renderChips(3)}
+          {/* Forms share the same viewport, so long results cannot squeeze them out. */}
+          {renderContactSection()}
+          <div ref={bottomRef} data-testid="chat-bottom-anchor" className="h-px" aria-hidden="true" />
         </div>
-      </ScrollArea>
-
-      {/* Contact form */}
-      {renderContactSection()}
+      </div>
     </div>
   );
 }
