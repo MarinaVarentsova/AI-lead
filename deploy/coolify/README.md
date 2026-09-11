@@ -1,4 +1,38 @@
-# SPA fallback: Coolify / Nixpacks static frontend
+# Frontend image: repository-owned SPA fallback
+
+Use `apps/web/Dockerfile` instead of the Nixpacks/static wrapper. The final nginx
+stage copies `apps/web/nginx/default.conf` to `/etc/nginx/conf.d/default.conf`
+and validates it with `RUN nginx -t`. It contains only built frontend assets and
+the committed server configuration. Backend code/settings remain unchanged.
+
+## Current Coolify settings (frontend resource only)
+
+- Branch: `inobr-v2`; Build Pack: **Dockerfile**.
+- Base Directory / build context: repository root `/`.
+- Dockerfile Location: `/apps/web/Dockerfile`; leave build stage empty.
+- Container port: `80`; keep the existing frontend domain.
+- Pass existing `VITE_API_BASE_URL` as a build argument pointing to the backend.
+  Leave `BASE_PATH=/`. Never pass backend or tester secrets as build arguments.
+- Do not use the Static wrapper, Custom Nginx Configuration, an nginx config
+  volume mount or a start command overriding the image CMD.
+- Redeploy after switching build packs. A Git push alone cannot change a resource
+  still configured as Nixpacks/static. No Coolify settings were changed here.
+
+Official deployment guide: https://coolify.io/docs/applications/build-packs/dockerfile
+
+From repository root (Docker required):
+
+```sh
+docker build -f apps/web/Dockerfile --build-arg VITE_API_BASE_URL=https://YOUR-BACKEND -t inobr-web .
+docker run --rm inobr-web nginx -T
+docker run --rm -p 8085:80 --name inobr-web-check inobr-web
+```
+
+Then run `node tests/unit/spa-fallback.check.mjs --url http://localhost:8085`.
+Without `--url`, only static image/config/route checks are performed, not Docker.
+`/`, `/tester`, refresh and unknown SPA paths return index.html; `/api` stays 404.
+
+## Legacy manual setup (superseded; do not use for the Dockerfile deployment)
 
 This repository contains React source. Keep Nixpacks and **Is it a static site?**
 enabled, with the existing build command and Publish Directory pointing to the
