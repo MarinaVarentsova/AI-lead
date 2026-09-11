@@ -7,28 +7,45 @@ const ts = require("typescript");
 const read = path => readFileSync(new URL(path, root), "utf8");
 const source = ts.transpileModule(read("apps/web/src/lib/chat-scroll.ts"), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
 const { createChatScroll } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
-let scheduled, resized, disposed = false, calls = 0;
+let scheduled;
+const calls = [], listeners = new Map();
 globalThis.requestAnimationFrame = fn => { scheduled = fn; return 1; };
 globalThis.cancelAnimationFrame = () => { scheduled = undefined; };
 globalThis.window = { matchMedia: () => ({ matches: false }) };
-globalThis.ResizeObserver = class { constructor(fn) { resized = fn; } observe() {} disconnect() { disposed = true; } };
-let onScroll;
-const viewport = { scrollTop: 600, scrollHeight: 1000, clientHeight: 400,
-  addEventListener(event, fn) { assert.equal(event, "scroll"); onScroll = fn; }, removeEventListener() {} };
-const bottom = { parentElement: {}, scrollIntoView(options) { assert.equal(options.block, "end"); calls++; } };
-const controller = createChatScroll(viewport, bottom);
-controller.schedule(); assert.equal(calls, 0, "wait for layout frame"); scheduled(); assert.equal(calls, 1);
-viewport.scrollHeight = 1400; resized(); scheduled(); assert.equal(calls, 2, "follow newly rendered long result");
-viewport.scrollTop = 200; onScroll(); controller.schedule(); scheduled(); assert.equal(calls, 2, "respect reading above bottom");
-controller.schedule(true); scheduled(); assert.equal(calls, 3, "explicit action resumes following");
-viewport.scrollTop = 1000; onScroll(); controller.schedule(); scheduled(); assert.equal(calls, 4);
-controller.dispose(); assert.ok(disposed); assert.equal(scheduled, undefined);
+const viewport = { scrollTop: 0, scrollHeight: 2000, clientHeight: 600,
+  addEventListener(event, fn) { listeners.set(event, fn); }, removeEventListener(event) { listeners.delete(event); } };
+const target = name => ({ isConnected: true, scrollIntoView(options) { calls.push({ name, ...options }); } });
+const controller = createChatScroll(viewport);
+const blocks = ["question1", "question2", "question3", "question4", "result", "input", "user", "assistant", "contact"];
+for (const name of blocks) {
+  const count = calls.length;
+  controller.schedule(target(name), true, name === "input" ? "center" : "start");
+  assert.equal(calls.length, count, "wait for post-render animation frame");
+  scheduled();
+  assert.deepEqual(calls.at(-1), { name, behavior: "smooth", block: name === "input" ? "center" : "start" });
+}
+listeners.get("wheel")();
+controller.schedule(target("incoming-answer"), false); scheduled();
+assert.equal(calls.length, blocks.length, "do not interrupt manual history reading");
+controller.schedule(target("explicit-question"), true); scheduled();
+assert.equal(calls.at(-1).name, "explicit-question");
+controller.schedule(target("incoming-answer"), false); scheduled();
+assert.equal(calls.at(-1).name, "incoming-answer");
+controller.schedule(target("cancelled"), false); listeners.get("touchstart")();
+assert.equal(scheduled, undefined, "touch cancels pending focus");
+controller.schedule(null, true); scheduled();
+const count = calls.length;
+controller.schedule({ ...target("unmounted"), isConnected: false }, true); scheduled(); assert.equal(calls.length, count);
+controller.dispose(); assert.equal(listeners.size, 0); assert.equal(scheduled, undefined);
 const widget = read("apps/web/src/components/chat-widget.tsx");
 const css = read("apps/web/src/index.css");
 assert.ok(widget.includes('data-testid="chat-bottom-anchor"'));
 assert.ok(widget.includes('min-h-0 min-w-0 flex-1 overflow-y-auto'));
 assert.ok(widget.indexOf('{renderContactSection()}') > widget.indexOf('aria-label="Диалог"'));
 assert.ok(widget.indexOf('{renderContactSection()}') < widget.indexOf('ref={bottomRef}'));
+for (const ref of ["currentQuestionRef", "diagnosticResultRef", "postDiagnosticInputRef", "latestAssistantMessageRef", "contactFormRef"]) assert.ok(widget.includes(`ref={${ref}}`) || widget.includes(`? ${ref}`));
+assert.ok(css.includes("scroll-margin-top"));
+assert.ok(!source.includes("ResizeObserver"));
 assert.ok(!widget.includes('<ScrollArea'));
 assert.ok(!read("apps/web/src/pages/home.tsx").includes('h-[600px]'));
 assert.ok(css.includes('height: 82dvh'));
@@ -45,4 +62,4 @@ for (const [width, height] of [[375,667],[390,844],[430,932],[768,1024],[820,118
   assert.ok(chatHeight > 0 && chatHeight + margin <= height);
   assert.ok(chatWidth + margin <= width);
 }
-console.log("PASS: scroll scheduling/follow/manual override/cleanup; responsive CSS and 8 viewport constraint cases (not browser rendering).");
+console.log("PASS: semantic block targets/post-render scheduling/manual override/cleanup; responsive CSS and 8 viewport constraint cases (not browser rendering).");

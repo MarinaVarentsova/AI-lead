@@ -220,11 +220,17 @@ export function ChatWidget() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
-  const consultantInputRef = useRef<HTMLDivElement>(null);
-  const scrollTarget = useRef<"bottom" | "consultant">("bottom");
+  const currentQuestionRef = useRef<HTMLDivElement>(null);
+  const diagnosticResultRef = useRef<HTMLDivElement>(null);
+  const postDiagnosticInputRef = useRef<HTMLTextAreaElement>(null);
+  const latestAssistantMessageRef = useRef<HTMLDivElement>(null);
+  const latestUserMessageRef = useRef<HTMLDivElement>(null);
+  const contactFormRef = useRef<HTMLDivElement>(null);
+  const limitCtaRef = useRef<HTMLDivElement>(null);
   const scrollController = useRef<ReturnType<typeof createChatScroll> | null>(null);
-  const forceScroll = useRef(false);
-  const showNextStep = () => { forceScroll.current = true; };
+  type FocusTarget = "question" | "result" | "input" | "user" | "assistant" | "contact" | "limit";
+  const [focusRequest, setFocusRequest] = useState<{ target: FocusTarget; force: boolean } | null>(null);
+  const showNextStep = (target: FocusTarget = "question", force = true) => setFocusRequest({ target, force });
 
   const createSession = useCreateSession();
   const createConversation = useCreateConversation();
@@ -254,19 +260,21 @@ export function ChatWidget() {
 
   const chatVisible = step > 0;
   useEffect(() => {
-    if (!scrollRef.current || !bottomRef.current) return;
-    const controller = createChatScroll(scrollRef.current, bottomRef.current);
+    if (!scrollRef.current) return;
+    const controller = createChatScroll(scrollRef.current);
     scrollController.current = controller;
     return () => { controller.dispose(); scrollController.current = null; };
   }, [chatVisible]);
 
-  // Effects run after the new DOM exists; RAF also covers layout/animation updates.
+  // Explicit actions and newly delivered answers focus their semantic block after render.
   useEffect(() => {
-    scrollController.current?.schedule(forceScroll.current,
-      (scrollTarget.current === "consultant" ? consultantInputRef.current : bottomRef.current) ?? undefined);
-    forceScroll.current = false;
-  }, [step, messages, isTyping, currentDictionary, activeCustomQ, contactPhase, contactError,
-    diagnosticStatus, postDiagnosticState, consultantMessages, consultantLoading, consultantError]);
+    if (!focusRequest) return;
+    const targets = { question: currentQuestionRef.current, result: diagnosticResultRef.current,
+      input: postDiagnosticInputRef.current, user: latestUserMessageRef.current,
+      assistant: latestAssistantMessageRef.current, contact: contactFormRef.current, limit: limitCtaRef.current };
+    scrollController.current?.schedule(targets[focusRequest.target], focusRequest.force,
+      focusRequest.target === "input" ? "center" : "start");
+  }, [focusRequest]);
 
   const uid = () => Date.now().toString() + Math.random().toString(36).slice(2);
 
@@ -305,6 +313,7 @@ export function ChatWidget() {
           // Показываем Q1 напрямую — без вызова OpenAI
           addBotMessage(QUESTION_TEXTS[0]);
           setStep(2);
+          showNextStep("question", false);
         },
         onError: () => {
           setIsTyping(false);
@@ -336,6 +345,7 @@ export function ChatWidget() {
     if (diagnosticBusy.current) return;
     diagnosticBusy.current = true;
     pendingDiagnostic.current = payload;
+    showNextStep("result");
     setDiagnosticStatus("loading");
     try {
       const response = await completeDiagnostic(payload, (data) =>
@@ -343,8 +353,10 @@ export function ChatWidget() {
       );
       setDiagnosticResult(response);
       setDiagnosticStatus("success");
+      showNextStep("result", false);
     } catch {
       setDiagnosticStatus("error");
+      showNextStep("result", false);
     } finally {
       diagnosticBusy.current = false;
     }
@@ -382,8 +394,7 @@ export function ChatWidget() {
   const handleConsultantSubmit = async () => {
     const question = questionDraft.trim();
     if (consultantLimitReached || consultantBusy.current || !conversationId || !question || question.length > 4000) return;
-    showNextStep();
-    scrollTarget.current = "consultant";
+    showNextStep("user");
     consultantBusy.current = true;
     setConsultantLoading(true);
     setConsultantError(false);
@@ -394,15 +405,15 @@ export function ChatWidget() {
     try {
       if (consultantRequest.current?.question !== question) consultantRequest.current = { question, id: crypto.randomUUID() };
       const reply = await sendConsultantTurn(conversationId, question, consultantRequest.current.id);
-      if (reply.limitReached) scrollTarget.current = "bottom";
+      showNextStep("assistant", false);
       setConsultantLimitReached(reply.limitReached);
       consultantRequest.current = null;
       setConsultantMessages((previous) => [...previous, { id: uid(), role: "bot", content: reply.message }]);
       setQuestionDraft("");
       failedQuestion.current = null;
     } catch (error) {
-      if (error instanceof ConsultantLimitError) { scrollTarget.current = "bottom"; setConsultantLimitReached(true); }
-      else setConsultantError(true);
+      if (error instanceof ConsultantLimitError) { showNextStep("limit", false); setConsultantLimitReached(true); }
+      else { setConsultantError(true); showNextStep("input", false); }
     } finally {
       consultantBusy.current = false;
       setConsultantLoading(false);
@@ -412,8 +423,7 @@ export function ChatWidget() {
   // ─── Contact form ────────────────────────────────────────────────────────────
 
   const handleSelectChannel = (code: string) => {
-    scrollTarget.current = "bottom";
-    showNextStep();
+    showNextStep("contact");
     setContactError(false);
     setSelectedChannel(code);
     setContactInput("");
@@ -623,7 +633,7 @@ export function ChatWidget() {
             <Button
               variant="outline"
               className="flex-1 rounded-lg text-sm border-border"
-              onClick={() => setContactPhase("channel")}
+              onClick={() => { showNextStep("contact"); setContactPhase("channel"); }}
               disabled={contactSubmitting}
             >
               Назад
@@ -769,9 +779,10 @@ export function ChatWidget() {
             {messages.map((msg) => (
               <motion.div
                 key={msg.id}
+                ref={msg.role === "bot" && msg.id === messages.at(-1)?.id ? currentQuestionRef : undefined}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`flex gap-2.5 max-w-[88%] ${
+                className={`chat-focus-target flex gap-2.5 max-w-[88%] ${
                   msg.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"
                 }`}
               >
@@ -812,6 +823,7 @@ export function ChatWidget() {
             )}
           </AnimatePresence>
 
+          <div ref={diagnosticResultRef} className="chat-focus-target">
           {diagnosticStatus === "loading" && (
             <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground px-4">
               <Loader2 className="w-4 h-4 animate-spin shrink-0" />
@@ -831,12 +843,15 @@ export function ChatWidget() {
           {diagnosticStatus === "success" && diagnosticResult && (
             <ResultCard
               result={diagnosticResult.structuredResult}
-              onAskQuestion={() => { scrollTarget.current = "consultant"; showNextStep(); setPostDiagnosticState("post-diagnostic-ready"); scrollController.current?.schedule(true, consultantInputRef.current ?? undefined); }}
-              onGetConsultation={() => { scrollTarget.current = "bottom"; showNextStep(); setContactPhase((phase) => phase ?? "channel"); scrollController.current?.schedule(true, bottomRef.current ?? undefined); }}
+              onAskQuestion={() => { showNextStep("input"); setPostDiagnosticState("post-diagnostic-ready"); }}
+              onGetConsultation={() => { showNextStep("contact"); setContactPhase((phase) => phase ?? "channel"); }}
             />
           )}
+          </div>
           {consultantMessages.map((message) => (
-            <div key={message.id} className={`max-w-[88%] px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap rounded-2xl ${
+            <div key={message.id} ref={message.id === consultantMessages.at(-1)?.id
+              ? message.role === "bot" ? latestAssistantMessageRef : latestUserMessageRef : undefined}
+              className={`chat-focus-target max-w-[88%] px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap rounded-2xl ${
               message.role === "user" ? "ml-auto bg-primary text-primary-foreground rounded-tr-sm" : "mr-auto bg-white border border-border shadow-sm rounded-tl-sm"
             }`}>
               {message.content}
@@ -846,8 +861,9 @@ export function ChatWidget() {
             <Loader2 className="w-4 h-4 animate-spin" />Готовим ответ...
           </div>}
           {postDiagnosticState === "post-diagnostic-ready" && !consultantLimitReached && (
-            <div ref={consultantInputRef} className="rounded-xl border border-border bg-white p-4 space-y-2">
+            <div className="rounded-xl border border-border bg-white p-4 space-y-2">
               <Textarea
+                ref={postDiagnosticInputRef}
                 value={questionDraft}
                 disabled={consultantLoading}
                 maxLength={4000}
@@ -860,7 +876,7 @@ export function ChatWidget() {
                 onChange={(event) => setQuestionDraft(event.target.value)}
                 placeholder="Что хотите уточнить?"
                 aria-label="Что хотите уточнить?"
-                className="min-h-[80px] text-sm resize-none rounded-xl"
+                className="chat-focus-target min-h-[80px] text-sm resize-none rounded-xl"
               />
               {consultantError && <p role="alert" className="text-sm text-destructive">{CONSULTANT_ERROR}</p>}
               <Button onClick={() => void handleConsultantSubmit()}
@@ -871,9 +887,9 @@ export function ChatWidget() {
             </div>
           )}
 
-          {consultantLimitReached && <Button className="w-full" onClick={() => {
-            scrollTarget.current = "bottom"; showNextStep(); setContactPhase(phase => phase ?? "channel");
-          }}>Продолжить с менеджером</Button>}
+          {consultantLimitReached && <div ref={limitCtaRef} className="chat-focus-target"><Button className="w-full" onClick={() => {
+            showNextStep("contact"); setContactPhase(phase => phase ?? "channel");
+          }}>Продолжить с менеджером</Button></div>}
 
           {/* "Начать" button (step 1) */}
           {step === 1 && !isTyping && (
@@ -899,7 +915,7 @@ export function ChatWidget() {
           {renderChips(2)}
           {renderChips(3)}
           {/* Forms share the same viewport, so long results cannot squeeze them out. */}
-          {renderContactSection()}
+          {contactPhase && <div ref={contactFormRef} className="chat-focus-target">{renderContactSection()}</div>}
           <div ref={bottomRef} data-testid="chat-bottom-anchor" className="h-px" aria-hidden="true" />
         </div>
       </div>

@@ -105,3 +105,6 @@
 @media (min-width: 1024px) {
   .chat-shell { width: 100%; max-width: 560px; height: 82dvh; max-height: calc(var(--chat-viewport-height, 100dvh) - 32px); }
 }
+
+/* Header/progress are outside the viewport; leave an inset below that fixed boundary. */
+.chat-focus-target { scroll-margin-top: 1rem; scroll-margin-bottom: 1rem; }
