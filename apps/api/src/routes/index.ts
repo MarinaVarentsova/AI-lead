@@ -12,6 +12,8 @@ import diagnoseRouter from "./diagnose";
 import contactsRouter from "./contacts";
 import consultantChatRouter from "./consultant-chat";
 
+import testerRouter from "./tester";
+
 const router: IRouter = Router();
 
 router.use(healthRouter);
@@ -26,5 +28,6 @@ router.use(qualifyRouter);
 router.use(diagnoseRouter);
 router.use(contactsRouter);
 router.use(consultantChatRouter);
+router.use(testerRouter);
 
 export default router;

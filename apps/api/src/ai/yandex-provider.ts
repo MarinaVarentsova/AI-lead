@@ -34,10 +34,34 @@ function readConfiguration(env: YandexEnvironment) {
 export class YandexAIProvider implements AIProvider, ConsultantAIProvider {
   constructor(private readonly env: YandexEnvironment = process.env) {}
 
+  /** Independent evaluator call; never shares conversational state with Artem. */
+  async generateStructured(system: string, input: unknown): Promise<unknown> {
+    const config = readConfiguration(this.env);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), Math.min(config.timeoutMs, 60000));
+    try {
+      const response = await fetch(config.url, {
+        method: "POST", redirect: "error", signal: controller.signal,
+        headers: { "Content-Type": "application/json", Authorization: `Api-Key ${config.apiKey}`, "OpenAI-Project": config.folderId },
+        body: JSON.stringify({ model: config.model, temperature: 0.1, max_tokens: 3000,
+          response_format: { type: "json_object" }, messages: [{ role: "system", content: system }, { role: "user", content: JSON.stringify(input) }] }),
+      });
+      if (!response.ok) throw new DiagnosticAIError("AI_REQUEST_FAILED");
+      const payload = await response.json() as { choices?: { finish_reason?: string; message?: { content?: unknown } }[] };
+      const choice = payload.choices?.[0];
+      if (choice?.finish_reason !== "stop" || typeof choice.message?.content !== "string") throw new DiagnosticAIError("AI_INVALID_RESULT");
+      return JSON.parse(choice.message.content.trim().replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i, "$1"));
+    } catch (error) {
+      if (controller.signal.aborted) throw new DiagnosticAIError("AI_REQUEST_TIMEOUT");
+      if (error instanceof DiagnosticAIError) throw error;
+      throw new DiagnosticAIError("AI_INVALID_RESULT");
+    } finally { clearTimeout(timer); }
+  }
+
   async generateConsultantReply(input: ConsultantProviderInput): Promise<string> {
     const config = readConfiguration(this.env);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+    const timer = setTimeout(() => controller.abort(), Math.min(config.timeoutMs, 60000));
     try {
       const response = await fetch(config.url, {
         method: "POST", redirect: "error", signal: controller.signal,
@@ -69,7 +93,7 @@ export class YandexAIProvider implements AIProvider, ConsultantAIProvider {
     const config = readConfiguration(this.env);
     const facts = selectDiagnosticFacts(input);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), config.timeoutMs);
+    const timer = setTimeout(() => controller.abort(), Math.min(config.timeoutMs, 60000));
     try {
       const response = await fetch(config.url, {
         method: "POST",

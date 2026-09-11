@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { createChatScroll } from "@/lib/chat-scroll";
-import { sendConsultantMessage, CONSULTANT_ERROR } from "@/lib/consultant-chat";
+import { sendConsultantTurn, ConsultantLimitError, CONSULTANT_ERROR } from "@/lib/consultant-chat";
 import { submitContact, CONTACT_ERROR, type ContactPayload } from "@/lib/contact";
 import {
   completeDiagnostic, DIAGNOSTIC_ERROR,
@@ -202,6 +202,8 @@ export function ChatWidget() {
   const [consultantMessages, setConsultantMessages] = useState<Message[]>([]);
   const [consultantLoading, setConsultantLoading] = useState(false);
   const [consultantError, setConsultantError] = useState(false);
+  const [consultantLimitReached, setConsultantLimitReached] = useState(false);
+  const consultantRequest = useRef<{ question: string; id: string } | null>(null);
   const consultantBusy = useRef(false);
   const failedQuestion = useRef<string | null>(null);
   const diagnosticBusy = useRef(false);
@@ -379,7 +381,7 @@ export function ChatWidget() {
 
   const handleConsultantSubmit = async () => {
     const question = questionDraft.trim();
-    if (consultantBusy.current || !conversationId || !question || question.length > 4000) return;
+    if (consultantLimitReached || consultantBusy.current || !conversationId || !question || question.length > 4000) return;
     showNextStep();
     scrollTarget.current = "consultant";
     consultantBusy.current = true;
@@ -390,12 +392,17 @@ export function ChatWidget() {
     }
     failedQuestion.current = question;
     try {
-      const reply = await sendConsultantMessage(conversationId, question);
-      setConsultantMessages((previous) => [...previous, { id: uid(), role: "bot", content: reply }]);
+      if (consultantRequest.current?.question !== question) consultantRequest.current = { question, id: crypto.randomUUID() };
+      const reply = await sendConsultantTurn(conversationId, question, consultantRequest.current.id);
+      if (reply.limitReached) scrollTarget.current = "bottom";
+      setConsultantLimitReached(reply.limitReached);
+      consultantRequest.current = null;
+      setConsultantMessages((previous) => [...previous, { id: uid(), role: "bot", content: reply.message }]);
       setQuestionDraft("");
       failedQuestion.current = null;
-    } catch {
-      setConsultantError(true);
+    } catch (error) {
+      if (error instanceof ConsultantLimitError) { scrollTarget.current = "bottom"; setConsultantLimitReached(true); }
+      else setConsultantError(true);
     } finally {
       consultantBusy.current = false;
       setConsultantLoading(false);
@@ -838,7 +845,7 @@ export function ChatWidget() {
           {consultantLoading && <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" />Готовим ответ...
           </div>}
-          {postDiagnosticState === "post-diagnostic-ready" && (
+          {postDiagnosticState === "post-diagnostic-ready" && !consultantLimitReached && (
             <div ref={consultantInputRef} className="rounded-xl border border-border bg-white p-4 space-y-2">
               <Textarea
                 value={questionDraft}
@@ -863,6 +870,10 @@ export function ChatWidget() {
               </Button>
             </div>
           )}
+
+          {consultantLimitReached && <Button className="w-full" onClick={() => {
+            scrollTarget.current = "bottom"; showNextStep(); setContactPhase(phase => phase ?? "channel");
+          }}>Продолжить с менеджером</Button>}
 
           {/* "Начать" button (step 1) */}
           {step === 1 && !isTyping && (

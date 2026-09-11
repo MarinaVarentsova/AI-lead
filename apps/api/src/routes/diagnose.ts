@@ -6,23 +6,14 @@ import {
   type DiagnosticAnswers,
 } from "@workspace/domain/diagnostic";
 import { eq } from "drizzle-orm";
-import { DiagnosticResultService, YandexAIProvider, type DiagnosticAIResult } from "../ai";
+import { DiagnosticResultService, YandexAIProvider } from "../ai";
 
 const router: IRouter = Router();
 const service = new DiagnosticResultService(new YandexAIProvider());
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export function formatDiagnosticResult(result: DiagnosticAIResult): string {
-  return [
-    result.summary,
-    `Ваш опыт: ${result.experience}`,
-    `Стаж: ${result.experienceYears}`,
-    `Образование: ${result.education}`,
-    `Ваша цель: ${result.goal}`,
-    `Рекомендация: ${result.recommendation}`,
-    ...(result.importantNote ? [`Важно: ${result.importantNote}`] : []),
-  ].join("\n\n");
-}
+import { formatDiagnosticResult } from "../ai/format-diagnostic";
+export { formatDiagnosticResult } from "../ai/format-diagnostic";
 
 router.post("/diagnose", async (req, res): Promise<void> => {
   // Do not log request bodies, raw answers, generated text or underlying errors.
