@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { testerRequest as request, getTesterToken, saveTesterToken, clearTesterToken, TESTER_UNAUTHORIZED_EVENT } from "@/lib/tester-access";
 type Evaluation = { score: number; verdict: string; strengths: string[]; problems: string[]; recommendedFixes: string[]; funnelAssessment: string; groundingAssessment: string };
 type TestCase = { id: string; caseNumber: number; persona: { label: string }; diagnosticAnswers: unknown; diagnosticResult: unknown;
   transcript: { role: string; message: string }[] | null; evaluatorResult: Evaluation | null; score: number | null; verdict: string; errorMessage: string | null };
@@ -8,15 +8,41 @@ type Summary = { totalCases: number; PASS: number; REVIEW: number; FAIL: number;
   evaluatedCases: number; errorCases: number; error?: string; summaryError?: string;
   aiSummary?: { topProblems: string[]; topStrengths: string[]; conversionImprovements: string[] } | null };
 type Run = { id: string; status: string; requestedCases: number; completedCases: number; knowledgeVersion: string; summary: Summary | null };
-async function request<T>(url: `/api/${string}`, options?: RequestInit): Promise<T> {
-  const response = await apiFetch(url, options);
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({}));
-    throw new Error(body.error === "TESTER_DISABLED" ? "Внутренний API выключен. Сначала настройте доступ и включите tester на backend." : body.error ?? `HTTP ${response.status}`);
-  }
-  return response.json();
-}
 export default function Tester() {
+  const [unlocked, setUnlocked] = useState(() => Boolean(getTesterToken()));
+  const [key, setKey] = useState("");
+  const [error, setError] = useState("");
+  const [checking, setChecking] = useState(false);
+  const checkingRef = useRef(false);
+  useEffect(() => {
+    const denied = () => { setUnlocked(false); setKey(""); setError("Ключ доступа отсутствует или неверен."); };
+    window.addEventListener(TESTER_UNAUTHORIZED_EVENT, denied);
+    return () => window.removeEventListener(TESTER_UNAUTHORIZED_EVENT, denied);
+  }, []);
+  if (unlocked) return <TesterPanel />;
+  return <main className="max-w-md mx-auto p-6 space-y-4">
+    <h1 className="text-2xl font-semibold">Внутренний тестировщик Артёма</h1>
+    <form className="space-y-4" onSubmit={async event => {
+      event.preventDefault();
+      if (checkingRef.current || !key.trim()) return;
+      checkingRef.current = true; setChecking(true); setError("");
+      try {
+        saveTesterToken(key.trim()); setKey("");
+        await request("/api/tester/runs");
+        setUnlocked(true);
+      } catch (error) { clearTesterToken(); setError((error as Error).message); }
+      finally { checkingRef.current = false; setChecking(false); }
+    }}>
+      <label className="block">Ключ доступа
+        <input type="password" aria-label="Ключ доступа" autoComplete="off" value={key}
+          disabled={checking} onChange={event => setKey(event.target.value)} className="block w-full border rounded p-2 mt-1" />
+      </label>
+      <button disabled={checking || !key.trim()} className="bg-primary text-white px-4 py-2 rounded disabled:opacity-50">Открыть тестировщик</button>
+      {error && <p role="alert" className="text-destructive">{error}</p>}
+    </form>
+  </main>;
+}
+function TesterPanel() {
   const [run, setRun] = useState<Run | null>(null);
   const [cases, setCases] = useState<TestCase[]>([]);
   const [count, setCount] = useState(10);
@@ -62,7 +88,7 @@ export default function Tester() {
   const summary = run?.summary;
   return <main className="max-w-5xl mx-auto p-4 sm:p-8 space-y-5">
     <h1 className="text-2xl font-semibold">Тестировщик Артёма</h1>
-    <p className="text-sm text-muted-foreground">Внутренний MVP. Запуск выполняет платные AI-вызовы. Не используйте персональные данные. Доступ должен быть ограничен внутренней авторизацией.</p>
+    <p className="text-sm text-muted-foreground">Внутренний MVP. Запуск выполняет платные AI-вызовы. Не используйте персональные данные. Доступ защищён внутренним ключом.</p>
     <div className="flex flex-wrap gap-3 items-center">
       <label>Кейсов <input aria-label="Количество тестов" type="number" min={1} max={10} value={count}
         disabled={initializing || starting || run?.status === "running"} onChange={event => setCount(Number(event.target.value))} className="border rounded p-2 w-20" /></label>

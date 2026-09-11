@@ -1,16 +1,12 @@
-import { Router, type IRouter, type RequestHandler } from "express";
+import { Router, type IRouter } from "express";
 import { and, asc, desc, eq, lt } from "drizzle-orm";
 import { db, aiTestRuns, aiTestCases } from "@workspace/db";
 import { getArtemRuntime } from "../ai/artem-runtime";
 import { runTester } from "../tester/runner";
 import { validateRunCount } from "../tester/personas";
+import { internalTesterAccess } from "../tester/access";
 const router: IRouter = Router();
-// Mount future internal authorization here. This enable switch is NOT authentication.
-const internalAccess: RequestHandler = (_req, res, next) => {
-  if (process.env.INTERNAL_TESTER_ENABLED !== "true") { res.status(404).json({ error: "TESTER_DISABLED" }); return; }
-  next();
-};
-router.use("/tester", internalAccess);
+router.use("/tester", internalTesterAccess);
 router.post("/tester/runs", async (req, res) => {
   let count: number;
   try { count = validateRunCount(req.body?.count ?? 10); } catch { res.status(400).json({ error: "Choose 1–10 cases." }); return; }
