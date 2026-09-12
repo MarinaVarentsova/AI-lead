@@ -4,8 +4,8 @@ import type { ConsultantExchange } from "../ai/consultant-funnel";
 import { formatDiagnosticResult } from "../ai/format-diagnostic";
 import { DiagnosticAIError } from "../ai/diagnostic-result.types";
 import { generatePersonas, validateRunCount, type Persona } from "./personas";
-import { EVALUATOR_PROMPT, validateEvaluation, type Evaluation } from "./evaluator";
-import { RUN_ASSESSMENT_PROMPT, validateRunAssessment, type RunAssessment } from "./run-assessment";
+import { CRITERIA, EVALUATOR_PROMPT, validateEvaluation, type Evaluation } from "./evaluator";
+import { buildDeterministicRunAssessment, RUN_ASSESSMENT_PROMPT, validateRunAssessment, type RunAssessment } from "./run-assessment";
 export interface CaseResult {
   caseNumber: number; persona: Persona; diagnosticAnswers: Persona["answers"]; diagnosticResult: unknown;
   transcript: ConsultantExchange[]; evaluatorResult: Evaluation | null; score: number | null;
@@ -23,12 +23,16 @@ export function aggregate(results: Pick<CaseResult, "verdict" | "errorMessage" |
   const quality = results.filter(r => r.verdict !== "TECH_ERROR" && !r.errorMessage && r.evaluatorResult);
   const evaluated = quality.map(r => r.evaluatorResult!);
   const avg = (get: (v: Evaluation) => number) => evaluated.length ? Math.round(evaluated.reduce((n,v) => n + get(v),0) / evaluated.length) : null;
+  const criterionScores = Object.fromEntries(CRITERIA.map(key => [key, avg(v => v.criteria[key])])) as
+    Record<typeof CRITERIA[number], number | null>;
   return { totalCases: results.length, PASS: quality.filter(r => r.verdict === "PASS").length,
     REVIEW: quality.filter(r => r.verdict === "REVIEW").length, FAIL: quality.filter(r => r.verdict === "FAIL").length,
     TECH_ERROR: results.length - evaluated.length,
     evaluatedCases: evaluated.length, errorCases: results.length - evaluated.length,
-    averageScore: avg(v => v.score), averageQualificationScore: avg(v => v.criteria.qualification),
-    averageGroundingScore: avg(v => v.criteria.grounding), averageSalesFunnelScore: avg(v => (v.criteria.sales + v.criteria.cta + v.criteria.conversion) / 3) };
+    averageScore: avg(v => v.score), averageQualificationScore: criterionScores.qualification,
+    averageGroundingScore: criterionScores.grounding,
+    averageSalesFunnelScore: avg(v => (v.criteria.sales + v.criteria.cta + v.criteria.conversion) / 3),
+    criterionScores };
 }
 export async function evaluateWithRetry<T>(evaluate: () => Promise<T>): Promise<T> {
   try { return await evaluate(); } catch { return evaluate(); }
@@ -73,21 +77,33 @@ export async function runTester(count: number, runtime: ArtemRuntime, store: Tes
     await store.progress(index + 1);
   }
   let runEvaluation: RunAssessment | null = null;
+  let summarySource: "ai" | "deterministic" = "deterministic";
   let summaryError: string | null = null;
   const metrics = aggregate(results);
   const assessed = results.filter(r => r.evaluatorResult && r.verdict !== "TECH_ERROR" && !r.errorMessage);
   if (assessed.length) {
-    const scores = { overallScore: metrics.averageScore!, qualificationScore: metrics.averageQualificationScore!,
-      knowledgeGroundingScore: metrics.averageGroundingScore!, salesFunnelScore: metrics.averageSalesFunnelScore! };
+    const scores = { overallScore: metrics.averageScore, qualificationScore: metrics.averageQualificationScore,
+      knowledgeGroundingScore: metrics.averageGroundingScore, salesFunnelScore: metrics.averageSalesFunnelScore,
+      criterionScores: metrics.criterionScores };
     try {
       runEvaluation = await evaluateWithRetry(async () => validateRunAssessment(
         await runtime.provider.generateStructured(RUN_ASSESSMENT_PROMPT, {
           cases: assessed, metrics: scores, confirmedKnowledge: runtime.markdown,
+          knowledgeSectionTitles: runtime.markdown.match(/^# .+$/gm) ?? [],
         }), assessed.map(r => r.caseNumber), runtime.markdown, scores));
-    } catch { summaryError = "AI_SUMMARY_UNAVAILABLE"; }
-  } else summaryError = "NO_EVALUATED_CASES";
-  const codexTask = runEvaluation?.codexTask ?? "Работать только в inobr-v2. Восстановить техническую оценку QA и повторить её проверку. Управленческое заключение не получено: не делать выводы о качестве Артёма и не менять его KB, diagnostic rules, prompt, retrieval или funnel. Проверить timeout, structured JSON, повтор evaluator и разделение TECH_ERROR/FAIL. Не запускать изменения или серии автоматически.";
-  const summary = { ...metrics, runEvaluation, codexTask, summaryError };
+      summarySource = "ai";
+    } catch {
+      summaryError = "AI_SUMMARY_UNAVAILABLE";
+      runEvaluation = buildDeterministicRunAssessment(assessed, scores);
+    }
+  } else {
+    summaryError = "NO_EVALUATED_CASES";
+    const scores = { overallScore: metrics.averageScore, qualificationScore: metrics.averageQualificationScore,
+      knowledgeGroundingScore: metrics.averageGroundingScore, salesFunnelScore: metrics.averageSalesFunnelScore,
+      criterionScores: metrics.criterionScores };
+    runEvaluation = buildDeterministicRunAssessment([], scores);
+  }
+  const summary = { ...metrics, runEvaluation, codexTask: runEvaluation.codexTask, summaryError, summarySource };
   await store.finish(summary);
   return summary;
 }

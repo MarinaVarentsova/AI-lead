@@ -219,7 +219,7 @@ try {
   const { runTester } = await import(new URL("apps/api/src/tester/runner.ts", root));
   const { createArtemRuntime } = await import(new URL("apps/api/src/ai/artem-runtime.ts", root));
   const { CRITERIA, validateEvaluation } = await import(new URL("apps/api/src/tester/evaluator.ts", root));
-  const { validateRunAssessment, nextIteration } = await import(new URL("apps/api/src/tester/run-assessment.ts", root));
+  const { validateRunAssessment, buildDeterministicRunAssessment, nextIteration } = await import(new URL("apps/api/src/tester/run-assessment.ts", root));
   for (const count of [0, 11, 1.5, "10"]) assert.throws(() => validateRunCount(count));
   const personas = generatePersonas(10);
   assert.equal(new Set(personas.map(p => p.label)).size, 10);
@@ -235,7 +235,12 @@ try {
     strengths: ["Квалификация основана на известных ответах"],
     recommendedChanges: [{ priority: 1, area: "consultant_prompt", problem: "Следующий шаг сформулирован общо.",
       change: "Связать CTA с уже снятым сомнением.", expectedEffect: "Более понятный переход к менеджеру.",
-      requiresBusinessDecision: false, confirmedQuotes: [] }], doNotChange: ["Ограничения по гарантиям"], codexTask: "Не доверять этому полю" };
+      target: "apps/api/src/ai/consultant-chat.prompt.ts", evidenceCaseNumbers: [1], requiresBusinessDecision: false, confirmedQuotes: [] }],
+    recommendationsForKnowledgeBase: [{ section: "# 50. Первый перевод к Bitrix-форме", currentGap: "Недостаточно примеров персонального CTA.",
+      recommendedAddition: "Не использовать сухую фразу.", evidenceCaseNumbers: [1], priority: "medium",
+      requiresProductDecision: false, confirmedQuotes: ["Не использовать сухую фразу:"] }],
+    trainingRules: ["Отвечать на сомнение.", "Персонализировать CTA.", "Не придумывать факты."],
+    doNotChange: ["Ограничения по гарантиям"], codexTask: "Не доверять этому полю" };
   let evaluatorAttempts = 0;
   const fakeProvider = new YandexAIProvider({});
   fakeProvider.generateStructured = async (prompt) => {
@@ -252,20 +257,54 @@ try {
   assert.equal(savedCases[1].verdict, "TECH_ERROR"); assert.equal(savedCases[1].score, null); assert.ok(savedCases[1].errorMessage);
   assert.equal(summary.PASS, 1); assert.equal(summary.FAIL, 0); assert.equal(summary.TECH_ERROR, 1);
   assert.equal(summary.evaluatedCases, 1); assert.equal(summary.errorCases, 1); assert.equal(summary.averageScore, 90);
+  assert.equal(summary.criterionScores.personalization, 90, "TECH_ERROR must not affect criterion averages");
   assert.equal(summary.runEvaluation?.overallScore, 90); assert.deepEqual(summary.runEvaluation?.systemicProblems[0].evidenceCaseNumbers, [1]);
-  assert.ok(summary.codexTask.includes("Кейсы: 1")); assert.ok(!summary.codexTask.includes("Не доверять этому полю"));
+  assert.equal(summary.runEvaluation?.recommendationsForKnowledgeBase[0].section, "# 50. Первый перевод к Bitrix-форме");
+  assert.equal(summary.runEvaluation?.trainingRules.length, 3);
+  assert.ok(summary.codexTask.includes("Кейсы: 1")); assert.ok(summary.codexTask.includes("# 50. Первый перевод к Bitrix-форме"));
+  assert.ok(!summary.codexTask.includes("Не доверять этому полю"));
   assert.equal(evaluatorAttempts, 4, "each failed evaluator call is retried once");
   assert.equal(persisted.length, productionBefore, "Tester must not write production messages");
   assert.ok(savedCases.every(c => c.transcript.filter(m => m.role === "user").length <= 3));
   await assert.rejects(runTester(11, runtime, {}));
   const guardedAssessment = validateRunAssessment({ ...runAssessment,
     recommendedChanges: [{ ...runAssessment.recommendedChanges[0], area: "knowledge_base", change: "Установить цену 123 456 ₽" }] },
-    [1], runtime.markdown, { overallScore: 90, qualificationScore: 90, knowledgeGroundingScore: 90, salesFunnelScore: 90 });
+    [1], runtime.markdown, { overallScore: 90, qualificationScore: 90, knowledgeGroundingScore: 90, salesFunnelScore: 90,
+      criterionScores: Object.fromEntries(CRITERIA.map(key => [key, 90])) });
   assert.equal(guardedAssessment.recommendedChanges[0].requiresBusinessDecision, true);
-  assert.ok(guardedAssessment.recommendedChanges[0].change.startsWith("Требуется бизнес-решение"));
+  assert.ok(guardedAssessment.recommendedChanges[0].change.startsWith("Требуется решение владельца продукта"));
+  const guardedKnowledge = validateRunAssessment({ ...runAssessment,
+    recommendationsForKnowledgeBase: [{ ...runAssessment.recommendationsForKnowledgeBase[0],
+      recommendedAddition: "Добавить новую цену 777 777 ₽.", confirmedQuotes: [] }] },
+    [1], runtime.markdown, { overallScore: 90, qualificationScore: 90, knowledgeGroundingScore: 90, salesFunnelScore: 90,
+      criterionScores: Object.fromEntries(CRITERIA.map(key => [key, 90])) });
+  assert.equal(guardedKnowledge.recommendationsForKnowledgeBase[0].requiresProductDecision, true);
+  assert.equal(guardedKnowledge.recommendationsForKnowledgeBase[0].recommendedAddition, "Требуется решение владельца продукта.");
   assert.throws(() => validateRunAssessment({ ...runAssessment,
     systemicProblems: [{ ...runAssessment.systemicProblems[0], evidenceCaseNumbers: [999] }] }, [1], runtime.markdown,
-    { overallScore: 90, qualificationScore: 90, knowledgeGroundingScore: 90, salesFunnelScore: 90 }));
+    { overallScore: 90, qualificationScore: 90, knowledgeGroundingScore: 90, salesFunnelScore: 90,
+      criterionScores: Object.fromEntries(CRITERIA.map(key => [key, 90])) }));
+  const deterministic = buildDeterministicRunAssessment([
+    { caseNumber: 1, evaluatorResult: { ...validateEvaluation(good), problems: ["Слабый переход к менеджеру"], recommendedFixes: ["Персонализировать CTA."] } },
+    { caseNumber: 4, evaluatorResult: { ...validateEvaluation(good), problems: ["Слабый переход к менеджеру"], recommendedFixes: ["Персонализировать CTA."] } },
+  ], { overallScore: 90, qualificationScore: 90, knowledgeGroundingScore: 90, salesFunnelScore: 90,
+    criterionScores: Object.fromEntries(CRITERIA.map(key => [key, 90])) });
+  assert.equal(deterministic.systemicProblems[0].frequency, 2);
+  assert.deepEqual(deterministic.systemicProblems[0].evidenceCaseNumbers, [1, 4]);
+  assert.ok(deterministic.trainingRules.length >= 3 && deterministic.trainingRules.length <= 7);
+  assert.ok(deterministic.codexTask.includes("Кейсы: 1, 4"));
+  const fallbackProvider = new YandexAIProvider({});
+  fallbackProvider.generateStructured = async prompt => {
+    if (prompt.includes("systemicProblems")) throw new Error("Run summary unavailable");
+    return { ...good, problems: ["Слабый переход к менеджеру"], recommendedFixes: ["Персонализировать CTA."] };
+  };
+  const fallbackRuntime = createArtemRuntime(runtime.markdown, fallbackProvider);
+  const fallbackSummary = await runTester(1, fallbackRuntime, { async saveCase() {}, async progress() {}, async finish() {} }, personas.slice(0, 1));
+  assert.equal(fallbackSummary.summarySource, "deterministic");
+  assert.ok(fallbackSummary.runEvaluation);
+  assert.equal(fallbackSummary.summaryError, "AI_SUMMARY_UNAVAILABLE");
+  assert.ok(fallbackSummary.runEvaluation.systemicProblems.length);
+  assert.equal(fallbackSummary.totalCases, fallbackSummary.PASS + fallbackSummary.REVIEW + fallbackSummary.FAIL + fallbackSummary.TECH_ERROR);
   assert.equal(nextIteration(), 1); assert.equal(nextIteration({ status: "completed", iterationNumber: 1 }), 2);
   assert.throws(() => nextIteration({ status: "completed", iterationNumber: 5 }));
   assert.throws(() => nextIteration({ status: "running", iterationNumber: 1 }));

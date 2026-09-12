@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { testerRequest as request, getTesterToken, saveTesterToken, clearTesterToken, TESTER_UNAUTHORIZED_EVENT } from "@/lib/tester-access";
-import { verdictLabel, runStatusLabel, errorLabel, areaLabel, severityLabel, type RunAssessmentView } from "@/lib/tester-report";
-type Evaluation = { score: number; verdict: string; strengths: string[]; problems: string[]; recommendedFixes: string[]; funnelAssessment: string; groundingAssessment: string };
+import { verdictLabel, runStatusLabel, errorLabel, areaLabel, severityLabel, scoreStatus, criterionLabel, type RunAssessmentView } from "@/lib/tester-report";
+type Evaluation = { score: number; verdict: string; criteria: Record<string, number>; strengths: string[]; problems: string[]; recommendedFixes: string[]; funnelAssessment: string; groundingAssessment: string };
 type TestCase = { id: string; caseNumber: number; persona: { label: string }; diagnosticAnswers: unknown; diagnosticResult: unknown;
   transcript: { role: string; message: string }[] | null; evaluatorResult: Evaluation | null; score: number | null; verdict: string; errorMessage: string | null };
 type Summary = { totalCases: number; PASS: number; REVIEW: number; FAIL: number; averageScore: number | null;
   averageQualificationScore: number | null; averageGroundingScore: number | null; averageSalesFunnelScore: number | null;
   evaluatedCases: number; errorCases: number; error?: string; summaryError?: string;
+  criterionScores?: Record<string, number | null>; summarySource?: "ai" | "deterministic";
   runEvaluation?: RunAssessmentView | null; codexTask?: string; TECH_ERROR?: number };
 type Run = { id: string; status: string; requestedCases: number; completedCases: number; knowledgeVersion: string; summary: Summary | null; parentRunId?: string | null; iterationNumber?: number };
 export default function Tester() {
@@ -110,9 +111,15 @@ function TesterPanel() {
       <progress className="w-full" max={run.requestedCases} value={run.completedCases} />
       <p className="text-xs break-all">Серия: {run.id} · Версия базы знаний: {run.knowledgeVersion}</p>
       {summary && <>
-        <p>Всего: {summary.totalCases ?? run.completedCases} · Пройдено: {summary.PASS ?? 0} · Требует внимания: {summary.REVIEW ?? 0} · Провалено по качеству: {summary.FAIL ?? 0}</p>
-        <p>Средний балл: {summary.averageScore ?? "—"} · Квалификация: {summary.averageQualificationScore ?? "—"} · KB: {summary.averageGroundingScore ?? "—"} · Продажи/воронка: {summary.averageSalesFunnelScore ?? "—"}</p>
-        <p>Оценено AI: {summary.evaluatedCases ?? 0} · Технических ошибок: {summary.TECH_ERROR ?? summary.errorCases ?? 0}. Средние рассчитаны только по полученным оценкам.</p>
+        <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+          <div><dt className="inline">Всего сценариев: </dt><dd className="inline font-semibold">{summary.totalCases ?? run.completedCases}</dd></div>
+          <div><dt className="inline">Оценено: </dt><dd className="inline font-semibold">{summary.evaluatedCases ?? 0}</dd></div>
+          <div><dt className="inline">Пройдено: </dt><dd className="inline font-semibold">{summary.PASS ?? 0}</dd></div>
+          <div><dt className="inline">Требует внимания: </dt><dd className="inline font-semibold">{summary.REVIEW ?? 0}</dd></div>
+          <div><dt className="inline">Провалено по качеству: </dt><dd className="inline font-semibold">{summary.FAIL ?? 0}</dd></div>
+          <div><dt className="inline">Технических ошибок: </dt><dd className="inline font-semibold">{summary.TECH_ERROR ?? summary.errorCases ?? 0}</dd></div>
+        </dl>
+        <p className="text-sm text-muted-foreground">Технические ошибки не считаются пройденными или проваленными и не участвуют в средних баллах.</p>
         {(summary.error || summary.summaryError) && <p>{errorLabel(summary.error || summary.summaryError || "")}</p>}
         {parentRun?.summary && <div className="border-t pt-3">
           <h2 className="font-semibold">Изменение относительно предыдущей серии</h2>
@@ -128,16 +135,43 @@ function TesterPanel() {
       <h2 className="text-xl font-semibold">Итоговое заключение руководителя отдела продаж</h2>
       {assessment ? <>
         <p>{assessment.executiveSummary}</p>
-        <p>Общий балл: {assessment.overallScore} · Квалификация: {assessment.qualificationScore} · База знаний: {assessment.knowledgeGroundingScore} · Продажи/воронка: {assessment.salesFunnelScore}</p>
-        <h3 className="font-semibold">Системные проблемы</h3>
+        {summary?.summarySource === "deterministic" && <p className="font-medium">Итог сформирован резервным способом</p>}
+        <section className="rounded bg-muted/40 p-4 space-y-3">
+          <h3 className="text-lg font-semibold">Общая оценка Артёма: {assessment.overallScore ?? "—"} / 100 — {scoreStatus(assessment.overallScore)}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {Object.entries(assessment.criterionScores ?? {}).map(([key, score]) =>
+              <p key={key}><span className="font-medium">{criterionLabel(key)}:</span> {score ?? "—"} / 100 — {scoreStatus(score)}</p>)}
+            <p><span className="font-medium">Продажи и воронка:</span> {assessment.salesFunnelScore ?? "—"} / 100 — {scoreStatus(assessment.salesFunnelScore)}</p>
+          </div>
+        </section>
+        <h3 className="text-lg font-semibold">Что нужно исправить в Артёме</h3>
         {assessment.systemicProblems.map((problem,i) => <article key={i} className="border rounded p-3 space-y-1">
-          <h4 className="font-semibold">{problem.title}</h4><p>Важность: {severityLabel(problem.severity)} · Сценарии: {problem.evidenceCaseNumbers.join(", ")}</p>
+          <h4 className="font-semibold">{problem.title}</h4>
+          <p>Встречается: {problem.frequency} из {problem.evaluatedCases} оценённых сценариев</p>
+          <p>Сценарии: {problem.evidenceCaseNumbers.join(", ")} · Приоритет: {severityLabel(problem.severity)}</p>
           <p>{problem.description}</p><p>Влияние на бизнес: {problem.businessImpact}</p>
         </article>)}
-        <h3 className="font-semibold">Рекомендуемые изменения</h3>
+        {!assessment.systemicProblems.length && <p>Повторяющихся проблем по оценённым сценариям не выявлено.</p>}
+        <h3 className="font-semibold">Где и что изменить</h3>
         {assessment.recommendedChanges.map((change,i) => <article key={i} className="border rounded p-3 space-y-1">
-          <p>Приоритет {change.priority} · {areaLabel(change.area)}</p><p>{change.problem}</p><p>{change.change}</p><p>Ожидаемый эффект: {change.expectedEffect}</p>
+          <p>Приоритет {change.priority} · {areaLabel(change.area)}</p>
+          <p>Встречается: {change.frequency} из {change.evaluatedCases} · Сценарии: {change.evidenceCaseNumbers.join(", ")}</p>
+          <p><span className="font-medium">Где исправлять:</span> {change.target}</p>
+          <p><span className="font-medium">Проблема:</span> {change.problem}</p>
+          <p><span className="font-medium">Что изменить:</span> {change.change}</p>
+          <p>Ожидаемый эффект: {change.expectedEffect}</p>
         </article>)}
+        <h3 className="text-lg font-semibold">Рекомендации для базы знаний</h3>
+        {assessment.recommendationsForKnowledgeBase.length ? assessment.recommendationsForKnowledgeBase.map((item,i) =>
+          <article key={i} className="border rounded p-3 space-y-1">
+            <p className="font-semibold">{item.section}</p>
+            <p>Пробел: {item.currentGap}</p><p>Что добавить: {item.recommendedAddition}</p>
+            <p>Сценарии: {item.evidenceCaseNumbers.join(", ")} · Приоритет: {severityLabel(item.priority)}</p>
+            {item.requiresProductDecision && <p className="font-medium">Требуется решение владельца продукта</p>}
+          </article>) : <p>Подтверждённых рекомендаций по изменению базы знаний нет.</p>}
+        <div><h3 className="text-lg font-semibold">Чему доучить Артёма</h3>
+          <ol className="list-decimal pl-5">{assessment.trainingRules.map((item,i) => <li key={i}>{item}</li>)}</ol>
+        </div>
         {([ ["Сильные стороны", assessment.strengths], ["Что не менять", assessment.doNotChange] ] as const).map(([title, items]) =>
           <div key={title}><h3 className="font-semibold">{title}</h3><ul className="list-disc pl-5">{items.map((item,i) => <li key={i}>{item}</li>)}</ul></div>)}
       </> : <p>{errorLabel(summary?.summaryError ?? "AI_SUMMARY_UNAVAILABLE")}</p>}
