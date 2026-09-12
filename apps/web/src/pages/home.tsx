@@ -60,7 +60,9 @@ export default function Home() {
               </ul>
 
               <div className="consultation-info__person">
-                <img src="/artem-consultant.png" alt="Артём, персональный консультант ИНОБР" />
+                <div className="consultation-info__portrait">
+                  <img src="/artem-consultant.png" alt="Артём, персональный консультант ИНОБР" />
+                </div>
                 <div className="consultation-info__person-copy">
                   <strong>Артём</strong>
                   <span>Ваш персональный консультант</span>
