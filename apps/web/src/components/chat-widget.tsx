@@ -102,20 +102,25 @@ const CONTACT_CHANNELS = [
 function ProgressBar({ current, total }: { current: number; total: number }) {
   const pct = Math.round((current / total) * 100);
   return (
-    <div className="px-4 pb-3 pt-1 shrink-0">
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs font-medium text-muted-foreground">
-          Вопрос {current} из {total}
-        </span>
+    <div className="px-5 py-3 shrink-0 bg-white border-b border-border/70">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-primary">Диагностика · вопрос {current} из {total}</span>
         <span className="text-xs text-muted-foreground">{pct}%</span>
       </div>
-      <div className="h-1 rounded-full bg-border overflow-hidden">
-        <motion.div
-          className="h-full rounded-full bg-primary"
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.4, ease: "easeOut" }}
-        />
+      <div className="flex items-center" aria-label={`Шаг ${current} из ${total}`}>
+        {Array.from({ length: total }, (_, index) => {
+          const number = index + 1;
+          const active = number === current;
+          const complete = number < current;
+          return (
+            <div key={number} className="flex items-center flex-1 last:flex-none">
+              <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold transition-colors ${
+                active ? "bg-[#c79d3e] text-[#073d33]" : complete ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              }`}>{number}</span>
+              {number < total && <span className={`mx-2 h-px flex-1 ${complete ? "bg-primary" : "bg-border"}`} />}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -664,20 +669,20 @@ export function ChatWidget() {
       <div className="chat-widget flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
         {/* Header */}
         <header
-          className="px-5 flex items-center gap-3 bg-[#24313B] text-white shrink-0"
-          style={{ minHeight: "64px" }}
+          className="consultation-chat-header px-5 pr-16 flex items-center gap-3 text-white shrink-0"
+          style={{ minHeight: "72px" }}
         >
           <div className="h-8 w-[70px] overflow-hidden shrink-0 rounded">
             <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
           </div>
           <div>
-            <h2 className="font-semibold text-[13px] text-white leading-tight">Консультант ИНОБР</h2>
-            <p className="text-[11px] text-white/50">Предварительная диагностика</p>
+            <h2 id="consultation-title" className="font-semibold text-[15px] text-white leading-tight">Подбор направления обучения</h2>
+            <p className="text-[11px] text-white/65">Персональная диагностика ИНОБР</p>
           </div>
         </header>
 
         {/* Body */}
-        <div className="flex flex-col items-center justify-start sm:justify-center flex-1 min-h-0 overflow-y-auto px-6 py-6 text-center">
+        <div className="consultation-chat-intro flex flex-col items-center justify-start sm:justify-center flex-1 min-h-0 overflow-y-auto px-6 py-6 text-center">
           <div className="h-14 w-[120px] overflow-hidden rounded-lg mb-6">
             <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
           </div>
@@ -752,14 +757,14 @@ export function ChatWidget() {
     <div className="chat-widget flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
       {/* Header */}
       <header
-        className="px-5 flex items-center gap-3 bg-[#24313B] text-white z-10 shrink-0"
-        style={{ minHeight: "64px" }}
+        className="consultation-chat-header px-5 pr-16 flex items-center gap-3 text-white z-10 shrink-0"
+        style={{ minHeight: "72px" }}
       >
         <div className="h-8 w-[70px] overflow-hidden shrink-0 rounded">
           <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
         </div>
         <div>
-          <h2 className="font-semibold text-[13px] text-white leading-tight">Консультант ИНОБР</h2>
+          <h2 id="consultation-title" className="font-semibold text-[15px] text-white leading-tight">Подбор направления обучения</h2>
           <p className="text-[11px] text-white/60 flex items-center gap-1.5 mt-0.5">
             <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
             Онлайн

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 const root = new URL("../../", import.meta.url);
 const require = createRequire(new URL("package.json", root));
@@ -47,19 +47,30 @@ for (const ref of ["currentQuestionRef", "diagnosticResultRef", "postDiagnosticI
 assert.ok(css.includes("scroll-margin-top"));
 assert.ok(!source.includes("ResizeObserver"));
 assert.ok(!widget.includes('<ScrollArea'));
-assert.ok(!read("apps/web/src/pages/home.tsx").includes('h-[600px]'));
-assert.ok(css.includes('height: 82dvh'));
-assert.ok(css.includes('max-width: 560px'));
-assert.ok(css.includes('max-height: calc(var(--chat-viewport-height, 100dvh)'));
+const home = read("apps/web/src/pages/home.tsx");
+assert.ok(!home.includes('h-[600px]'));
+assert.ok(home.includes('role="dialog"'));
+assert.ok(home.includes('aria-modal="true"'));
+assert.ok(home.includes('consultation-modal__close'));
+assert.ok(home.includes('Персональная рекомендация'));
+assert.ok(home.includes('Артём'));
+assert.ok(home.includes('src="/artem-consultant.png"'));
+assert.ok(css.includes('width: min(1080px, calc(100vw - 32px))'));
+assert.ok(css.includes('height: min(840px, calc(var(--chat-viewport-height, 100dvh) - 32px))'));
+assert.ok(css.includes('grid-template-columns: minmax(0, 1fr) 316px'));
+assert.ok(css.includes('@media (max-width: 899px)'));
+assert.ok(css.includes('@media (max-width: 639px)'));
+assert.ok(css.includes('height: var(--chat-viewport-height, 100dvh)'));
 assert.ok(css.includes('overflow-wrap: anywhere'));
-assert.ok(read("apps/web/src/pages/home.tsx").includes('window.visualViewport'));
+assert.ok(home.includes('window.visualViewport'));
+assert.ok(statSync(new URL("apps/web/public/artem-consultant.png", root)).size > 100_000);
 const card = widget.slice(widget.indexOf('function ResultCard'), widget.indexOf('// ─── Main component'));
 assert.ok(!/overflow-hidden|line-clamp|max-h-/.test(card), "long card remains unbounded inside viewport");
 for (const [width, height] of [[375,667],[390,844],[430,932],[768,1024],[820,1180],[1366,768],[1440,900],[1920,1080]]) {
-  const margin = width < 640 ? 8 : 32;
-  const chatHeight = width >= 1024 ? Math.min(height * .82, height - margin) : height - margin;
-  const chatWidth = width >= 1024 ? Math.min(560, width - margin) : width - margin;
-  assert.ok(chatHeight > 0 && chatHeight + margin <= height);
-  assert.ok(chatWidth + margin <= width);
+  const margin = width < 640 ? 0 : 32;
+  const modalHeight = width < 640 ? height : Math.min(840, height - margin);
+  const modalWidth = width < 640 ? width : Math.min(1080, width - margin);
+  assert.ok(modalHeight > 0 && modalHeight + margin <= height);
+  assert.ok(modalWidth + margin <= width);
 }
-console.log("PASS: semantic block targets/post-render scheduling/manual override/cleanup; responsive CSS and 8 viewport constraint cases (not browser rendering).");
+console.log("PASS: semantic chat focus, modal composition, Artem portrait, and responsive desktop/tablet/mobile constraints across 8 viewports (not browser rendering).");

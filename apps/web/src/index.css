@@ -91,20 +91,185 @@
   }
 }
 
-/* Keep the header outside the only scrolling region. dvh follows browser chrome. */
-.chat-page { min-height: 100vh; min-height: var(--chat-viewport-height, 100dvh); padding: 4px; }
-.chat-shell { height: calc(100vh - 8px); height: calc(var(--chat-viewport-height, 100dvh) - 8px); max-height: calc(var(--chat-viewport-height, 100dvh) - 8px); min-width: 0; }
+/* Standalone preview of the widget over a landing. In production the same modal
+   can sit over the real landing without relying on its layout. */
+.consultation-stage {
+  min-height: 100vh;
+  min-height: var(--chat-viewport-height, 100dvh);
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 82% 16%, rgba(190, 154, 70, .22), transparent 24rem),
+    linear-gradient(135deg, #06372f 0%, #0a493d 58%, #e8eee9 58%, #f6f7f4 100%);
+}
+.consultation-stage__brand {
+  position: absolute;
+  inset: 0;
+  padding: clamp(28px, 6vw, 84px);
+  color: white;
+  opacity: .72;
+}
+.consultation-stage__mark { font-size: clamp(18px, 2vw, 28px); font-weight: 750; letter-spacing: .14em; }
+.consultation-stage__lines { margin-top: 15vh; width: min(42vw, 560px); display: grid; gap: 18px; }
+.consultation-stage__lines span { height: 18px; border-radius: 99px; background: rgba(255,255,255,.18); }
+.consultation-stage__lines span:nth-child(1) { width: 72%; }
+.consultation-stage__lines span:nth-child(2) { width: 100%; height: 34px; background: rgba(190,154,70,.46); }
+.consultation-stage__lines span:nth-child(3) { width: 84%; }
+.consultation-stage__trigger {
+  position: relative;
+  z-index: 1;
+  min-height: 52px;
+  border: 0;
+  border-radius: 12px;
+  padding: 0 28px;
+  background: #c79d3e;
+  color: #082f29;
+  font-weight: 750;
+  box-shadow: 0 18px 50px rgba(0,0,0,.2);
+}
+.consultation-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(4, 23, 20, .72);
+  backdrop-filter: blur(8px);
+}
+.consultation-modal {
+  --primary: 169 73% 17%;
+  --primary-foreground: 45 36% 96%;
+  --secondary: 145 24% 93%;
+  --secondary-foreground: 169 73% 17%;
+  --accent: 42 51% 89%;
+  --accent-foreground: 169 73% 17%;
+  --ring: 40 52% 51%;
+  --border: 148 15% 85%;
+  width: min(1080px, calc(100vw - 32px));
+  height: min(840px, calc(var(--chat-viewport-height, 100dvh) - 32px));
+  max-height: calc(var(--chat-viewport-height, 100dvh) - 32px);
+  min-height: 560px;
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 316px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 32px 100px rgba(1, 22, 18, .34);
+}
+.consultation-modal__workspace { min-width: 0; min-height: 0; overflow: hidden; }
+.consultation-modal__close {
+  position: absolute;
+  z-index: 30;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(5, 57, 47, .12);
+  border-radius: 999px;
+  background: rgba(255,255,255,.9);
+  color: #083e34;
+  box-shadow: 0 8px 22px rgba(5,57,47,.1);
+  backdrop-filter: blur(8px);
+}
+.consultation-modal__close svg { width: 20px; height: 20px; }
+.consultation-info {
+  min-width: 0;
+  overflow-y: auto;
+  padding: 72px 28px 28px;
+  color: #0a3e34;
+  background:
+    radial-gradient(circle at 105% 92%, rgba(190,154,70,.22), transparent 13rem),
+    linear-gradient(155deg, #eef5f0, #f7f4e9);
+  border-left: 1px solid #dce7df;
+}
+.consultation-info__heading { display: flex; align-items: flex-start; gap: 13px; }
+.consultation-info__icon {
+  width: 44px; height: 44px; flex: 0 0 auto; display: grid; place-items: center;
+  border-radius: 999px; color: #0a493d; background: #f3e6bc;
+}
+.consultation-info__icon svg { width: 22px; }
+.consultation-info__eyebrow { margin-bottom: 5px; color: #6d7d76; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.consultation-info h2 { max-width: 220px; font-size: 24px; line-height: 1.08; font-weight: 750; letter-spacing: -.03em; }
+.consultation-info__benefits { margin: 28px 0; display: grid; gap: 16px; }
+.consultation-info__benefits li { display: flex; align-items: flex-start; gap: 10px; color: #37584f; font-size: 13px; line-height: 1.4; }
+.consultation-info__benefits svg { width: 19px; height: 19px; flex: 0 0 auto; color: #aa7f21; }
+.consultation-info__person { padding-top: 22px; border-top: 1px solid rgba(8,62,52,.13); }
+.consultation-info__person img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; object-position: center 31%; border-radius: 16px; }
+.consultation-info__person-copy { margin-top: 13px; display: grid; }
+.consultation-info__person-copy strong { font-size: 18px; }
+.consultation-info__person-copy span { color: #aa7f21; font-size: 12px; font-weight: 700; }
+.consultation-info__person-copy p { margin-top: 7px; color: #60736c; font-size: 12px; line-height: 1.45; }
+.consultation-info__hint { margin-top: 20px; display: flex; gap: 10px; color: #49655d; font-size: 12px; line-height: 1.45; }
+.consultation-info__hint span { width: 3px; border-radius: 99px; flex: 0 0 auto; background: #c39a3c; }
+
+.consultation-chat-header { background: #073d33; }
+.consultation-chat-intro {
+  background:
+    radial-gradient(circle at 100% 0, rgba(197,157,63,.12), transparent 18rem),
+    linear-gradient(#ffffff, #f6f8f5);
+}
+.consultation-modal .chat-dialogue { background: #f2f6f3; }
+.consultation-modal .chat-widget { color: #152b25; }
+.consultation-modal .chat-widget .bg-white { box-shadow: 0 8px 24px rgba(7,61,51,.055); }
 .chat-dialogue { overflow-anchor: none; scrollbar-gutter: stable; }
 .chat-dialogue > div { min-width: 0; overflow-wrap: anywhere; }
 .chat-widget textarea, .chat-widget input { max-width: 100%; font-size: 16px; }
 .chat-widget button { max-width: 100%; white-space: normal; height: auto; min-height: 40px; }
-@media (min-width: 640px) {
-  .chat-page { padding: 16px; }
-  .chat-shell { height: calc(var(--chat-viewport-height, 100dvh) - 32px); max-height: calc(var(--chat-viewport-height, 100dvh) - 32px); }
-}
-@media (min-width: 1024px) {
-  .chat-shell { width: 100%; max-width: 560px; height: 82dvh; max-height: calc(var(--chat-viewport-height, 100dvh) - 32px); }
-}
 
 /* Header/progress are outside the viewport; leave an inset below that fixed boundary. */
 .chat-focus-target { scroll-margin-top: 1rem; scroll-margin-bottom: 1rem; }
+
+@media (max-width: 899px) {
+  .consultation-modal {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    min-height: 0;
+  }
+  .consultation-modal__workspace { grid-row: 2; }
+  .consultation-info {
+    grid-row: 1;
+    padding: 14px 64px 14px 18px;
+    overflow: hidden;
+    border-left: 0;
+    border-bottom: 1px solid #dce7df;
+  }
+  .consultation-info__heading { align-items: center; }
+  .consultation-info__heading h2 { max-width: none; font-size: 18px; }
+  .consultation-info__eyebrow { margin-bottom: 2px; }
+  .consultation-info__benefits, .consultation-info__hint { display: none; }
+  .consultation-info__person { margin-top: 10px; padding-top: 10px; display: flex; align-items: center; gap: 12px; }
+  .consultation-info__person img { width: 54px; height: 54px; aspect-ratio: 1; border-radius: 12px; flex: 0 0 auto; }
+  .consultation-info__person-copy { margin: 0; }
+  .consultation-info__person-copy strong { font-size: 15px; }
+  .consultation-info__person-copy p { display: none; }
+}
+@media (max-width: 639px) {
+  .consultation-stage { padding: 0; }
+  .consultation-overlay { padding: 0; }
+  .consultation-modal {
+    width: 100vw;
+    height: var(--chat-viewport-height, 100dvh);
+    max-height: var(--chat-viewport-height, 100dvh);
+    border: 0;
+    border-radius: 0;
+  }
+  .consultation-modal__close { position: fixed; top: 10px; right: 10px; width: 38px; height: 38px; }
+  .consultation-info { padding: 10px 56px 9px 14px; }
+  .consultation-info__icon { width: 36px; height: 36px; }
+  .consultation-info__icon svg { width: 19px; }
+  .consultation-info__heading h2 { font-size: 16px; }
+  .consultation-info__eyebrow { font-size: 9px; }
+  .consultation-info__person { display: none; }
+  .chat-dialogue { scrollbar-gutter: auto; }
+}
+@media (max-height: 680px) and (max-width: 899px) {
+  .consultation-info__person { display: none; }
+}
