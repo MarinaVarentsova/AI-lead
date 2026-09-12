@@ -198,17 +198,62 @@
 .consultation-info__icon svg { width: 22px; }
 .consultation-info__eyebrow { margin-bottom: 5px; color: #6d7d76; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .consultation-info h2 { max-width: 220px; font-size: 24px; line-height: 1.08; font-weight: 750; letter-spacing: -.03em; }
-.consultation-info__benefits { margin: 28px 0; display: grid; gap: 16px; }
+.consultation-info__benefits {
+  margin: 24px 0 28px;
+  padding-top: 22px;
+  display: grid;
+  gap: 16px;
+  background: linear-gradient(90deg, #c79d3e, rgba(199,157,62,0)) top / 100% 1px no-repeat;
+}
 .consultation-info__benefits li { display: flex; align-items: flex-start; gap: 10px; color: #37584f; font-size: 13px; line-height: 1.4; }
 .consultation-info__benefits svg { width: 19px; height: 19px; flex: 0 0 auto; color: #aa7f21; }
 .consultation-info__person { padding-top: 22px; border-top: 1px solid rgba(8,62,52,.13); }
-.consultation-info__person img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; object-position: center 31%; border-radius: 16px; }
+.consultation-info__portrait {
+  height: clamp(220px, 27vh, 280px);
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(163,120,28,.28);
+  border-radius: 18px;
+  background: linear-gradient(145deg, #dde9e1, #f4ead0);
+  box-shadow: 0 16px 34px rgba(7,61,51,.13);
+}
+.consultation-info__portrait::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0;
+  height: 28%;
+  pointer-events: none;
+  background: linear-gradient(transparent, rgba(4,48,40,.12));
+}
+.consultation-info__portrait img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+}
 .consultation-info__person-copy { margin-top: 13px; display: grid; }
 .consultation-info__person-copy strong { font-size: 18px; }
 .consultation-info__person-copy span { color: #aa7f21; font-size: 12px; font-weight: 700; }
 .consultation-info__person-copy p { margin-top: 7px; color: #60736c; font-size: 12px; line-height: 1.45; }
 .consultation-info__hint { margin-top: 20px; display: flex; gap: 10px; color: #49655d; font-size: 12px; line-height: 1.45; }
 .consultation-info__hint span { width: 3px; border-radius: 99px; flex: 0 0 auto; background: #c39a3c; }
+.consultation-primary-cta {
+  color: #092f29 !important;
+  background: linear-gradient(135deg, #d8b24f, #bd8f2d) !important;
+  border-color: #bd8f2d !important;
+  box-shadow: 0 9px 22px rgba(166,119,24,.2);
+}
+.consultation-primary-cta:hover { background: linear-gradient(135deg, #e3c263, #c79d3e) !important; }
+.consultation-primary-cta:focus-visible,
+.consultation-modal .chat-widget button:focus-visible,
+.consultation-modal .chat-widget textarea:focus-visible,
+.consultation-modal .chat-widget input:focus-visible {
+  outline: 2px solid #c79d3e;
+  outline-offset: 2px;
+}
+.consultation-modal [data-testid^="chip-"]:hover { border-color: #c79d3e; }
 
 .consultation-chat-header { background: #073d33; }
 .consultation-chat-intro {
@@ -246,7 +291,7 @@
   .consultation-info__eyebrow { margin-bottom: 2px; }
   .consultation-info__benefits, .consultation-info__hint { display: none; }
   .consultation-info__person { margin-top: 10px; padding-top: 10px; display: flex; align-items: center; gap: 12px; }
-  .consultation-info__person img { width: 54px; height: 54px; aspect-ratio: 1; border-radius: 12px; flex: 0 0 auto; }
+  .consultation-info__portrait { width: 64px; height: 64px; border-radius: 13px; flex: 0 0 auto; box-shadow: 0 8px 18px rgba(7,61,51,.12); }
   .consultation-info__person-copy { margin: 0; }
   .consultation-info__person-copy strong { font-size: 15px; }
   .consultation-info__person-copy p { display: none; }
@@ -267,7 +312,9 @@
   .consultation-info__icon svg { width: 19px; }
   .consultation-info__heading h2 { font-size: 16px; }
   .consultation-info__eyebrow { font-size: 9px; }
-  .consultation-info__person { display: none; }
+  .consultation-info__person { margin-top: 7px; padding-top: 7px; }
+  .consultation-info__portrait { width: 52px; height: 52px; border-radius: 11px; }
+  .consultation-info__person-copy span { font-size: 11px; }
   .chat-dialogue { scrollbar-gutter: auto; }
 }
 @media (max-height: 680px) and (max-width: 899px) {
