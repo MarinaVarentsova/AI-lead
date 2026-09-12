@@ -1,8 +1,14 @@
 -- Additive only. Run manually before enabling /api/tester. No production data writes.
 CREATE TABLE IF NOT EXISTS public.ai_test_runs (
- id uuid PRIMARY KEY DEFAULT gen_random_uuid(), status text NOT NULL,
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ parent_run_id uuid REFERENCES public.ai_test_runs(id),
+ iteration_number integer NOT NULL DEFAULT 1 CHECK (iteration_number BETWEEN 1 AND 5),
+ status text NOT NULL,
  requested_cases integer NOT NULL CHECK (requested_cases BETWEEN 1 AND 10), completed_cases integer NOT NULL DEFAULT 0,
- knowledge_version text NOT NULL, summary jsonb, started_at timestamptz NOT NULL DEFAULT now(), completed_at timestamptz
+ knowledge_version text NOT NULL, summary jsonb, started_at timestamptz NOT NULL DEFAULT now(), completed_at timestamptz,
+ CONSTRAINT ai_test_runs_iteration_parent CHECK
+   ((parent_run_id IS NULL AND iteration_number = 1) OR
+    (parent_run_id IS NOT NULL AND parent_run_id <> id AND iteration_number > 1))
 );
 CREATE UNIQUE INDEX IF NOT EXISTS ai_test_runs_one_active ON public.ai_test_runs(status) WHERE status = 'running';
 CREATE TABLE IF NOT EXISTS public.ai_test_cases (

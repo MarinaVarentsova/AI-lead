@@ -219,6 +219,7 @@ try {
   const { runTester } = await import(new URL("apps/api/src/tester/runner.ts", root));
   const { createArtemRuntime } = await import(new URL("apps/api/src/ai/artem-runtime.ts", root));
   const { CRITERIA, validateEvaluation } = await import(new URL("apps/api/src/tester/evaluator.ts", root));
+  const { validateRunAssessment, nextIteration } = await import(new URL("apps/api/src/tester/run-assessment.ts", root));
   for (const count of [0, 11, 1.5, "10"]) assert.throws(() => validateRunCount(count));
   const personas = generatePersonas(10);
   assert.equal(new Set(personas.map(p => p.label)).size, 10);
@@ -227,23 +228,48 @@ try {
   assert.equal(validateEvaluation(good).verdict, "PASS");
   assert.equal(validateEvaluation({ ...good, criteria: { ...good.criteria, noHallucinations: 0 } }).verdict, "FAIL");
   assert.throws(() => validateEvaluation({ ...good, criteria: {} }));
-  let evaluations = 0;
+  const runAssessment = { executiveSummary: "Серия в целом стабильна, но требует точечной доработки.", overallScore: 1,
+    qualificationScore: 1, knowledgeGroundingScore: 1, salesFunnelScore: 1,
+    systemicProblems: [{ title: "Недостаточно конкретный переход", severity: "medium", evidenceCaseNumbers: [1],
+      description: "В первом сценарии следующий шаг сформулирован слишком общо.", businessImpact: "Пользователь может не перейти к консультации." }],
+    strengths: ["Квалификация основана на известных ответах"],
+    recommendedChanges: [{ priority: 1, area: "consultant_prompt", problem: "Следующий шаг сформулирован общо.",
+      change: "Связать CTA с уже снятым сомнением.", expectedEffect: "Более понятный переход к менеджеру.",
+      requiresBusinessDecision: false, confirmedQuotes: [] }], doNotChange: ["Ограничения по гарантиям"], codexTask: "Не доверять этому полю" };
+  let evaluatorAttempts = 0;
   const fakeProvider = new YandexAIProvider({});
   fakeProvider.generateStructured = async (prompt) => {
-    if (prompt.includes("topProblems")) return { topProblems: [], topStrengths: ["Проверено"], conversionImprovements: [] };
-    if (++evaluations === 1) throw new Error("Evaluator unavailable");
+    if (prompt.includes("systemicProblems")) return runAssessment;
+    evaluatorAttempts += 1;
+    if (evaluatorAttempts === 1 || evaluatorAttempts === 3 || evaluatorAttempts === 4) throw new Error("Evaluator unavailable");
     return good;
   };
   const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem-expertovich-final.md", root), "utf8"), fakeProvider);
   const productionBefore = persisted.length;
   const savedCases = [], progress = [];
   const summary = await runTester(2, runtime, { async saveCase(c) { savedCases.push(c); }, async progress(n) { progress.push(n); }, async finish() {} }, personas.slice(0, 2));
-  assert.deepEqual(progress, [1,2]); assert.equal(savedCases[0].verdict, "FAIL"); assert.ok(savedCases[0].errorMessage);
-  assert.equal(savedCases[1].verdict, "PASS"); assert.equal(summary.evaluatedCases, 1); assert.equal(summary.errorCases, 1);
+  assert.deepEqual(progress, [1,2]); assert.equal(savedCases[0].verdict, "PASS"); assert.equal(savedCases[0].errorMessage, null);
+  assert.equal(savedCases[1].verdict, "TECH_ERROR"); assert.equal(savedCases[1].score, null); assert.ok(savedCases[1].errorMessage);
+  assert.equal(summary.PASS, 1); assert.equal(summary.FAIL, 0); assert.equal(summary.TECH_ERROR, 1);
+  assert.equal(summary.evaluatedCases, 1); assert.equal(summary.errorCases, 1); assert.equal(summary.averageScore, 90);
+  assert.equal(summary.runEvaluation?.overallScore, 90); assert.deepEqual(summary.runEvaluation?.systemicProblems[0].evidenceCaseNumbers, [1]);
+  assert.ok(summary.codexTask.includes("Кейсы: 1")); assert.ok(!summary.codexTask.includes("Не доверять этому полю"));
+  assert.equal(evaluatorAttempts, 4, "each failed evaluator call is retried once");
   assert.equal(persisted.length, productionBefore, "Tester must not write production messages");
   assert.ok(savedCases.every(c => c.transcript.filter(m => m.role === "user").length <= 3));
   await assert.rejects(runTester(11, runtime, {}));
-  console.log("PASS: tester max 10, diverse valid personas, max 3, evaluator validation, critical caps, failed case isolation, no production writes.");
+  const guardedAssessment = validateRunAssessment({ ...runAssessment,
+    recommendedChanges: [{ ...runAssessment.recommendedChanges[0], area: "knowledge_base", change: "Установить цену 123 456 ₽" }] },
+    [1], runtime.markdown, { overallScore: 90, qualificationScore: 90, knowledgeGroundingScore: 90, salesFunnelScore: 90 });
+  assert.equal(guardedAssessment.recommendedChanges[0].requiresBusinessDecision, true);
+  assert.ok(guardedAssessment.recommendedChanges[0].change.startsWith("Требуется бизнес-решение"));
+  assert.throws(() => validateRunAssessment({ ...runAssessment,
+    systemicProblems: [{ ...runAssessment.systemicProblems[0], evidenceCaseNumbers: [999] }] }, [1], runtime.markdown,
+    { overallScore: 90, qualificationScore: 90, knowledgeGroundingScore: 90, salesFunnelScore: 90 }));
+  assert.equal(nextIteration(), 1); assert.equal(nextIteration({ status: "completed", iterationNumber: 1 }), 2);
+  assert.throws(() => nextIteration({ status: "completed", iterationNumber: 5 }));
+  assert.throws(() => nextIteration({ status: "running", iterationNumber: 1 }));
+  console.log("PASS: tester retry, TECH_ERROR isolation, quality averages, grounded run assessment, evidence validation, Codex task, max 5 iterations, no production writes.");
   // Inspect the actual Yandex request with fake configuration and an in-memory fetch.
   let outbound;
   globalThis.fetch = async (_url, options) => {

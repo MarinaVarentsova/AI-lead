@@ -4,21 +4,34 @@ import type { ConsultantExchange } from "../ai/consultant-funnel";
 import { formatDiagnosticResult } from "../ai/format-diagnostic";
 import { DiagnosticAIError } from "../ai/diagnostic-result.types";
 import { generatePersonas, validateRunCount, type Persona } from "./personas";
-import { EVALUATOR_PROMPT, SUMMARY_PROMPT, validateEvaluation, validateSummary, type Evaluation } from "./evaluator";
+import { EVALUATOR_PROMPT, validateEvaluation, type Evaluation } from "./evaluator";
+import { RUN_ASSESSMENT_PROMPT, validateRunAssessment, type RunAssessment } from "./run-assessment";
 export interface CaseResult {
   caseNumber: number; persona: Persona; diagnosticAnswers: Persona["answers"]; diagnosticResult: unknown;
   transcript: ConsultantExchange[]; evaluatorResult: Evaluation | null; score: number | null;
-  verdict: "PASS" | "REVIEW" | "FAIL"; errorMessage: string | null;
+  verdict: "PASS" | "REVIEW" | "FAIL" | "TECH_ERROR"; errorMessage: string | null;
 }
 export interface TestStore { saveCase(result: CaseResult): Promise<void>; progress(count: number): Promise<void>; finish(summary: unknown): Promise<void> }
-export function aggregate(results: CaseResult[]) {
-  const evaluated = results.flatMap(r => r.evaluatorResult ? [r.evaluatorResult] : []);
+export function normalizeStoredCase<T extends { evaluatorResult: unknown; errorMessage: string | null; verdict: string | null; score: number | null }>(row: T) {
+  let evaluatorResult: Evaluation | null = null;
+  try { if (!row.errorMessage && row.verdict !== "TECH_ERROR") evaluatorResult = validateEvaluation(row.evaluatorResult); } catch { /* legacy invalid evaluator output */ }
+  return { ...row, evaluatorResult, score: evaluatorResult?.score ?? null,
+    verdict: evaluatorResult?.verdict ?? "TECH_ERROR" as const,
+    errorMessage: evaluatorResult ? null : row.errorMessage ?? "CASE_EXECUTION_OR_EVALUATION_FAILED" };
+}
+export function aggregate(results: Pick<CaseResult, "verdict" | "errorMessage" | "evaluatorResult">[]) {
+  const quality = results.filter(r => r.verdict !== "TECH_ERROR" && !r.errorMessage && r.evaluatorResult);
+  const evaluated = quality.map(r => r.evaluatorResult!);
   const avg = (get: (v: Evaluation) => number) => evaluated.length ? Math.round(evaluated.reduce((n,v) => n + get(v),0) / evaluated.length) : null;
-  return { totalCases: results.length, PASS: results.filter(r => r.verdict === "PASS").length,
-    REVIEW: results.filter(r => r.verdict === "REVIEW").length, FAIL: results.filter(r => r.verdict === "FAIL").length,
-    evaluatedCases: evaluated.length, errorCases: results.filter(r => r.errorMessage).length,
+  return { totalCases: results.length, PASS: quality.filter(r => r.verdict === "PASS").length,
+    REVIEW: quality.filter(r => r.verdict === "REVIEW").length, FAIL: quality.filter(r => r.verdict === "FAIL").length,
+    TECH_ERROR: results.length - evaluated.length,
+    evaluatedCases: evaluated.length, errorCases: results.length - evaluated.length,
     averageScore: avg(v => v.score), averageQualificationScore: avg(v => v.criteria.qualification),
     averageGroundingScore: avg(v => v.criteria.grounding), averageSalesFunnelScore: avg(v => (v.criteria.sales + v.criteria.cta + v.criteria.conversion) / 3) };
+}
+export async function evaluateWithRetry<T>(evaluate: () => Promise<T>): Promise<T> {
+  try { return await evaluate(); } catch { return evaluate(); }
 }
 export async function runTester(count: number, runtime: ArtemRuntime, store: TestStore, personas = generatePersonas(count)) {
   validateRunCount(count);
@@ -27,7 +40,7 @@ export async function runTester(count: number, runtime: ArtemRuntime, store: Tes
   const behaviourRules = runtime.markdown.split(/(?=^# \d+\.)/m).filter(section => /^# (?:2|30|49|50|51|52|54|59)\./.test(section)).join("\n");
   for (const [index, persona] of personas.entries()) {
     const result: CaseResult = { caseNumber: index + 1, persona, diagnosticAnswers: persona.answers,
-      diagnosticResult: null, transcript: [], evaluatorResult: null, score: null, verdict: "FAIL", errorMessage: null };
+      diagnosticResult: null, transcript: [], evaluatorResult: null, score: null, verdict: "TECH_ERROR", errorMessage: null };
     try {
       const resolved = DiagnosticKnowledgeResolver.resolve(persona.answers);
       const diagnostic = await runtime.diagnostic.generate(DiagnosticKnowledgeResolver.buildFactsPacket(resolved));
@@ -35,7 +48,7 @@ export async function runTester(count: number, runtime: ArtemRuntime, store: Tes
       result.transcript.push({ role: "assistant", message: formatDiagnosticResult(diagnostic.result) });
       const history: ConsultantExchange[] = [];
       const relevant = new Map<string, { id: string; title: string; content: string }>();
-      const turnMetadata = [];
+      const turnMetadata: Awaited<ReturnType<ArtemRuntime["reply"]>>[] = [];
       for (const question of persona.questions) {
         const facts = runtime.prepare(persona.answers, question);
         facts.matchedSections.forEach(section => relevant.set(section.id, section));
@@ -45,12 +58,12 @@ export async function runTester(count: number, runtime: ArtemRuntime, store: Tes
         turnMetadata.push(response);
       }
 
-      result.evaluatorResult = validateEvaluation(await runtime.provider.generateStructured(EVALUATOR_PROMPT, {
+      result.evaluatorResult = await evaluateWithRetry(async () => validateEvaluation(await runtime.provider.generateStructured(EVALUATOR_PROMPT, {
         persona, diagnosticAnswers: persona.answers, diagnosticResult: diagnostic,
         transcript: result.transcript, turnMetadata,
         expectedRules: { diagnostic: DiagnosticKnowledgeResolver.buildFactsPacket(resolved), behaviourRules,
           relevantSections: [...relevant.values()], maxAdditionalQuestions: 3 },
-      }));
+      })));
       result.score = result.evaluatorResult.score; result.verdict = result.evaluatorResult.verdict;
     } catch (error) {
       result.errorMessage = error instanceof DiagnosticAIError ? error.code : "CASE_EXECUTION_OR_EVALUATION_FAILED";
@@ -59,13 +72,22 @@ export async function runTester(count: number, runtime: ArtemRuntime, store: Tes
     await store.saveCase(result);
     await store.progress(index + 1);
   }
-  let aiSummary: ReturnType<typeof validateSummary> | null = null;
+  let runEvaluation: RunAssessment | null = null;
   let summaryError: string | null = null;
-  try {
-    aiSummary = validateSummary(await runtime.provider.generateStructured(SUMMARY_PROMPT,
-      results.map(({ caseNumber, evaluatorResult, errorMessage }) => ({ caseNumber, evaluatorResult, errorMessage }))));
-  } catch { summaryError = "AI_SUMMARY_UNAVAILABLE"; }
-  const summary = { ...aggregate(results), aiSummary, summaryError };
+  const metrics = aggregate(results);
+  const assessed = results.filter(r => r.evaluatorResult && r.verdict !== "TECH_ERROR" && !r.errorMessage);
+  if (assessed.length) {
+    const scores = { overallScore: metrics.averageScore!, qualificationScore: metrics.averageQualificationScore!,
+      knowledgeGroundingScore: metrics.averageGroundingScore!, salesFunnelScore: metrics.averageSalesFunnelScore! };
+    try {
+      runEvaluation = await evaluateWithRetry(async () => validateRunAssessment(
+        await runtime.provider.generateStructured(RUN_ASSESSMENT_PROMPT, {
+          cases: assessed, metrics: scores, confirmedKnowledge: runtime.markdown,
+        }), assessed.map(r => r.caseNumber), runtime.markdown, scores));
+    } catch { summaryError = "AI_SUMMARY_UNAVAILABLE"; }
+  } else summaryError = "NO_EVALUATED_CASES";
+  const codexTask = runEvaluation?.codexTask ?? "Работать только в inobr-v2. Восстановить техническую оценку QA и повторить её проверку. Управленческое заключение не получено: не делать выводы о качестве Артёма и не менять его KB, diagnostic rules, prompt, retrieval или funnel. Проверить timeout, structured JSON, повтор evaluator и разделение TECH_ERROR/FAIL. Не запускать изменения или серии автоматически.";
+  const summary = { ...metrics, runEvaluation, codexTask, summaryError };
   await store.finish(summary);
   return summary;
 }
