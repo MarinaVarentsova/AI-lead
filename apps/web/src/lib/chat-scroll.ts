@@ -33,3 +33,18 @@ export function createChatScroll(viewport: HTMLElement) {
     },
   };
 }
+
+/** Holds an answer-triggered focus until the next question's options exist in the DOM. */
+export function createQuestionFocusGate() {
+  let pendingQuestion = -1;
+  return {
+    afterAnswer(nextQuestion: number) {
+      pendingQuestion = nextQuestion;
+    },
+    afterOptionsRender(currentQuestion: number, loading: boolean, optionCount: number) {
+      if (pendingQuestion !== currentQuestion || loading || optionCount === 0) return false;
+      pendingQuestion = -1;
+      return true;
+    },
+  };
+}

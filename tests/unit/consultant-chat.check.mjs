@@ -104,7 +104,8 @@ try {
   const originalGenerate = YandexAIProvider.prototype.generateConsultantReply;
   let captured;
   async function run({ message = "Сколько стоит обучение?", conversationId = fixture.conversationId,
-    row = fixture.row, status = 200, aiReply, saveFailure = false, history = [], assistantFailure = false } = {}) {
+    row = fixture.row, status = 200, aiReply, saveFailure = false, history = [], assistantFailure = false,
+    requestId } = {}) {
     state = { row, reads: 0, writes: [], logs: [], saved: false, saveFailure, history, assistantFailure };
     captured = undefined;
     YandexAIProvider.prototype.generateConsultantReply = async function(input) {
@@ -119,12 +120,19 @@ try {
     };
     const log = Object.fromEntries(["info", "warn", "error"].map(level => [level, (...args) => state.logs.push({ level, args })]));
     const res = { statusCode: 200, status(value) { this.statusCode = value; return this; }, json(body) { this.body = body; return this; } };
-    try { await handler({ body: { conversationId, message }, log }, res); }
+    try { await handler({ body: { conversationId, message, ...(requestId ? { requestId } : {}) }, log }, res); }
     finally { YandexAIProvider.prototype.generateConsultantReply = originalGenerate; }
     assert.equal(res.statusCode, status);
     const events = state.logs.map(entry => entry.args.at(-1));
     assert.equal(events[0], "CONSULTANT_CHAT_START");
     assert.equal(events.at(-1), "CONSULTANT_CHAT_FINISH");
+    const startMeta = state.logs[0].args[0];
+    const finishMeta = state.logs.at(-1).args[0];
+    assert.match(startMeta.requestId, /^[0-9a-f-]{36}$/i);
+    assert.equal(finishMeta.requestId, startMeta.requestId);
+    assert.equal(finishMeta.httpStatus, status);
+    assert.equal(typeof finishMeta.stage, "string");
+    assert.equal(typeof finishMeta.provider, "string");
     if (status === 200) {
       assert.ok(res.body.message.length > 60);
       assert.deepEqual(state.writes.map(({ id, createdAt, ...value }) => value), [

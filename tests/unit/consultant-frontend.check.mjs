@@ -40,9 +40,15 @@ try {
     if (receivedIds.length === 1) throw new Error("Lost acknowledgement");
     return Response.json({ message: "Третий ответ. Продолжите с менеджером.", limitReached: true });
   };
-  await assert.rejects(sendConsultantTurn("same-conversation", "Третий", stableId));
   const last = await sendConsultantTurn("same-conversation", "Третий", stableId);
   assert.equal(last.limitReached, true); assert.deepEqual(receivedIds, [stableId, stableId]);
+  const retryStatuses = [];
+  globalThis.fetch = async () => {
+    retryStatuses.push(true);
+    return retryStatuses.length === 1 ? new Response("", { status: 503 }) : Response.json({ message: "Ответ после восстановления" });
+  };
+  assert.equal((await sendConsultantTurn("same-conversation", "Цена?", stableId)).message, "Ответ после восстановления");
+  assert.equal(retryStatuses.length, 2);
   globalThis.fetch = async () => Response.json({ error: "FOLLOW_UP_LIMIT" }, { status: 409 });
   await assert.rejects(sendConsultantTurn("same-conversation", "Четвертый", stableId), ConsultantLimitError);
   const widget = read("apps/web/src/components/chat-widget.tsx");

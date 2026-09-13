@@ -4,10 +4,21 @@ export const CONSULTANT_ERROR = "Не удалось получить ответ
 
 export class ConsultantLimitError extends Error {}
 export async function sendConsultantTurn(conversationId: string, message: string, requestId?: string): Promise<{ message: string; limitReached: boolean }> {
-  const response = await apiFetch("/api/consultant-chat", {
+  const options = {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ conversationId, message: message.trim(), ...(requestId ? { requestId } : {}) }),
-  });
+  };
+  let response: Response | undefined;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      response = await apiFetch("/api/consultant-chat", options);
+    } catch {
+      if (!requestId || attempt > 0) throw new Error(CONSULTANT_ERROR);
+      continue;
+    }
+    if (!requestId || attempt > 0 || ![502, 503, 504].includes(response.status)) break;
+  }
+  if (!response) throw new Error(CONSULTANT_ERROR);
   if (response.status === 409) {
     const error = await response.json();
     if (error?.error === "FOLLOW_UP_LIMIT") throw new ConsultantLimitError("FOLLOW_UP_LIMIT");

@@ -6,7 +6,7 @@ const require = createRequire(new URL("package.json", root));
 const ts = require("typescript");
 const read = path => readFileSync(new URL(path, root), "utf8");
 const source = ts.transpileModule(read("apps/web/src/lib/chat-scroll.ts"), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
-const { createChatScroll } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
+const { createChatScroll, createQuestionFocusGate } = await import(`data:text/javascript;base64,${Buffer.from(source).toString("base64")}`);
 let scheduled;
 const calls = [], listeners = new Map();
 globalThis.requestAnimationFrame = fn => { scheduled = fn; return 1; };
@@ -75,6 +75,16 @@ for (const technicalField of ["result.summary", "result.experience", "result.exp
   assert.ok(!card.includes(technicalField), `${technicalField} is not rendered`);
 }
 assert.ok(widget.includes('focusRequest.target === "question" ? "end"'));
+const gate = createQuestionFocusGate();
+for (const [answered, next, options] of [[0, 1, 5], [1, 2, 6], [2, 3, 6]]) {
+  gate.afterAnswer(next);
+  assert.equal(gate.afterOptionsRender(answered, false, options), false, "old question cannot consume focus");
+  assert.equal(gate.afterOptionsRender(next, true, 0), false, "loading dictionary cannot consume focus");
+  assert.equal(gate.afterOptionsRender(next, false, options), true, "rendered next options trigger focus");
+  assert.equal(gate.afterOptionsRender(next, false, options), false, "focus is consumed once");
+}
+assert.ok(widget.indexOf("questionFocusGate.current.afterAnswer") < widget.indexOf("addBotMessage(QUESTION_TEXTS[qIndex + 1])"));
+assert.ok(widget.includes("questionFocusGate.current.afterOptionsRender"));
 for (const [width, height] of [[375,667],[390,844],[430,932],[768,1024],[820,1180],[1366,768],[1440,900],[1920,1080]]) {
   const margin = width < 640 ? 0 : 32;
   const modalHeight = width < 640 ? height : Math.min(840, height - margin);

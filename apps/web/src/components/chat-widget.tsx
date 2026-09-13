@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { createChatScroll } from "@/lib/chat-scroll";
+import { createChatScroll, createQuestionFocusGate } from "@/lib/chat-scroll";
 import { sendConsultantTurn, ConsultantLimitError, CONSULTANT_ERROR } from "@/lib/consultant-chat";
 import { submitContact, CONTACT_ERROR, type ContactPayload } from "@/lib/contact";
 import {
@@ -213,6 +213,7 @@ export function ChatWidget() {
   const contactFormRef = useRef<HTMLDivElement>(null);
   const limitCtaRef = useRef<HTMLDivElement>(null);
   const scrollController = useRef<ReturnType<typeof createChatScroll> | null>(null);
+  const questionFocusGate = useRef(createQuestionFocusGate());
   type FocusTarget = "question" | "result" | "input" | "user" | "assistant" | "contact" | "limit";
   const [focusRequest, setFocusRequest] = useState<{ target: FocusTarget; force: boolean } | null>(null);
   const showNextStep = (target: FocusTarget = "question", force = true) => setFocusRequest({ target, force });
@@ -234,6 +235,16 @@ export function ChatWidget() {
       },
     }
   );
+
+  useEffect(() => {
+    if (questionFocusGate.current.afterOptionsRender(
+      currentQIndex,
+      isDictLoading,
+      currentDictionary?.length ?? 0,
+    )) {
+      showNextStep("question");
+    }
+  }, [currentQIndex, currentDictionary, isDictLoading]);
 
   // Create session on mount
   useEffect(() => {
@@ -311,8 +322,8 @@ export function ChatWidget() {
   // ─── Chip selection ─────────────────────────────────────────────────────────
 
   const handleOptionSelect = (qIndex: number, code: string, displayName: string, isCustom: boolean) => {
-    showNextStep();
     if (isCustom) {
+      showNextStep();
       setActiveCustomQ(QUESTIONS[qIndex].id);
       setCustomInput("");
       return;
@@ -350,7 +361,6 @@ export function ChatWidget() {
   const submitAnswer = (qIndex: number, code: string, raw: string) => {
     // Synchronous guards also cover repeated clicks before React re-renders.
     if (!conversationId || diagnosticBusy.current || qIndex !== answeredCount.current) return;
-    showNextStep();
     answeredCount.current++;
     const q = QUESTIONS[qIndex];
     const newAnswer: DiagnosticAnswer = { questionNumber: qIndex + 1, questionKey: q.key, code, raw };
@@ -360,6 +370,7 @@ export function ChatWidget() {
     setStep(qIndex + 3);
 
     if (qIndex < QUESTIONS.length - 1) {
+      questionFocusGate.current.afterAnswer(qIndex + 1);
       addBotMessage(QUESTION_TEXTS[qIndex + 1]);
     } else {
       void generateResult({
@@ -465,7 +476,6 @@ export function ChatWidget() {
 
     return (
       <motion.div
-        ref={currentQuestionRef}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-wrap gap-2 mt-4 px-4"
@@ -762,31 +772,37 @@ export function ChatWidget() {
       <div className="chat-dialogue min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-4 sm:py-5 bg-muted/40" ref={scrollRef} tabIndex={0} aria-label="Диалог">
         <div className="space-y-4 pb-4">
           <AnimatePresence initial={false}>
-            {messages.map((msg) => (
-              <motion.div
-                key={msg.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                className={`chat-focus-target flex gap-2.5 max-w-[88%] ${
-                  msg.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"
-                }`}
-              >
-                {msg.role === "bot" && (
-                  <div className="w-7 h-7 overflow-hidden rounded shrink-0 mt-1">
-                    <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
-                  </div>
-                )}
-                <div
-                  className={`px-4 py-3 text-[14px] leading-relaxed whitespace-pre-wrap ${
-                    msg.role === "user"
-                      ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-sm"
-                      : "bg-white text-foreground rounded-2xl rounded-tl-sm border border-border shadow-sm"
-                  }`}
-                >
-                  {msg.content}
+            {messages.map((msg) => {
+              const currentQuestion = isDiagnosticStep && msg.role === "bot" && msg.id === messages.at(-1)?.id;
+              return (
+                <div key={msg.id} ref={currentQuestion ? currentQuestionRef : undefined}
+                  className={currentQuestion ? "chat-focus-target space-y-4" : undefined}>
+                  <motion.div
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`chat-focus-target flex gap-2.5 max-w-[88%] ${
+                      msg.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"
+                    }`}
+                  >
+                    {msg.role === "bot" && (
+                      <div className="w-7 h-7 overflow-hidden rounded shrink-0 mt-1">
+                        <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
+                      </div>
+                    )}
+                    <div
+                      className={`px-4 py-3 text-[14px] leading-relaxed whitespace-pre-wrap ${
+                        msg.role === "user"
+                          ? "bg-primary text-primary-foreground rounded-2xl rounded-tr-sm"
+                          : "bg-white text-foreground rounded-2xl rounded-tl-sm border border-border shadow-sm"
+                      }`}
+                    >
+                      {msg.content}
+                    </div>
+                  </motion.div>
+                  {currentQuestion && renderChips(currentQIndex)}
                 </div>
-              </motion.div>
-            ))}
+              );
+            })}
 
             {isTyping && (
               <motion.div
@@ -894,11 +910,6 @@ export function ChatWidget() {
             </motion.div>
           )}
 
-          {/* Chips */}
-          {renderChips(0)}
-          {renderChips(1)}
-          {renderChips(2)}
-          {renderChips(3)}
           {/* Forms share the same viewport, so long results cannot squeeze them out. */}
           {contactPhase && <div ref={contactFormRef} className="chat-focus-target">{renderContactSection()}</div>}
           <div ref={bottomRef} data-testid="chat-bottom-anchor" className="h-px" aria-hidden="true" />
