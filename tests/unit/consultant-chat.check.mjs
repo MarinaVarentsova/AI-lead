@@ -1,9 +1,11 @@
 // Node 22.15+; uses existing TypeScript for in-memory loading, no new test runner.
 // Run: node tests/unit/consultant-chat.check.mjs
 import assert from "node:assert/strict";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { registerHooks, createRequire } from "node:module";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 const root = new URL("../../", import.meta.url);
 const require = createRequire(new URL("package.json", root));
@@ -217,7 +219,19 @@ try {
   assert.equal(fetchCalls, 0);
   const { generatePersonas, validateRunCount } = await import(new URL("apps/api/src/tester/personas.ts", root));
   const { runTester } = await import(new URL("apps/api/src/tester/runner.ts", root));
-  const { createArtemRuntime } = await import(new URL("apps/api/src/ai/artem-runtime.ts", root));
+  const { createArtemRuntime, loadArtemKnowledge } = await import(new URL("apps/api/src/ai/artem-runtime.ts", root));
+  const packaged = mkdtempSync(path.join(tmpdir(), "artem-runtime-"));
+  try {
+    const knowledgeDir = path.join(packaged, "knowledge");
+    mkdirSync(knowledgeDir);
+    const markdown = readFileSync(new URL("knowledge/inobr/artem-expertovich-final.md", root), "utf8");
+    writeFileSync(path.join(knowledgeDir, "artem-expertovich-final.md"), markdown);
+    assert.equal(await loadArtemKnowledge(pathToFileURL(path.join(packaged, "index.mjs")).href), markdown);
+    assert.ok(readFileSync(new URL("apps/api/build.mjs", root), "utf8")
+      .includes('path.join(knowledgeDir, "artem-expertovich-final.md")'));
+  } finally {
+    rmSync(packaged, { recursive: true, force: true });
+  }
   const { CRITERIA, validateEvaluation } = await import(new URL("apps/api/src/tester/evaluator.ts", root));
   const { validateRunAssessment, buildDeterministicRunAssessment, nextIteration } = await import(new URL("apps/api/src/tester/run-assessment.ts", root));
   for (const count of [0, 11, 1.5, "10"]) assert.throws(() => validateRunCount(count));

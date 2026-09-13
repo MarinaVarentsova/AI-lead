@@ -139,31 +139,11 @@ function ResultCard({
     <div className="rounded-xl border border-border bg-white shadow-sm p-4 space-y-3">
       <div className="flex items-center gap-2">
         <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
-        <span className="font-semibold text-[15px] text-foreground">Диагностика завершена</span>
+        <span className="font-semibold text-[15px] text-foreground">Ваша рекомендация</span>
       </div>
 
       <div className="text-sm text-foreground leading-[1.6] whitespace-pre-wrap">
-        <p>{result.summary}</p>
-        <dl className="space-y-2 mt-3">
-          {([
-            ["Опыт", result.experience],
-            ["Стаж", result.experienceYears],
-            ["Образование", result.education],
-            ["Цель", result.goal],
-            ["Рекомендация", result.recommendation],
-          ] as const).map(([label, value]) => (
-            <div key={label}>
-              <dt className="font-semibold">{label}:</dt>
-              <dd>{value}</dd>
-            </div>
-          ))}
-        </dl>
-        {result.importantNote !== null && (
-          <div className="rounded-lg bg-secondary p-3 mt-3">
-            <p className="font-semibold">Важно</p>
-            <p>{result.importantNote}</p>
-          </div>
-        )}
+        <p>{result.recommendation}</p>
       </div>
 
 
@@ -278,7 +258,7 @@ export function ChatWidget() {
       input: postDiagnosticInputRef.current, user: latestUserMessageRef.current,
       assistant: latestAssistantMessageRef.current, contact: contactFormRef.current, limit: limitCtaRef.current };
     scrollController.current?.schedule(targets[focusRequest.target], focusRequest.force,
-      focusRequest.target === "input" ? "center" : "start");
+      focusRequest.target === "input" ? "center" : focusRequest.target === "question" ? "end" : "start");
   }, [focusRequest]);
 
   const uid = () => Date.now().toString() + Math.random().toString(36).slice(2);
@@ -485,6 +465,7 @@ export function ChatWidget() {
 
     return (
       <motion.div
+        ref={currentQuestionRef}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         className="flex flex-wrap gap-2 mt-4 px-4"
@@ -784,7 +765,6 @@ export function ChatWidget() {
             {messages.map((msg) => (
               <motion.div
                 key={msg.id}
-                ref={msg.role === "bot" && msg.id === messages.at(-1)?.id ? currentQuestionRef : undefined}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={`chat-focus-target flex gap-2.5 max-w-[88%] ${

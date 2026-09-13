@@ -8,6 +8,23 @@ import { YandexAIProvider } from "./yandex-provider";
 import { applyConsultantFunnel, type ConsultantExchange } from "./consultant-funnel";
 export const MAX_FOLLOW_UPS = 3;
 export const followUpCount = (history: ConsultantExchange[]) => history.filter(row => row.role === "user").length;
+
+export async function loadArtemKnowledge(moduleUrl = import.meta.url): Promise<string> {
+  const cwd = process.cwd();
+  const root = cwd.endsWith(path.join("apps", "api")) ? path.resolve(cwd, "../..") : cwd;
+  const candidates = [
+    new URL("./knowledge/artem-expertovich-final.md", moduleUrl),
+    new URL("../../../../knowledge/inobr/artem-expertovich-final.md", moduleUrl),
+    path.join(root, "knowledge/inobr/artem-expertovich-final.md"),
+  ];
+  let lastError: unknown;
+  for (const candidate of candidates) {
+    try { return await readFile(candidate, "utf8"); }
+    catch (error) { lastError = error; }
+  }
+  throw lastError;
+}
+
 export function createArtemRuntime(markdown: string, provider = new YandexAIProvider()) {
   const resolver = new ConsultantKnowledgeResolver(markdown);
   const consultant = new ConsultantChatService(resolver, provider);
@@ -37,9 +54,7 @@ export type ArtemRuntime = ReturnType<typeof createArtemRuntime>;
 let cached: Promise<ArtemRuntime> | undefined;
 export function getArtemRuntime(): Promise<ArtemRuntime> {
   if (!cached) {
-    const cwd = process.cwd();
-    const root = cwd.endsWith(path.join("apps", "api")) ? path.resolve(cwd, "../..") : cwd;
-    cached = readFile(path.join(root, "knowledge/inobr/artem-expertovich-final.md"), "utf8").then(createArtemRuntime)
+    cached = loadArtemKnowledge().then(createArtemRuntime)
       .catch(error => { cached = undefined; throw error; });
   }
   return cached;

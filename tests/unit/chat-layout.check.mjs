@@ -24,9 +24,12 @@ for (const name of blocks) {
   scheduled();
   assert.deepEqual(calls.at(-1), { name, behavior: "smooth", block: name === "input" ? "center" : "start" });
 }
+controller.schedule(target("next-question-options"), true, "end"); scheduled();
+assert.deepEqual(calls.at(-1), { name: "next-question-options", behavior: "smooth", block: "end" });
+const actionCallCount = calls.length;
 listeners.get("wheel")();
 controller.schedule(target("incoming-answer"), false); scheduled();
-assert.equal(calls.length, blocks.length, "do not interrupt manual history reading");
+assert.equal(calls.length, actionCallCount, "do not interrupt manual history reading");
 controller.schedule(target("explicit-question"), true); scheduled();
 assert.equal(calls.at(-1).name, "explicit-question");
 controller.schedule(target("incoming-answer"), false); scheduled();
@@ -54,7 +57,7 @@ assert.ok(home.includes('aria-modal="true"'));
 assert.ok(home.includes('consultation-modal__close'));
 assert.ok(home.includes('Персональная рекомендация'));
 assert.ok(home.includes('Артём'));
-assert.ok(home.includes('src="/artem-consultant.png"'));
+assert.ok(home.includes('src="/artem-consultant-full.jpg"'));
 assert.ok(css.includes('width: min(1080px, calc(100vw - 32px))'));
 assert.ok(css.includes('height: min(840px, calc(var(--chat-viewport-height, 100dvh) - 32px))'));
 assert.ok(css.includes('grid-template-columns: minmax(0, 1fr) 316px'));
@@ -63,9 +66,15 @@ assert.ok(css.includes('@media (max-width: 639px)'));
 assert.ok(css.includes('height: var(--chat-viewport-height, 100dvh)'));
 assert.ok(css.includes('overflow-wrap: anywhere'));
 assert.ok(home.includes('window.visualViewport'));
-assert.ok(statSync(new URL("apps/web/public/artem-consultant.png", root)).size > 100_000);
+assert.ok(statSync(new URL("apps/web/public/artem-consultant-full.jpg", root)).size > 100_000);
 const card = widget.slice(widget.indexOf('function ResultCard'), widget.indexOf('// ─── Main component'));
 assert.ok(!/overflow-hidden|line-clamp|max-h-/.test(card), "long card remains unbounded inside viewport");
+assert.ok(card.includes("Ваша рекомендация"));
+assert.ok(card.includes("result.recommendation"));
+for (const technicalField of ["result.summary", "result.experience", "result.experienceYears", "result.education", "result.goal"]) {
+  assert.ok(!card.includes(technicalField), `${technicalField} is not rendered`);
+}
+assert.ok(widget.includes('focusRequest.target === "question" ? "end"'));
 for (const [width, height] of [[375,667],[390,844],[430,932],[768,1024],[820,1180],[1366,768],[1440,900],[1920,1080]]) {
   const margin = width < 640 ? 0 : 32;
   const modalHeight = width < 640 ? height : Math.min(840, height - margin);

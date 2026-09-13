@@ -147,6 +147,8 @@ try {
   assert.equal(fallback.provider, "fallback");
   assert.equal(fallback.fallbackReason, "AI_CONFIGURATION_ERROR");
   assert.equal(fallback.structuredResult.recommendedTrack, "construction_expertise");
+  assert.match(fallback.structuredResult.recommendation, /У вас|Ваш/);
+  assert.doesNotMatch(fallback.structuredResult.recommendation, /Пользователь имеет|Рекомендация должна учитывать/);
   for (const body of [null, {}, { conversationId: "invalid" }, { conversationId: 123 }]) {
     await run({ body, status: 400 });
     assert.equal(state.reads, 0);
@@ -186,6 +188,10 @@ try {
   const facts = DiagnosticKnowledgeResolver.buildFactsPacket(DiagnosticKnowledgeResolver.resolve(fixture.row));
   assert.deepEqual(parseDiagnosticResult("```json\n" + JSON.stringify(fixture.validResult) + "\n```", facts), fixture.validResult);
   assert.throws(() => parseDiagnosticResult("not json", facts), { code: "AI_INVALID_RESULT" });
+  assert.throws(() => parseDiagnosticResult(JSON.stringify({
+    ...fixture.validResult,
+    recommendation: "Пользователь имеет опыт. Рекомендация должна учитывать цель.",
+  }), facts), { code: "AI_INVALID_RESULT" });
   assert.equal(fetchCalls, 0);
   console.log(`PASS: ${checks} route cases; parser checks; workspace resolution; zero fetch calls.`);
 } finally {

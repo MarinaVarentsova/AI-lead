@@ -52,13 +52,18 @@ export function validateDiagnosticResult(value: unknown, facts: DiagnosticFactsP
     (hasSchoolGuard(facts) || facts.recommendedTrackHint !== "construction_expertise")) {
     return invalid();
   }
+  const recommendation = readText("recommendation");
+  if (/Пользователь имеет|Рекомендация должна учитывать/iu.test(recommendation) ||
+    !/(?:у вас|ваш|вам|в вашем|с вашим)/iu.test(recommendation)) {
+    return invalid();
+  }
   return {
     summary: readText("summary"),
     experience: readText("experience"),
     experienceYears: readText("experienceYears"),
     education: readText("education"),
     goal: readText("goal"),
-    recommendation: readText("recommendation"),
+    recommendation,
     recommendedTrack: track,
     importantNote: record.importantNote === null ? null : readText("importantNote"),
   };
