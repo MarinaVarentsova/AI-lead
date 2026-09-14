@@ -26,6 +26,12 @@ delete process.env.YANDEX_AI_API_KEY;
 delete process.env.YANDEX_AI_MODEL;
 
 const db = {
+  select() {
+    return { from() { return { where() { return { async limit() {
+      if (state.lookupError) throw state.lookupError;
+      return state.missing ? [] : [{ id: fixture.conversationId }];
+    } }; } }; } };
+  },
   insert(table) {
     assert.equal(table, schema.aiContacts);
     return { values(value) {
@@ -54,7 +60,7 @@ const hooks = registerHooks({
     if (url === "diagnose-check:db") {
       return { format: "module", shortCircuit: true, source:
         `export const db = globalThis.__diagnoseCheckDB;
-         export { aiContacts } from ${JSON.stringify(new URL("packages/db/src/schema/ai-sessions.ts", root).href)};` };
+         export { aiContacts, aiConversations } from ${JSON.stringify(new URL("packages/db/src/schema/ai-sessions.ts", root).href)};` };
     }
     if (url.startsWith("file:") && url.endsWith(".ts")) {
       return { format: "module", shortCircuit: true, source: ts.transpileModule(
@@ -75,14 +81,20 @@ try {
   const handler = router.stack.find(layer => layer.route?.path === "/contacts").route.stack[0].handle;
   const receipt = { contactId: "22222222-2222-4222-8222-222222222222", conversationId: fixture.conversationId };
   const payload = { conversationId: fixture.conversationId, contactChannel: "telegram", telegram: "@local_test" };
-  async function run(body, status, error, empty = false) {
-    state = { writes: [], error, empty };
+  async function run(body, status, error, empty = false, extra = {}) {
+    state = { writes: [], error, empty, ...extra };
     const logs = [];
     const res = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(value) { this.body = value; return this; } };
     await handler({ body, log: { info: (...args) => logs.push(args), error: (...args) => logs.push(args) } }, res);
     assert.equal(res.statusCode, status);
     assert.ok(!JSON.stringify(logs).includes("@local_test"));
     assert.ok(!JSON.stringify(logs).includes("PRIVATE_SQL"));
+    for (const [entry] of logs) {
+      assert.ok(Object.keys(entry).every(key => ["requestId", "stage", "errorCode", "httpStatus", "constraint"].includes(key)));
+      assert.match(entry.requestId, /^[0-9a-f-]{36}$/);
+    }
+    assert.equal(new Set(logs.map(([entry]) => entry.requestId)).size, 1);
+    if (status === 201) assert.deepEqual(logs.map(([entry]) => entry.stage), ["validation", "conversation_lookup", "insert", "response"]);
     if (status === 201) assert.deepEqual(res.body, receipt);
     return res;
   }
@@ -98,6 +110,11 @@ try {
   await run(payload, 404, { cause: { code: "23503", message: "PRIVATE_SQL" } });
   await run(payload, 500, { message: "PRIVATE_SQL", cause: { code: "42703" } });
   await run(payload, 500, undefined, true);
+  await run(payload, 404, undefined, false, { missing: true });
+  assert.deepEqual(state.writes, []);
+  await run(payload, 500, undefined, false, { lookupError: { code: "08006", message: "PRIVATE_SQL" } });
+  assert.deepEqual(state.writes, []);
+  await run(payload, 404, { cause: { code: "23503", constraint_name: "ai_contacts_conversation_id_fkey", detail: "PRIVATE_SQL" } });
   for (const body of [null, {}, { ...payload, conversationId: "bad" }, { ...payload, telegram: " " }, { ...payload, contactChannel: "unknown" }]) {
     await run(body, 400); assert.deepEqual(state.writes, []);
   }
@@ -110,6 +127,7 @@ try {
   let phase = "details";
   const accepted = () => { phase = "submitted"; };
   for (const makeResponse of [
+    () => Response.json({ error: "Invalid contact request." }, { status: 400 }),
     () => new Response("", { status: 500 }),
     () => Response.json(receipt, { status: 200 }),
     () => Response.json({}, { status: 201 }),
@@ -123,7 +141,7 @@ try {
   globalThis.fetch = async (url) => { assert.equal(url, "/api/contacts"); return Response.json(receipt, { status: 201 }); };
   await submitContact(payload, accepted);
   assert.equal(phase, "submitted");
-  console.log("PASS: 11 backend contact cases and 5 frontend acknowledgement/retry cases; no real DB or network calls.");
+  console.log("PASS: contact validation, lookup/insert failures, safe stage logs and frontend receipt/error states; mocked DB/network.");
 } finally {
   hooks.deregister(); globalThis.fetch = originalFetch; delete globalThis.__diagnoseCheckDB;
   for (const key of envNames) { if (savedEnv[key] === undefined) delete process.env[key]; else process.env[key] = savedEnv[key]; }

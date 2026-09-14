@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { createChatScroll, createQuestionFocusGate } from "@/lib/chat-scroll";
-import { sendConsultantTurn, ConsultantLimitError, CONSULTANT_ERROR } from "@/lib/consultant-chat";
+import { sendConsultantTurn, createConsultantRequestId, ConsultantLimitError, CONSULTANT_ERROR } from "@/lib/consultant-chat";
 import { submitContact, CONTACT_ERROR, type ContactPayload } from "@/lib/contact";
 import {
   completeDiagnostic, DIAGNOSTIC_ERROR,
@@ -399,7 +399,7 @@ export function ChatWidget() {
     }
     failedQuestion.current = question;
     try {
-      if (consultantRequest.current?.question !== question) consultantRequest.current = { question, id: crypto.randomUUID() };
+      if (consultantRequest.current?.question !== question) consultantRequest.current = { question, id: createConsultantRequestId() };
       const reply = await sendConsultantTurn(conversationId, question, consultantRequest.current.id);
       showNextStep("assistant", false);
       setConsultantLimitReached(reply.limitReached);
