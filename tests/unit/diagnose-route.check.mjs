@@ -169,7 +169,7 @@ try {
     assert.ok(!school.result.includes("construction_expertise"));
     assert.equal(school.isAI, false);
   }
-  const apartment = await run({ row: { ...fixture.row, goal: "apartment_acceptance" } });
+  const apartment = await run({ row: { ...fixture.row, goal: "apartment_acceptance", goalRaw: "Приёмка квартир" } });
   assert.equal(apartment.structuredResult.recommendedTrack, "apartment_acceptance");
   const success = await run({ providerResult: fixture.validResult });
   assert.equal(success.isAI, true);

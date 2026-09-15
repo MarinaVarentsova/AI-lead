@@ -25,7 +25,7 @@ const hooks = registerHooks({
 });
 try {
   const { ConsultantKnowledgeResolver, createConsultantSections } = await import(new URL("packages/domain/src/consultant/index.ts", root));
-  const markdown = readFileSync(new URL("knowledge/inobr/artem-expertovich-final.md", root), "utf8");
+  const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v2_2.md", root), "utf8");
   const resolver = new ConsultantKnowledgeResolver(markdown);
   const fixtures = JSON.parse(readFileSync(new URL("consultant-retrieval.fixtures.json", import.meta.url), "utf8"));
   for (const fixture of fixtures) {
@@ -80,7 +80,7 @@ try {
   const catalog = createConsultantSections(markdown);
   assert.equal(catalog.length, 22);
   assert.ok(!catalog.some(s => s.sources.includes("6.3") || s.sources.includes("8.2") || s.sources.includes("16.5")));
-  assert.ok(catalog.find(s => s.id === "house_control").content.includes("Длительное сопровождение"));
+  assert.ok(catalog.find(s => s.id === "house_control").content.includes("сопровождению строительства частного дома по этапам"));
   assert.throws(() => new ConsultantKnowledgeResolver("# 10. Missing rest"));
   console.log(`PASS: ${fixtures.length} retrieval fixtures; determinism, 2–5 limit, context priority, school guard, privacy, validation and final source checks.`);
   for (const fixture of fixtures.slice(0, 3)) console.log(JSON.stringify({ question: fixture.question,

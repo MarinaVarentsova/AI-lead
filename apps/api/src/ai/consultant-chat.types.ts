@@ -1,4 +1,5 @@
 export interface ConsultantProviderInput {
+  history?: { role: string; message: string }[];
   question: string;
   diagnosticContext: string;
   matchedSections: { id: string; title: string; content: string }[];

@@ -1,6 +1,7 @@
 import {
   EDUCATION_TYPE_RULES, EXPERIENCE_AREA_RULES, EXPERIENCE_YEARS_RULES, GOAL_RULES,
 } from "./diagnostic-rules";
+import { explicitProgram } from "./program-routing";
 import {
   DiagnosticValidationError, SOURCE_VERSION,
   type DiagnosticAnswers, type DiagnosticFactsPacket, type DiagnosticValidationIssue,
@@ -49,7 +50,7 @@ export class DiagnosticKnowledgeResolver {
     }
 
     const guards: ResolvedDiagnostic["guards"] = [];
-    if (educationType.code === "school_only") {
+    if (educationType.code === "school_only" && !/учусь|получаю.*образован|студент/i.test(educationType.raw ?? "")) {
       guards.push({
         code: "school_only_no_dpo",
         severity: "hard",
@@ -57,7 +58,10 @@ export class DiagnosticKnowledgeResolver {
       });
     }
     let recommendedTrackHint: ResolvedDiagnostic["recommendedTrackHint"] = null;
-    if (goal.code === "apartment_acceptance") {
+    const explicit = explicitProgram(goal.raw ?? "");
+    if (explicit?.startsWith("house_")) {
+      recommendedTrackHint = null; // Existing API enum remains unchanged; text names the IЖС product.
+    } else if (explicit === "apartment_acceptance" || (!explicit && goal.code === "apartment_acceptance")) {
       recommendedTrackHint = "apartment_acceptance";
     } else if (
       (educationType.code === "higher_technical" ||
@@ -73,7 +77,11 @@ export class DiagnosticKnowledgeResolver {
         experience: EXPERIENCE_AREA_RULES[experienceArea.code],
         experienceYears: EXPERIENCE_YEARS_RULES[experienceYears.code],
         education: EDUCATION_TYPE_RULES[educationType.code],
-        goal: GOAL_RULES[goal.code],
+        goal: explicit === "house_acceptance" ? "Ваша цель — разовые проверки готовых частных домов." :
+          explicit === "house_control" ? "Ваша цель — сопровождение стройки дома по этапам." :
+          explicit === "house_unspecified" ? "Вы интересуетесь обучением для работы с ИЖС." :
+          explicit === "apartment_acceptance" ? GOAL_RULES.apartment_acceptance :
+          explicit === "construction_expertise" ? GOAL_RULES.construction_expertise : GOAL_RULES[goal.code],
       },
       guards,
       recommendedTrackHint,

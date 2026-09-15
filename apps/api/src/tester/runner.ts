@@ -41,7 +41,7 @@ export async function runTester(count: number, runtime: ArtemRuntime, store: Tes
   validateRunCount(count);
   if (personas.length !== count || personas.some(p => p.questions.length < 1 || p.questions.length > 3)) throw new Error("INVALID_PERSONAS");
   const results: CaseResult[] = [];
-  const behaviourRules = runtime.markdown.split(/(?=^# \d+\.)/m).filter(section => /^# (?:2|30|49|50|51|52|54|59)\./.test(section)).join("\n");
+  const behaviourRules = runtime.markdown;
   for (const [index, persona] of personas.entries()) {
     const result: CaseResult = { caseNumber: index + 1, persona, diagnosticAnswers: persona.answers,
       diagnosticResult: null, transcript: [], evaluatorResult: null, score: null, verdict: "TECH_ERROR", errorMessage: null };
@@ -54,7 +54,7 @@ export async function runTester(count: number, runtime: ArtemRuntime, store: Tes
       const relevant = new Map<string, { id: string; title: string; content: string }>();
       const turnMetadata: Awaited<ReturnType<ArtemRuntime["reply"]>>[] = [];
       for (const question of persona.questions) {
-        const facts = runtime.prepare(persona.answers, question);
+        const facts = runtime.prepare(persona.answers, question, history);
         facts.matchedSections.forEach(section => relevant.set(section.id, section));
         const response = await runtime.reply(facts, history);
         const turn = [{ role: "user", message: question }, { role: "assistant", message: response.message }];
@@ -89,7 +89,7 @@ export async function runTester(count: number, runtime: ArtemRuntime, store: Tes
       runEvaluation = await evaluateWithRetry(async () => validateRunAssessment(
         await runtime.provider.generateStructured(RUN_ASSESSMENT_PROMPT, {
           cases: assessed, metrics: scores, confirmedKnowledge: runtime.markdown,
-          knowledgeSectionTitles: runtime.markdown.match(/^# .+$/gm) ?? [],
+          knowledgeSectionTitles: runtime.markdown.match(/^#{1,3} .+$/gm) ?? [],
         }), assessed.map(r => r.caseNumber), runtime.markdown, scores));
       summarySource = "ai";
     } catch {

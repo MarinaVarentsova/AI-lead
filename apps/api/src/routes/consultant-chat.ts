@@ -30,7 +30,8 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
       phase = "load_context";
       const [row] = await tx.select({ experienceArea: aiDiagnosticAnswers.experienceArea,
         experienceYears: aiDiagnosticAnswers.experienceYears, educationType: aiDiagnosticAnswers.educationType,
-        goal: aiDiagnosticAnswers.goal }).from(aiDiagnosticAnswers).where(eq(aiDiagnosticAnswers.conversationId, conversationId)).limit(1);
+        goal: aiDiagnosticAnswers.goal, goalRaw: aiDiagnosticAnswers.goalRaw,
+        educationTypeRaw: aiDiagnosticAnswers.educationTypeRaw }).from(aiDiagnosticAnswers).where(eq(aiDiagnosticAnswers.conversationId, conversationId)).limit(1);
       if (!row) return { status: 404, body: { error: "Diagnostic answers not found.", code: "DIAGNOSTIC_ANSWERS_NOT_FOUND" } };
       const history = await tx.select({ id: aiMessages.id, role: aiMessages.role, message: aiMessages.message }).from(aiMessages)
         .where(and(eq(aiMessages.conversationId, conversationId), eq(aiMessages.step, "post_diagnostic_chat")))
@@ -48,7 +49,8 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
       phase = "load_runtime";
       const runtime = await getArtemRuntime();
       const facts = runtime.prepare({ experienceArea: row.experienceArea ?? "", experienceYears: row.experienceYears ?? "",
-        educationType: row.educationType ?? "", goal: row.goal ?? "" }, message);
+        educationType: row.educationType ?? "", educationTypeRaw: row.educationTypeRaw,
+        goal: row.goal ?? "", goalRaw: row.goalRaw }, message, history);
       req.log.info({ requestId, stage: phase, provider, sectionIds: facts.matchedSections.map(s => s.id) }, "CONSULTANT_KNOWLEDGE_RESOLVED");
       phase = "save_user";
       const [user] = await tx.insert(aiMessages).values({ id: requestId, conversationId, role: "user", step: "post_diagnostic_chat", message, createdAt: new Date() }).returning({ id: aiMessages.id });

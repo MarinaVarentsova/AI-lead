@@ -1,4 +1,5 @@
 import type { DiagnosticFactsPacket } from "@workspace/domain/diagnostic";
+import { diagnosticProgram, PROGRAM_NAMES } from "./artem-policy";
 
 export type { DiagnosticFactsPacket };
 
@@ -53,6 +54,18 @@ export function validateDiagnosticResult(value: unknown, facts: DiagnosticFactsP
     return invalid();
   }
   const recommendation = readText("recommendation");
+  const normalize = (text: string) => text.toLowerCase().replace(/ё/g, "е").replace(/приемку/g, "приемка").replace(/[«»".,;:!?]/g, "").replace(/\s+/g, " ").trim();
+  const publicText = normalize(recommendation);
+  if (!normalize(recommendation.split(/[.!?]/)[0] ?? "").includes(normalize(PROGRAM_NAMES[diagnosticProgram(facts)]))) return invalid();
+  const confirmed = [facts.experience, facts.experienceYears, facts.education, facts.goal]
+    .filter(fact => publicText.includes(normalize(fact)));
+  if (confirmed.length < 2 || !publicText.includes(normalize(PROGRAM_NAMES[diagnosticProgram(facts)])) ||
+    !/дефект|документац|исследова|заключени|осмотр|проверк|стройк|подрядчик/i.test(recommendation) ||
+    !/Связаться с менеджером|уточни/i.test(recommendation)) return invalid();
+  if (facts.recommendedTrackHint === null && !hasSchoolGuard(facts) && diagnosticProgram(facts) === "construction_expertise" &&
+    !/если|условн|уточни/i.test(recommendation)) return invalid();
+  if (["summary", "experience", "experienceYears", "education", "goal", "recommendation"].some(key =>
+    /Пользователь имеет|Рекомендация должна|recommendedTrack|school_only|diploma_not_available/i.test(readText(key)))) return invalid();
   if (/Пользователь имеет|Рекомендация должна учитывать/iu.test(recommendation) ||
     !/(?:у вас|ваш|вам|в вашем|с вашим)/iu.test(recommendation)) {
     return invalid();

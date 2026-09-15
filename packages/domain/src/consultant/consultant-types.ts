@@ -1,6 +1,7 @@
 import type { DiagnosticGoal, EducationType, ExperienceArea, ExperienceYears } from "../diagnostic/diagnostic-types";
 
 export interface ConsultantDiagnosticContext {
+  program?: import("../diagnostic/program-routing").ArtemProgram;
   experienceArea?: ExperienceArea;
   experienceYears?: ExperienceYears;
   educationType?: EducationType;

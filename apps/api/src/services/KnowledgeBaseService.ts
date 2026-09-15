@@ -1,20 +1,5 @@
-/**
- * KnowledgeBaseService
- *
- * Provides access to the ИНОБР knowledge base content.
- * Supports two interchangeable sources:
- *   - "file"     → reads from a Markdown file on disk
- *   - "database" → reads from the ai_knowledge table (Phase 2)
- *
- * Switch source via KNOWLEDGE_BASE_SOURCE env var (default: "file").
- * No code changes required to switch sources.
- *
- * Phase 2 extension points:
- *   - Plug in OpenAI embeddings for semantic search
- *   - Add vector similarity search against ai_knowledge entries
- *   - Cache loaded content with TTL
- */
-import fs from "fs";
+/** Canonical v2.2 source for legacy API readers as well as the shared Artem runtime. */
+import { loadArtemKnowledge } from "../ai/artem-knowledge";
 import path from "path";
 import { logger } from "../lib/logger";
 
@@ -40,10 +25,9 @@ export interface KnowledgeBaseStatus {
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const KNOWLEDGE_BASE_SOURCE =
-  (process.env.KNOWLEDGE_BASE_SOURCE as KnowledgeSource | undefined) ?? "file";
+const KNOWLEDGE_BASE_SOURCE: KnowledgeSource = "file";
 
-const KNOWLEDGE_FILE_NAME = "knowledge_base_inobr_ai_consultant_v1.md";
+const KNOWLEDGE_FILE_NAME = "artem_unified_knowledge_base_v2_2.md";
 
 /**
  * Resolve the knowledge base file path relative to the workspace root,
@@ -124,9 +108,9 @@ class KnowledgeBaseService {
 
   // ─── File source ────────────────────────────────────────────────────────────
 
-  private checkFileStatus(): KnowledgeBaseStatus {
+  private async checkFileStatus(): Promise<KnowledgeBaseStatus> {
     const filePath = resolveKnowledgeFilePath();
-    const available = fs.existsSync(filePath);
+    const available = await loadArtemKnowledge().then(() => true, () => false);
     return {
       source: "file",
       available,
@@ -141,17 +125,12 @@ class KnowledgeBaseService {
   private async loadFromFile(): Promise<KnowledgeEntry[]> {
     const filePath = resolveKnowledgeFilePath();
 
-    if (!fs.existsSync(filePath)) {
-      logger.warn({ filePath }, "Knowledge base file not found — returning empty");
-      return [];
-    }
-
-    const content = fs.readFileSync(filePath, "utf-8");
+    const content = await loadArtemKnowledge();
     logger.info({ filePath, bytes: content.length }, "Knowledge base file loaded");
 
     return [
       {
-        id: "kb-file-v1",
+        id: "artem-v2.2",
         title: "ИНОБР Knowledge Base",
         content,
         category: "general",

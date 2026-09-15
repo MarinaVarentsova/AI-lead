@@ -6,10 +6,9 @@ import {
   type DiagnosticAnswers,
 } from "@workspace/domain/diagnostic";
 import { eq } from "drizzle-orm";
-import { DiagnosticResultService, YandexAIProvider } from "../ai";
+import { getArtemRuntime } from "../ai/artem-runtime";
 
 const router: IRouter = Router();
-const service = new DiagnosticResultService(new YandexAIProvider());
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 import { formatDiagnosticResult } from "../ai/format-diagnostic";
@@ -67,7 +66,7 @@ router.post("/diagnose", async (req, res): Promise<void> => {
 
     phase = "generate_result";
     req.log.info({ provider: "yandex" }, "DIAGNOSTIC_AI_CALL_START");
-    const outcome = await service.generate(facts);
+    const outcome = await (await getArtemRuntime()).diagnostic.generate(facts);
     const structuredResult = outcome.result;
     const result = formatDiagnosticResult(structuredResult);
     const isAI = outcome.source === "ai";

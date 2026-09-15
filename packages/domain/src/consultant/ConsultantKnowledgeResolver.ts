@@ -35,6 +35,7 @@ function context(input: unknown): ConsultantDiagnosticContext {
   };
   // Never spread caller context or return arbitrary text/PII.
   return {
+    program: read("program", ["construction_expertise", "apartment_acceptance", "house_acceptance", "house_control", "house_unspecified"] as const),
     experienceArea: read("experienceArea", EXPERIENCE_AREA_CODES),
     experienceYears: read("experienceYears", EXPERIENCE_YEARS_CODES),
     educationType: read("educationType", EDUCATION_TYPE_CODES),
@@ -52,7 +53,7 @@ export class ConsultantKnowledgeResolver {
     // Stable content fingerprint, not a security hash. Changes invalidate the source version.
     let hash = 2166136261;
     for (const char of markdown.replace(/\r\n/g, "\n")) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-    this.sourceVersion = `inobr-artem-final-v1-${(hash >>> 0).toString(16)}`;
+    this.sourceVersion = `inobr-artem-v2.2-${(hash >>> 0).toString(16)}`;
   }
 
   resolve(input: ConsultantInput): ConsultantRetrievalPacket {
@@ -61,17 +62,17 @@ export class ConsultantKnowledgeResolver {
     }
     const diagnostic = context(input.diagnosticContext);
     const question = normalize(input.question);
-    const houseAcceptance = ["приемк ижс", "проверять частн дом", "дом перед покупк", "готовые дом", "разов проверк"].some(term => matches(question, term));
-    const houseControl = ["вести стройк", "по этап", "сопровожден строительств", "строительн контрол ижс"].some(term => matches(question, term));
+    const houseAcceptance = diagnostic.program === "house_acceptance" || ["приемк ижс", "проверять частн дом", "дом перед покупк", "готовые дом", "разов проверк"].some(term => matches(question, term));
+    const houseControl = diagnostic.program === "house_control" || (!houseAcceptance && ["вести стройк", "по этап", "сопровожден строительств", "строительн контрол ижс"].some(term => matches(question, term)));
     const choice = isConsultantChoiceQuestion(question);
     const hasTopic = !/погод|гороскоп/.test(question) && (choice || this.sections.some(section => section.keywords.some(keyword => matches(question, keyword))));
     const school = diagnostic.educationType === "school_only" || matches(question, "у меня только аттестат") || matches(question, "у меня только школа");
     const professional = ["higher_technical", "secondary_technical", "non_profile"].includes(diagnostic.educationType ?? "");
-    const explicitApartment = diagnostic.goal === "apartment_acceptance" ||
+    const explicitApartment = diagnostic.program === "apartment_acceptance" || (!diagnostic.program && diagnostic.goal === "apartment_acceptance") ||
       ["хочу приемку квартир", "нужна приемка квартир", "только приемка квартир", "только принимать квартиры"].some(term => matches(question, term));
     const explicitHouse = matches(question, "ижс") && (matches(question, "мне нужен") || matches(question, "хочу")) &&
       ["контрол", "надзор", "приемк"].some(term => matches(question, term));
-    const stroyPriority = !school && !explicitApartment && !explicitHouse && !houseAcceptance && !houseControl && professional;
+    const stroyPriority = !school && !explicitApartment && !explicitHouse && !houseAcceptance && !houseControl && diagnostic.program !== "house_unspecified" && professional;
     const required = new Set<string>();
     if (choice) {
       required.add("admission"); required.add("comparison");
@@ -80,6 +81,7 @@ export class ConsultantKnowledgeResolver {
     }
     if (houseAcceptance) required.add("house_acceptance");
     if (houseControl) required.add("house_control");
+    if (explicitApartment) required.add("apartment_acceptance");
     if (school) { required.add("school_restriction"); required.add("apartment_acceptance"); }
     const nonProfileQuestion = ["экономическ", "экономист", "непрофиль", "гуманитар", "педагог", "медицин"].some(term => matches(question, term));
     if (nonProfileQuestion && !school) {

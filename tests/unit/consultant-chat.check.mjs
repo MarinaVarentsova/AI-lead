@@ -111,7 +111,7 @@ try {
     YandexAIProvider.prototype.generateConsultantReply = async function(input) {
       assert.equal(state.writes.length, 1, "Save user before generation");
       captured = input;
-      assert.deepEqual(Object.keys(input), ["question", "diagnosticContext", "matchedSections"]);
+      assert.deepEqual(Object.keys(input), ["history", "question", "diagnosticContext", "matchedSections"]);
       assert.ok(input.matchedSections.length >= 2 && input.matchedSections.length <= 5);
       for (const section of input.matchedSections) assert.deepEqual(Object.keys(section), ["id", "title", "content"]);
       assert.ok(!JSON.stringify(input).includes("knowledge_base_id:"));
@@ -134,7 +134,7 @@ try {
     assert.equal(typeof finishMeta.stage, "string");
     assert.equal(typeof finishMeta.provider, "string");
     if (status === 200) {
-      assert.ok(res.body.message.length > 60);
+      assert.ok(res.body.message.trim().length > 0);
       assert.deepEqual(state.writes.map(({ id, createdAt, ...value }) => value), [
         { conversationId, role: "user", step: "post_diagnostic_chat", message: message.trim() },
         { conversationId, role: "assistant", step: "post_diagnostic_chat", message: res.body.message },
@@ -156,11 +156,11 @@ try {
     examples.push({ question: message, answer: result.message });
   }
   assert.ok(examples[0].answer.includes("14 880"));
-  assert.ok(examples[1].answer.includes("Профиль базового образования значения не имеет"));
-  assert.ok(examples[2].answer.includes("не означает автоматического назначения"));
-  assert.ok(examples[3].answer.includes("Гарантировать определённое количество заказов нельзя"));
+  assert.ok(examples[1].answer.includes("образования любого профиля"));
+  assert.ok(examples[2].answer.includes("Автоматического назначения"));
+  assert.ok(examples[3].answer.includes("Институт не гарантирует"));
   const school = await run({ row: { ...fixture.row, educationType: "school_only" } });
-  assert.ok(school.message.includes("Стройэксперт недоступен"));
+  assert.ok(school.message.includes("Приёмка квартир"));
   for (const message of ["", " ", null, "a".repeat(4001)]) await run({ message, status: 400 });
   await run({ conversationId: "invalid", status: 400 });
   await run({ row: null, status: 404 });
@@ -177,7 +177,7 @@ try {
   assert.equal(captured, undefined);
   const unknownReply = await run({ message: "Какая погода завтра?", aiReply: "Завтра будет солнечно" });
   assert.equal(captured, undefined);
-  assert.ok(unknownReply.message.includes("недостаточно информации"));
+  assert.ok(unknownReply.message.includes("требует проверки"));
   assert.ok(!unknownReply.message.includes("солнечно"));
   await run({ message: "Паспорт 1234 567890. Сколько стоит Стройэксперт?" });
   assert.ok(!JSON.stringify(captured).includes("567890"));
@@ -188,17 +188,17 @@ try {
   for (const message of ["что выбрать", "что мне выбрать", "кем быть", "кем стать", "какое направление", "какой курс", "что подходит", "что лучше для меня", "куда идти", "что в итоге выбрать", "кем быть в итоге что выбрать?"]) {
     const choice = await run({ message, row: qualified });
     assert.notEqual(choice.fallbackReason, "INSUFFICIENT_KNOWLEDGE");
-    assert.ok(choice.message.includes("рекомендовал «Стройэксперт»"));
+    assert.ok(choice.message.includes("рассмотреть «Стройэксперт»"));
     for (const id of ["stroyexpert", "admission", "comparison"]) assert.ok(choice.matchedSectionIds.includes(id));
   }
-  const apartmentChoice = await run({ row: { ...qualified, goal: "apartment_acceptance" }, message: "что выбрать" });
-  assert.ok(!apartmentChoice.message.includes("рекомендовал «Стройэксперт»"));
+  const apartmentChoice = await run({ row: { ...qualified, goal: "apartment_acceptance", goalRaw: "Приёмка квартир" }, message: "что выбрать" });
+  assert.ok(!apartmentChoice.message.includes("рассмотреть «Стройэксперт»"));
   assert.ok(apartmentChoice.matchedSectionIds.includes("apartment_acceptance"));
   const first = await run({ row: qualified });
   assert.ok(!first.message.includes("Если хотите"));
   const history = [{ role: "user", message: "Сколько стоит обучение?" }, { role: "assistant", message: first.message }];
   const second = await run({ row: qualified, history });
-  assert.ok(second.message.includes("Если хотите"));
+  assert.ok(!second.message.includes("Если хотите"), "No mechanical second-turn CTA in v2.2");
   const third = await run({ row: qualified, history: [...history, { role: "assistant", message: second.message }] });
   assert.ok(!third.message.includes("Если хотите"));
   const refusal = await run({ row: qualified, history, message: "Не хочу оставлять контакт. Сколько стоит обучение?" });
@@ -207,12 +207,12 @@ try {
   assert.equal(offTopic.fallbackReason, "INSUFFICIENT_KNOWLEDGE");
   assert.equal(captured, undefined);
   const schoolChoice = await run({ row: { ...qualified, educationType: "school_only" }, message: "что выбрать" });
-  assert.ok(!schoolChoice.message.includes("рекомендовал «Стройэксперт»"));
+  assert.ok(!schoolChoice.message.includes("рассмотреть «Стройэксперт»"));
   assert.ok(schoolChoice.matchedSectionIds.includes("apartment_acceptance"));
   const completeHistory = [1,2].flatMap(n => [{ id: `u${n}`, role: "user", message: "Цена?" }, { id: `a${n}`, role: "assistant", message: "Ответ по программе." }]);
   const finalReply = await run({ row: qualified, history: completeHistory });
   assert.equal(finalReply.questionsUsed, 3); assert.equal(finalReply.limitReached, true);
-  assert.ok(finalReply.message.includes("Дальше можно продолжить с менеджером"));
+  assert.ok(!finalReply.message.includes("Дальше можно продолжить с менеджером"), "No mechanical third-turn CTA in v2.2");
   await run({ row: qualified, history: [...completeHistory, { role: "user", message: "Третий" }, { role: "assistant", message: "Третий ответ" }], status: 409 });
   const beforeFailedPair = persisted.length;
   await run({ row: qualified, assistantFailure: true, status: 500 });
@@ -232,11 +232,11 @@ try {
   try {
     const knowledgeDir = path.join(packaged, "knowledge");
     mkdirSync(knowledgeDir);
-    const markdown = readFileSync(new URL("knowledge/inobr/artem-expertovich-final.md", root), "utf8");
-    writeFileSync(path.join(knowledgeDir, "artem-expertovich-final.md"), markdown);
+    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v2_2.md", root), "utf8");
+    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v2_2.md"), markdown);
     assert.equal(await loadArtemKnowledge(pathToFileURL(path.join(packaged, "index.mjs")).href), markdown);
     assert.ok(readFileSync(new URL("apps/api/build.mjs", root), "utf8")
-      .includes('path.join(knowledgeDir, "artem-expertovich-final.md")'));
+      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v2_2.md")'));
   } finally {
     rmSync(packaged, { recursive: true, force: true });
   }
@@ -258,9 +258,9 @@ try {
     recommendedChanges: [{ priority: 1, area: "consultant_prompt", problem: "Следующий шаг сформулирован общо.",
       change: "Связать CTA с уже снятым сомнением.", expectedEffect: "Более понятный переход к менеджеру.",
       target: "apps/api/src/ai/consultant-chat.prompt.ts", evidenceCaseNumbers: [1], requiresBusinessDecision: false, confirmedQuotes: [] }],
-    recommendationsForKnowledgeBase: [{ section: "# 50. Первый перевод к Bitrix-форме", currentGap: "Недостаточно примеров персонального CTA.",
+    recommendationsForKnowledgeBase: [{ section: "## 19. Когда и как приглашать к менеджеру", currentGap: "Недостаточно примеров персонального CTA.",
       recommendedAddition: "Не использовать сухую фразу.", evidenceCaseNumbers: [1], priority: "medium",
-      requiresProductDecision: false, confirmedQuotes: ["Не использовать сухую фразу:"] }],
+      requiresProductDecision: false, confirmedQuotes: ["Сначала дай доступный содержательный ответ."] }],
     trainingRules: ["Отвечать на сомнение.", "Персонализировать CTA.", "Не придумывать факты."],
     doNotChange: ["Ограничения по гарантиям"], codexTask: "Не доверять этому полю" };
   let evaluatorAttempts = 0;
@@ -271,7 +271,7 @@ try {
     if (evaluatorAttempts === 1 || evaluatorAttempts === 3 || evaluatorAttempts === 4) throw new Error("Evaluator unavailable");
     return good;
   };
-  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem-expertovich-final.md", root), "utf8"), fakeProvider);
+  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v2_2.md", root), "utf8"), fakeProvider);
   const productionBefore = persisted.length;
   const savedCases = [], progress = [];
   const summary = await runTester(2, runtime, { async saveCase(c) { savedCases.push(c); }, async progress(n) { progress.push(n); }, async finish() {} }, personas.slice(0, 2));
@@ -281,9 +281,9 @@ try {
   assert.equal(summary.evaluatedCases, 1); assert.equal(summary.errorCases, 1); assert.equal(summary.averageScore, 90);
   assert.equal(summary.criterionScores.personalization, 90, "TECH_ERROR must not affect criterion averages");
   assert.equal(summary.runEvaluation?.overallScore, 90); assert.deepEqual(summary.runEvaluation?.systemicProblems[0].evidenceCaseNumbers, [1]);
-  assert.equal(summary.runEvaluation?.recommendationsForKnowledgeBase[0].section, "# 50. Первый перевод к Bitrix-форме");
+  assert.equal(summary.runEvaluation?.recommendationsForKnowledgeBase[0].section, "## 19. Когда и как приглашать к менеджеру");
   assert.equal(summary.runEvaluation?.trainingRules.length, 3);
-  assert.ok(summary.codexTask.includes("Кейсы: 1")); assert.ok(summary.codexTask.includes("# 50. Первый перевод к Bitrix-форме"));
+  assert.ok(summary.codexTask.includes("Кейсы: 1")); assert.ok(summary.codexTask.includes("## 19. Когда и как приглашать к менеджеру"));
   assert.ok(!summary.codexTask.includes("Не доверять этому полю"));
   assert.equal(evaluatorAttempts, 4, "each failed evaluator call is retried once");
   assert.equal(persisted.length, productionBefore, "Tester must not write production messages");

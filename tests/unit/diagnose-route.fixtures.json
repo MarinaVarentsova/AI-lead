@@ -16,10 +16,10 @@
     "experienceYears": "Ваш стаж превышает десять лет.",
     "education": "Непрофильное высшее образование не препятствует поступлению на программу «Стройэксперт».",
     "goal": "Ваша цель — строительная экспертиза.",
-    "recommendation": "У вас есть практический опыт и подходящее образование. С учётом вашей цели рекомендую программу «Стройэксперт».",
+    "recommendation": "Под вашу задачу подходит «Стройэксперт». У вас есть опыт в строительстве или ремонте. Ваша цель — строительная экспертиза. На программе можно осваивать исследование дефектов и подготовку заключения. Для уточнения тарифа нажмите «Связаться с менеджером».",
     "recommendedTrack": "construction_expertise",
     "importantNote": null
   },
   "factsPacketKeys": ["sourceVersion", "experience", "experienceYears", "education", "goal", "rawAnswers", "guards", "recommendedTrackHint"],
-  "expectedSourceVersion": "inobr-diagnostic-rules-v2"
+  "expectedSourceVersion": "inobr-artem-v2.2"
 }

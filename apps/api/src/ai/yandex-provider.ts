@@ -1,4 +1,5 @@
 import type { AIProvider } from "./provider";
+import { artemSystemPrompt } from "./artem-knowledge";
 import type { ConsultantAIProvider, ConsultantProviderInput } from "./consultant-chat.types";
 import { CONSULTANT_CHAT_PROMPT, selectConsultantInput } from "./consultant-chat.prompt";
 import { DIAGNOSTIC_RESULT_SYSTEM_PROMPT, selectDiagnosticFacts } from "./diagnostic-result.prompt";
@@ -68,7 +69,7 @@ export class YandexAIProvider implements AIProvider, ConsultantAIProvider {
         headers: { "Content-Type": "application/json", Authorization: `Api-Key ${config.apiKey}`, "OpenAI-Project": config.folderId },
         body: JSON.stringify({ model: config.model, temperature: 0.2, max_tokens: 1200,
           response_format: { type: "json_object" }, messages: [
-            { role: "system", content: CONSULTANT_CHAT_PROMPT },
+            { role: "system", content: await artemSystemPrompt(CONSULTANT_CHAT_PROMPT) },
             { role: "user", content: JSON.stringify(selectConsultantInput(input)) },
           ] }),
       });
@@ -107,7 +108,7 @@ export class YandexAIProvider implements AIProvider, ConsultantAIProvider {
         body: JSON.stringify({
           model: config.model,
           messages: [
-            { role: "system", content: DIAGNOSTIC_RESULT_SYSTEM_PROMPT },
+            { role: "system", content: await artemSystemPrompt(DIAGNOSTIC_RESULT_SYSTEM_PROMPT) },
             { role: "user", content: JSON.stringify(facts) },
           ],
           temperature: 0.2,
