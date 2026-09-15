@@ -10,14 +10,65 @@ export interface CaseResult {
   caseNumber: number; persona: Persona; diagnosticAnswers: Persona["answers"]; diagnosticResult: unknown;
   transcript: ConsultantExchange[]; evaluatorResult: Evaluation | null; score: number | null;
   verdict: "PASS" | "REVIEW" | "FAIL" | "TECH_ERROR"; errorMessage: string | null;
+  stage: TesterStage | null; errorCode: string | null; attempts: number | null;
 }
 export interface TestStore { saveCase(result: CaseResult): Promise<void>; progress(count: number): Promise<void>; finish(summary: unknown): Promise<void> }
+export type TesterStage = "diagnostic_generation" | "consultant_generation" | "evaluator" | "run_summary";
+export const TESTER_AI_TIMEOUT_MS = 45_000;
+export const TESTER_CASE_DELAY_MS = 1_000;
+export const TESTER_RETRY_DELAYS_MS = [1_000, 2_000] as const;
+interface TesterExecutionOptions {
+  sleep(ms: number): Promise<void>;
+  caseDelayMs: number;
+  retryDelaysMs: readonly number[];
+}
+const defaultOptions: TesterExecutionOptions = {
+  sleep: ms => new Promise(resolve => setTimeout(resolve, ms)),
+  caseDelayMs: TESTER_CASE_DELAY_MS,
+  retryDelaysMs: TESTER_RETRY_DELAYS_MS,
+};
+class TesterStageError extends Error {
+  constructor(readonly stage: TesterStage, readonly errorCode: string, readonly attempts: number) {
+    super(errorCode);
+  }
+}
+function technicalErrorCode(error: unknown): string | null {
+  if (error instanceof DiagnosticAIError && ["AI_REQUEST_TIMEOUT", "AI_REQUEST_FAILED", "AI_INVALID_RESULT"].includes(error.code)) return error.code;
+  if (error instanceof TypeError || (error instanceof Error && /timeout|network|transport|fetch|ECONN|INVALID_(?:EVALUATION|RUN_ASSESSMENT)/i.test(error.message))) {
+    return error instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(error.message) ? error.message : "AI_REQUEST_FAILED";
+  }
+  return null;
+}
+async function executeAI<T>(stage: TesterStage, operation: () => Promise<T>, options: TesterExecutionOptions): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try { return await operation(); }
+    catch (error) {
+      const errorCode = technicalErrorCode(error) ??
+        (stage === "evaluator" || stage === "run_summary" ? "AI_REQUEST_FAILED" : null);
+      const delay = options.retryDelaysMs[attempt - 1];
+      if (!errorCode || delay === undefined) {
+        throw new TesterStageError(stage, errorCode ?? (error instanceof Error ? error.message : "CASE_EXECUTION_OR_EVALUATION_FAILED"), attempt);
+      }
+      await options.sleep(delay);
+    }
+  }
+}
+function storedTechnicalError(value: string | null) {
+  try {
+    const parsed = JSON.parse(value ?? "") as { stage?: unknown; errorCode?: unknown; attempts?: unknown };
+    if (typeof parsed.stage === "string" && typeof parsed.errorCode === "string" && typeof parsed.attempts === "number") return parsed;
+  } catch { /* legacy plain errorMessage */ }
+  return { stage: null, errorCode: value, attempts: value ? 1 : null };
+}
 export function normalizeStoredCase<T extends { evaluatorResult: unknown; errorMessage: string | null; verdict: string | null; score: number | null }>(row: T) {
   let evaluatorResult: Evaluation | null = null;
   try { if (!row.errorMessage && row.verdict !== "TECH_ERROR") evaluatorResult = validateEvaluation(row.evaluatorResult); } catch { /* legacy invalid evaluator output */ }
+  const technical = storedTechnicalError(row.errorMessage);
   return { ...row, evaluatorResult, score: evaluatorResult?.score ?? null,
     verdict: evaluatorResult?.verdict ?? "TECH_ERROR" as const,
-    errorMessage: evaluatorResult ? null : row.errorMessage ?? "CASE_EXECUTION_OR_EVALUATION_FAILED" };
+    errorMessage: evaluatorResult ? null : technical.errorCode ?? "CASE_EXECUTION_OR_EVALUATION_FAILED",
+    stage: evaluatorResult ? null : technical.stage, errorCode: evaluatorResult ? null : technical.errorCode,
+    attempts: evaluatorResult ? null : technical.attempts };
 }
 export function aggregate(results: Pick<CaseResult, "verdict" | "errorMessage" | "evaluatorResult">[]) {
   const quality = results.filter(r => r.verdict !== "TECH_ERROR" && !r.errorMessage && r.evaluatorResult);
@@ -34,47 +85,67 @@ export function aggregate(results: Pick<CaseResult, "verdict" | "errorMessage" |
     averageSalesFunnelScore: avg(v => (v.criteria.sales + v.criteria.cta + v.criteria.conversion) / 3),
     criterionScores };
 }
-export async function evaluateWithRetry<T>(evaluate: () => Promise<T>): Promise<T> {
-  try { return await evaluate(); } catch { return evaluate(); }
+export async function evaluateWithRetry<T>(evaluate: () => Promise<T>, options: Partial<TesterExecutionOptions> = {}): Promise<T> {
+  return executeAI("evaluator", evaluate, { ...defaultOptions, ...options });
 }
-export async function runTester(count: number, runtime: ArtemRuntime, store: TestStore, personas = generatePersonas(count)) {
+export async function runTester(count: number, runtime: ArtemRuntime, store: TestStore, personas = generatePersonas(count),
+  executionOptions: Partial<TesterExecutionOptions> = {}) {
   validateRunCount(count);
   if (personas.length !== count || personas.some(p => p.questions.length < 1 || p.questions.length > 3)) throw new Error("INVALID_PERSONAS");
+  const options = { ...defaultOptions, ...executionOptions };
   const results: CaseResult[] = [];
   const behaviourRules = runtime.markdown;
   for (const [index, persona] of personas.entries()) {
     const result: CaseResult = { caseNumber: index + 1, persona, diagnosticAnswers: persona.answers,
-      diagnosticResult: null, transcript: [], evaluatorResult: null, score: null, verdict: "TECH_ERROR", errorMessage: null };
+      diagnosticResult: null, transcript: [], evaluatorResult: null, score: null, verdict: "TECH_ERROR", errorMessage: null,
+      stage: null, errorCode: null, attempts: null };
+    let currentStage: TesterStage = "diagnostic_generation";
     try {
       const resolved = DiagnosticKnowledgeResolver.resolve(persona.answers);
-      const diagnostic = await runtime.diagnostic.generate(DiagnosticKnowledgeResolver.buildFactsPacket(resolved));
+      const diagnostic = await executeAI("diagnostic_generation", async () => {
+        const outcome = await runtime.diagnostic.generate(DiagnosticKnowledgeResolver.buildFactsPacket(resolved));
+        if (outcome.source === "fallback" && outcome.failureReason !== "AI_CONFIGURATION_ERROR") {
+          throw new DiagnosticAIError(outcome.failureReason ?? "AI_REQUEST_FAILED");
+        }
+        return outcome;
+      }, options);
       result.diagnosticResult = diagnostic;
       result.transcript.push({ role: "assistant", message: formatDiagnosticResult(diagnostic.result) });
       const history: ConsultantExchange[] = [];
       const relevant = new Map<string, { id: string; title: string; content: string }>();
       const turnMetadata: Awaited<ReturnType<ArtemRuntime["reply"]>>[] = [];
       for (const question of persona.questions) {
+        currentStage = "consultant_generation";
         const facts = runtime.prepare(persona.answers, question, history);
         facts.matchedSections.forEach(section => relevant.set(section.id, section));
-        const response = await runtime.reply(facts, history);
+        const response = await executeAI("consultant_generation", async () => {
+          const reply = await runtime.reply(facts, history);
+          if (reply.fallbackReason && ["AI_REQUEST_TIMEOUT", "AI_REQUEST_FAILED", "AI_INVALID_RESULT"].includes(reply.fallbackReason)) {
+            throw new DiagnosticAIError(reply.fallbackReason as "AI_REQUEST_TIMEOUT" | "AI_REQUEST_FAILED" | "AI_INVALID_RESULT");
+          }
+          return reply;
+        }, options);
         const turn = [{ role: "user", message: question }, { role: "assistant", message: response.message }];
         history.push(...turn); result.transcript.push(...turn);
         turnMetadata.push(response);
       }
 
-      result.evaluatorResult = await evaluateWithRetry(async () => validateEvaluation(await runtime.provider.generateStructured(EVALUATOR_PROMPT, {
+      currentStage = "evaluator";
+      result.evaluatorResult = await executeAI("evaluator", async () => validateEvaluation(await runtime.provider.generateStructured(EVALUATOR_PROMPT, {
         persona, diagnosticAnswers: persona.answers, diagnosticResult: diagnostic,
         transcript: result.transcript, turnMetadata,
         expectedRules: { diagnostic: DiagnosticKnowledgeResolver.buildFactsPacket(resolved), behaviourRules,
           relevantSections: [...relevant.values()], maxAdditionalQuestions: 3 },
-      })));
+      })), options);
       result.score = result.evaluatorResult.score; result.verdict = result.evaluatorResult.verdict;
     } catch (error) {
-      result.errorMessage = error instanceof DiagnosticAIError ? error.code : "CASE_EXECUTION_OR_EVALUATION_FAILED";
+      const failure = error instanceof TesterStageError ? error : new TesterStageError(currentStage, technicalErrorCode(error) ?? "CASE_EXECUTION_OR_EVALUATION_FAILED", 1);
+      result.errorMessage = failure.errorCode; result.stage = failure.stage; result.errorCode = failure.errorCode; result.attempts = failure.attempts;
     }
     results.push(result);
     await store.saveCase(result);
     await store.progress(index + 1);
+    if (index + 1 < personas.length) await options.sleep(options.caseDelayMs);
   }
   let runEvaluation: RunAssessment | null = null;
   let summarySource: "ai" | "deterministic" = "deterministic";
@@ -86,11 +157,11 @@ export async function runTester(count: number, runtime: ArtemRuntime, store: Tes
       knowledgeGroundingScore: metrics.averageGroundingScore, salesFunnelScore: metrics.averageSalesFunnelScore,
       criterionScores: metrics.criterionScores };
     try {
-      runEvaluation = await evaluateWithRetry(async () => validateRunAssessment(
+      runEvaluation = await executeAI("run_summary", async () => validateRunAssessment(
         await runtime.provider.generateStructured(RUN_ASSESSMENT_PROMPT, {
           cases: assessed, metrics: scores, confirmedKnowledge: runtime.markdown,
           knowledgeSectionTitles: runtime.markdown.match(/^#{1,3} .+$/gm) ?? [],
-        }), assessed.map(r => r.caseNumber), runtime.markdown, scores));
+        }), assessed.map(r => r.caseNumber), runtime.markdown, scores), options);
       summarySource = "ai";
     } catch {
       summaryError = "AI_SUMMARY_UNAVAILABLE";

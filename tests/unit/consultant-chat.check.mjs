@@ -268,13 +268,13 @@ try {
   fakeProvider.generateStructured = async (prompt) => {
     if (prompt.includes("systemicProblems")) return runAssessment;
     evaluatorAttempts += 1;
-    if (evaluatorAttempts === 1 || evaluatorAttempts === 3 || evaluatorAttempts === 4) throw new Error("Evaluator unavailable");
+    if (evaluatorAttempts === 1 || evaluatorAttempts === 3 || evaluatorAttempts === 4 || evaluatorAttempts === 5) throw new Error("Evaluator unavailable");
     return good;
   };
   const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v2_2.md", root), "utf8"), fakeProvider);
   const productionBefore = persisted.length;
   const savedCases = [], progress = [];
-  const summary = await runTester(2, runtime, { async saveCase(c) { savedCases.push(c); }, async progress(n) { progress.push(n); }, async finish() {} }, personas.slice(0, 2));
+  const summary = await runTester(2, runtime, { async saveCase(c) { savedCases.push(c); }, async progress(n) { progress.push(n); }, async finish() {} }, personas.slice(0, 2), { sleep: async () => {} });
   assert.deepEqual(progress, [1,2]); assert.equal(savedCases[0].verdict, "PASS"); assert.equal(savedCases[0].errorMessage, null);
   assert.equal(savedCases[1].verdict, "TECH_ERROR"); assert.equal(savedCases[1].score, null); assert.ok(savedCases[1].errorMessage);
   assert.equal(summary.PASS, 1); assert.equal(summary.FAIL, 0); assert.equal(summary.TECH_ERROR, 1);
@@ -285,7 +285,7 @@ try {
   assert.equal(summary.runEvaluation?.trainingRules.length, 3);
   assert.ok(summary.codexTask.includes("Кейсы: 1")); assert.ok(summary.codexTask.includes("## 19. Когда и как приглашать к менеджеру"));
   assert.ok(!summary.codexTask.includes("Не доверять этому полю"));
-  assert.equal(evaluatorAttempts, 4, "each failed evaluator call is retried once");
+  assert.equal(evaluatorAttempts, 5, "each failed evaluator call is retried twice");
   assert.equal(persisted.length, productionBefore, "Tester must not write production messages");
   assert.ok(savedCases.every(c => c.transcript.filter(m => m.role === "user").length <= 3));
   await assert.rejects(runTester(11, runtime, {}));
@@ -321,7 +321,7 @@ try {
     return { ...good, problems: ["Слабый переход к менеджеру"], recommendedFixes: ["Персонализировать CTA."] };
   };
   const fallbackRuntime = createArtemRuntime(runtime.markdown, fallbackProvider);
-  const fallbackSummary = await runTester(1, fallbackRuntime, { async saveCase() {}, async progress() {}, async finish() {} }, personas.slice(0, 1));
+  const fallbackSummary = await runTester(1, fallbackRuntime, { async saveCase() {}, async progress() {}, async finish() {} }, personas.slice(0, 1), { sleep: async () => {} });
   assert.equal(fallbackSummary.summarySource, "deterministic");
   assert.ok(fallbackSummary.runEvaluation);
   assert.equal(fallbackSummary.summaryError, "AI_SUMMARY_UNAVAILABLE");

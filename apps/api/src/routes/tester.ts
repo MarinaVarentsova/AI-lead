@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
 import { and, asc, desc, eq, lt } from "drizzle-orm";
 import { db, aiTestRuns, aiTestCases } from "@workspace/db";
-import { getArtemRuntime } from "../ai/artem-runtime";
-import { runTester, aggregate, normalizeStoredCase } from "../tester/runner";
+import { createArtemRuntime, getArtemRuntime } from "../ai/artem-runtime";
+import { YandexAIProvider } from "../ai/yandex-provider";
+import { runTester, aggregate, normalizeStoredCase, TESTER_AI_TIMEOUT_MS } from "../tester/runner";
 import { validateRunCount, type Persona } from "../tester/personas";
 import { nextIteration } from "../tester/run-assessment";
 import { internalTesterAccess } from "../tester/access";
@@ -30,18 +31,25 @@ router.post("/tester/runs", async (req, res) => {
         res.status(409).json({ error: "PARENT_CASES_UNAVAILABLE" }); return;
       }
     }
-    const runtime = await getArtemRuntime();
-    // A stopped process cannot resume its in-memory worker. Only expire runs beyond
-    // the bounded maximum duration (62 AI calls including retries, <=60s each).
+    const sharedRuntime = await getArtemRuntime();
+    const runtime = createArtemRuntime(sharedRuntime.markdown,
+      new YandexAIProvider({ ...process.env, AI_REQUEST_TIMEOUT_MS: String(TESTER_AI_TIMEOUT_MS) }));
+    // A stopped process cannot resume its in-memory worker. The three-hour bound
+    // covers 10 sequential cases, three attempts per AI stage and 45s timeouts.
     await db.update(aiTestRuns).set({ status: "failed", completedAt: new Date(), summary: { error: "RUN_INTERRUPTED" } })
-      .where(and(eq(aiTestRuns.status, "running"), lt(aiTestRuns.startedAt, new Date(Date.now() - 90 * 60_000))));
+      .where(and(eq(aiTestRuns.status, "running"), lt(aiTestRuns.startedAt, new Date(Date.now() - 3 * 60 * 60_000))));
     const [run] = await db.insert(aiTestRuns).values({ status: "running", requestedCases: count,
       parentRunId: typeof parentRunId === "string" ? parentRunId : null, iterationNumber,
       knowledgeVersion: runtime.resolver.resolve({ question: "Стройэксперт" }).sourceVersion }).returning();
     if (!run) throw new Error("RUN_NOT_SAVED");
     res.status(202).json(run);
     void runTester(count, runtime, {
-      async saveCase(value) { await db.insert(aiTestCases).values({ ...value, runId: run.id, completedAt: new Date() }); },
+      async saveCase(value) {
+        const { stage, errorCode, attempts, ...stored } = value;
+        const errorMessage = value.verdict === "TECH_ERROR" && errorCode
+          ? JSON.stringify({ stage, errorCode, attempts }) : stored.errorMessage;
+        await db.insert(aiTestCases).values({ ...stored, errorMessage, runId: run.id, completedAt: new Date() });
+      },
       async progress(completedCases) { await db.update(aiTestRuns).set({ completedCases }).where(eq(aiTestRuns.id, run.id)); },
       async finish(summary) { await db.update(aiTestRuns).set({ status: "completed", summary, completedAt: new Date() }).where(eq(aiTestRuns.id, run.id)); },
     }, personas).catch(async () => {

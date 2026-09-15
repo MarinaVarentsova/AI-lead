@@ -82,7 +82,7 @@ try {
   }
   const saved = [];
   for (const group of [cases.slice(0, 10), cases.slice(10)]) {
-    const summary = await runTester(group.length, runtime, { async saveCase(c) { saved.push(c); }, async progress() {}, async finish() {} }, group);
+    const summary = await runTester(group.length, runtime, { async saveCase(c) { saved.push(c); }, async progress() {}, async finish() {} }, group, { sleep: async () => {} });
     assert.equal(summary.TECH_ERROR, 0); assert.equal(summary.averageScore, 90);
     assert.equal(summary.summarySource, "deterministic"); assert.ok(summary.runEvaluation);
   }
