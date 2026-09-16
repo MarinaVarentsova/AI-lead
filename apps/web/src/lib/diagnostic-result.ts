@@ -2,10 +2,10 @@ import { apiFetch } from "./api";
 
 export interface StructuredDiagnosticResult {
   summary: string;
-  experience: string;
-  experienceYears: string;
+  currentArea: string;
+  currentRole: string;
   education: string;
-  goal: string;
+  targetTasks: string;
   recommendation: string;
   recommendedTrack: "construction_expertise" | "apartment_acceptance" | "not_defined";
   importantNote: string | null;
@@ -22,14 +22,11 @@ export interface DiagnoseResponse {
 
 export interface DiagnosticPayload {
   conversationId: string;
-  experienceArea: string;
-  experienceAreaRaw: string;
-  experienceYears: string;
-  experienceYearsRaw: string;
-  educationType: string;
-  educationTypeRaw: string;
-  goal: string;
-  goalRaw: string;
+  current_area: string;
+  current_area_other_text?: string;
+  current_role: string;
+  education_status: string;
+  target_tasks: string;
 }
 
 export const DIAGNOSTIC_ERROR = "Не удалось сформировать результат диагностики. Попробуйте ещё раз.";
@@ -56,9 +53,9 @@ export function parseDiagnoseResponse(value: unknown): DiagnoseResponse {
   return {
     result: text(response.result),
     structuredResult: {
-      summary: text(result.summary), experience: text(result.experience),
-      experienceYears: text(result.experienceYears), education: text(result.education),
-      goal: text(result.goal), recommendation: text(result.recommendation),
+      summary: text(result.summary), currentArea: text(result.currentArea),
+      currentRole: text(result.currentRole), education: text(result.education),
+      targetTasks: text(result.targetTasks), recommendation: text(result.recommendation),
       recommendedTrack: track,
       importantNote: result.importantNote === null ? null : text(result.importantNote),
     },
@@ -72,7 +69,12 @@ export function parseDiagnoseResponse(value: unknown): DiagnoseResponse {
 /** Persist answers first. A failed save must never trigger generation. */
 export async function completeDiagnostic(
   payload: DiagnosticPayload,
-  saveAnswers: (payload: DiagnosticPayload) => Promise<unknown>,
+  saveAnswers: (payload: DiagnosticPayload) => Promise<unknown> = async value => {
+    const response = await apiFetch("/api/diagnostic-answers", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify(value) });
+    if (!response.ok) throw new Error(DIAGNOSTIC_ERROR);
+    return response.json();
+  },
 ): Promise<DiagnoseResponse> {
   await saveAnswers(payload);
   const response = await apiFetch("/api/diagnose", {

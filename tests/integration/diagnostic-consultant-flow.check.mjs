@@ -38,7 +38,10 @@ const db = {
     return { from(table) {
       if (table === schema.aiDiagnosticAnswers) return { where() { return { async limit() {
         const conversationId = store.conversations.at(-1)?.id;
-        const row = store.answers.get(conversationId); return row ? [row] : [];
+        const row = store.answers.get(conversationId); return row ? [{
+          currentArea: row.experienceArea, currentAreaOtherText: row.experienceAreaRaw,
+          currentRole: row.experienceYears, educationStatus: row.educationType, targetTasks: row.goal,
+        }] : [];
       } }; } };
       assert.equal(table, schema.aiMessages);
       return { where() { return { async orderBy() {
@@ -92,9 +95,10 @@ try {
     import(new URL("apps/api/src/ai/yandex-provider.ts", root)),
   ]);
   YandexAIProvider.prototype.generateDiagnosticResult = async () => ({
-    summary: "Диагностика завершена.", experience: "У вас есть опыт в строительстве.",
-    experienceYears: "У вас стаж до трёх лет.", education: "У вас есть СПО.", goal: "Ваша цель — новая профессия.",
-    recommendation: "У вас есть практический опыт и СПО. С учётом вашей цели рекомендую программу «Стройэксперт».",
+    summary: "Диагностика завершена.", currentArea: "Ваша текущая сфера — Строительство и ремонт.",
+    currentRole: "Ваша роль — прораб, мастер или специалист на объекте.", education: "У вас среднее профессиональное образование.",
+    targetTasks: "Вы хотите работать с задачами: дефекты и качество строительных работ.",
+    recommendation: "Стройэксперт подходит под вашу задачу. Ваша текущая сфера — Строительство и ремонт. Вы хотите работать с задачами: дефекты и качество строительных работ. На программе можно изучать дефекты и подготовку заключения. Для условий нажмите «Связаться с менеджером».",
     recommendedTrack: "construction_expertise", importantNote: null,
   });
   YandexAIProvider.prototype.generateConsultantReply = async input =>
@@ -106,10 +110,9 @@ try {
   assert.equal(conversation.statusCode, 201);
   const conversationId = conversation.body.conversationId;
   const saved = await invoke(answers, "/diagnostic-answers", {
-    conversationId, experienceArea: "construction", experienceAreaRaw: "Строительство",
-    experienceYears: "up_to_3", experienceYearsRaw: "До 3 лет",
-    educationType: "secondary_technical", educationTypeRaw: "Среднее техническое",
-    goal: "new_profession", goalRaw: "Новая профессия",
+    conversationId, current_area: "construction_repair",
+    current_role: "foreman_master_site_specialist", education_status: "secondary_vocational",
+    target_tasks: "defects_quality",
   });
   assert.equal(saved.statusCode, 201);
   const diagnostic = await invoke(diagnose, "/diagnose", { conversationId });

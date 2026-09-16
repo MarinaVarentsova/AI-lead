@@ -1,91 +1,42 @@
-export const EXPERIENCE_AREA_CODES = [
-  "construction", "design", "supervision", "legal_expertise", "no_experience", "other",
-] as const;
-export const EXPERIENCE_YEARS_CODES = [
-  "none", "up_to_3", "from_3_to_10", "more_than_10", "related_experience", "need_clarification",
-] as const;
-export const EDUCATION_TYPE_CODES = [
-  "higher_technical", "secondary_technical", "non_profile", "school_only",
-  "diploma_not_available", "need_clarification",
-] as const;
-export const GOAL_CODES = [
-  "extra_income", "new_profession", "expand_services", "apartment_acceptance",
-  "construction_expertise", "research_only",
-] as const;
-
-export type ExperienceArea = typeof EXPERIENCE_AREA_CODES[number];
-export type ExperienceYears = typeof EXPERIENCE_YEARS_CODES[number];
-export type EducationType = typeof EDUCATION_TYPE_CODES[number];
-export type DiagnosticGoal = typeof GOAL_CODES[number];
+import type { CurrentArea, CurrentRole, EducationStatus, TargetTasks } from "./diagnostic-schema";
 
 export type DiagnosticAnswers = {
-  experienceArea: string;
-  experienceAreaRaw?: string | null;
-  experienceYears: string;
-  experienceYearsRaw?: string | null;
-  educationType: string;
-  educationTypeRaw?: string | null;
-  goal: string;
-  goalRaw?: string | null;
+  current_area: string;
+  current_area_other_text?: string | null;
+  current_role: string;
+  education_status: string;
+  target_tasks: string;
 };
-
-export const SOURCE_VERSION = "inobr-artem-v2.2" as const;
-
-export type DiagnosticGuard = {
-  code: "school_only_no_dpo";
-  severity: "hard";
-  rule: "Do not recommend SSTE/DPO as the primary training path.";
-};
+export const SOURCE_VERSION = "inobr-artem-v3.0" as const;
+export type ResolvedAnswer<Code extends string> = { code: Code };
+export type DiagnosticGuard = { code: "no_professional_education" | "completion_document_pending";
+  severity: "hard" | "conditional"; rule: string };
 export type RecommendedTrackHint = "apartment_acceptance" | "construction_expertise" | null;
-export type ResolvedAnswer<Code extends string> = { code: Code; raw: string | null };
-
 export type ResolvedDiagnostic = {
   sourceVersion: typeof SOURCE_VERSION;
   answers: {
-    experienceArea: ResolvedAnswer<ExperienceArea>;
-    experienceYears: ResolvedAnswer<ExperienceYears>;
-    educationType: ResolvedAnswer<EducationType>;
-    goal: ResolvedAnswer<DiagnosticGoal>;
+    currentArea: ResolvedAnswer<CurrentArea> & { otherText: string | null };
+    currentRole: ResolvedAnswer<CurrentRole>;
+    educationStatus: ResolvedAnswer<EducationStatus>;
+    targetTasks: ResolvedAnswer<TargetTasks>;
   };
-  rules: {
-    experience: string;
-    experienceYears: string;
-    education: string;
-    goal: string;
-  };
+  facts: { currentArea: string; currentRole: string; education: string; targetTasks: string };
   guards: DiagnosticGuard[];
   recommendedTrackHint: RecommendedTrackHint;
 };
-
 export type DiagnosticFactsPacket = {
   sourceVersion: typeof SOURCE_VERSION;
-  experience: string;
-  experienceYears: string;
-  education: string;
-  goal: string;
-  rawAnswers: {
-    experienceArea: string | null;
-    experienceYears: string | null;
-    educationType: string | null;
-    goal: string | null;
-  };
+  currentArea: string; currentRole: string; education: string; targetTasks: string;
+  rawAnswers: { currentAreaOtherText: string | null };
+  answerCodes: { currentArea: CurrentArea; currentRole: CurrentRole; educationStatus: EducationStatus; targetTasks: TargetTasks };
   guards: DiagnosticGuard[];
   recommendedTrackHint: RecommendedTrackHint;
 };
-
-export type DiagnosticValidationIssue = {
-  field: keyof DiagnosticAnswers | "answers";
-  code: "invalid_input" | "required" | "unknown_code" | "invalid_raw";
-};
-
-/** Controlled input error; does not echo user input or contact data. */
+export type DiagnosticValidationIssue = { field: keyof DiagnosticAnswers | "answers";
+  code: "invalid_input" | "required" | "unknown_code" | "invalid_raw" | "unexpected" };
 export class DiagnosticValidationError extends Error {
   readonly code = "DIAGNOSTIC_VALIDATION_ERROR";
-  readonly issues: readonly DiagnosticValidationIssue[];
-
-  constructor(issues: DiagnosticValidationIssue[]) {
-    super("Diagnostic answers failed validation.");
-    this.name = "DiagnosticValidationError";
-    this.issues = issues;
+  constructor(readonly issues: readonly DiagnosticValidationIssue[]) {
+    super("Diagnostic answers failed validation."); this.name = "DiagnosticValidationError";
   }
 }

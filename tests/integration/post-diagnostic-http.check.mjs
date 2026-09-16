@@ -90,7 +90,8 @@ try {
   assert.equal(c.status, 201);
   const conversationId = c.body.conversationId;
   assert.equal((await post("/api/diagnostic-answers", { conversationId,
-    experienceArea: "construction", experienceYears: "up_to_3", educationType: "secondary_technical", goal: "new_profession",
+    current_area: "construction_repair", current_role: "foreman_master_site_specialist",
+    education_status: "secondary_vocational", target_tasks: "defects_quality",
   })).status, 201);
 
   // Execute the actual widget handlers, not copies. Emulate insecure browser globals.

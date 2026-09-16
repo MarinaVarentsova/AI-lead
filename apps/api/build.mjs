@@ -125,8 +125,8 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
   const knowledgeDir = path.join(distDir, "knowledge");
   await mkdir(knowledgeDir, { recursive: true });
   await copyFile(
-    path.resolve(artifactDir, "../../knowledge/inobr/artem_unified_knowledge_base_v2_2.md"),
-    path.join(knowledgeDir, "artem_unified_knowledge_base_v2_2.md"),
+    path.resolve(artifactDir, "../../knowledge/inobr/artem_unified_knowledge_base_v3.md"),
+    path.join(knowledgeDir, "artem_unified_knowledge_base_v3.md"),
   );
 }
 

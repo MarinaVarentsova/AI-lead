@@ -27,14 +27,11 @@ router.post("/diagnose", async (req, res): Promise<void> => {
 
     phase = "load_answers";
     const [row] = await db.select({
-      experienceArea: aiDiagnosticAnswers.experienceArea,
-      experienceAreaRaw: aiDiagnosticAnswers.experienceAreaRaw,
-      experienceYears: aiDiagnosticAnswers.experienceYears,
-      experienceYearsRaw: aiDiagnosticAnswers.experienceYearsRaw,
-      educationType: aiDiagnosticAnswers.educationType,
-      educationTypeRaw: aiDiagnosticAnswers.educationTypeRaw,
-      goal: aiDiagnosticAnswers.goal,
-      goalRaw: aiDiagnosticAnswers.goalRaw,
+      currentArea: aiDiagnosticAnswers.experienceArea,
+      currentAreaOtherText: aiDiagnosticAnswers.experienceAreaRaw,
+      currentRole: aiDiagnosticAnswers.experienceYears,
+      educationStatus: aiDiagnosticAnswers.educationType,
+      targetTasks: aiDiagnosticAnswers.goal,
     }).from(aiDiagnosticAnswers)
       .where(eq(aiDiagnosticAnswers.conversationId, conversationId)).limit(1);
     req.log.info({ found: Boolean(row) }, "DIAGNOSTIC_ANSWERS_LOADED");
@@ -47,14 +44,9 @@ router.post("/diagnose", async (req, res): Promise<void> => {
     // Drizzle maps the existing snake_case columns to these camelCase properties.
     // Empty codes remain invalid; the resolver reports all missing/unknown codes.
     const answers: DiagnosticAnswers = {
-      experienceArea: row.experienceArea ?? "",
-      experienceAreaRaw: row.experienceAreaRaw,
-      experienceYears: row.experienceYears ?? "",
-      experienceYearsRaw: row.experienceYearsRaw,
-      educationType: row.educationType ?? "",
-      educationTypeRaw: row.educationTypeRaw,
-      goal: row.goal ?? "",
-      goalRaw: row.goalRaw,
+      current_area: row.currentArea ?? "", current_area_other_text: row.currentAreaOtherText,
+      current_role: row.currentRole ?? "", education_status: row.educationStatus ?? "",
+      target_tasks: row.targetTasks ?? "",
     };
     const resolved = DiagnosticKnowledgeResolver.resolve(answers);
     const facts = buildFactsPacket(resolved);

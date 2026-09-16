@@ -24,9 +24,8 @@ import type {
   ConversationResult,
   DiagnosticAnswersInput,
   DiagnosticAnswersResult,
-  DictionaryItem,
+  DiagnosticSchemaQuestion,
   ErrorResponse,
-  GetDictionaryParams,
   HealthStatus,
   MessageInput,
   MessageResult,
@@ -110,90 +109,6 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getHealthCheckQueryOptions(options)
-
-  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
-
-  return { ...query, queryKey: queryOptions.queryKey };
-}
-
-
-
-
-
-
-
-export const getGetDictionaryUrl = (params: GetDictionaryParams,) => {
-  const normalizedParams = new URLSearchParams();
-
-  Object.entries(params || {}).forEach(([key, value]) => {
-
-    if (value !== undefined) {
-      normalizedParams.append(key, value === null ? 'null' : value.toString())
-    }
-  });
-
-  const stringifiedParams = normalizedParams.toString();
-
-  return stringifiedParams.length > 0 ? `/api/dictionaries?${stringifiedParams}` : `/api/dictionaries`
-}
-
-/**
- * @summary Get dictionary items by type
- */
-export const getDictionary = async (params: GetDictionaryParams, options?: RequestInit): Promise<DictionaryItem[]> => {
-
-  return customFetch<DictionaryItem[]>(getGetDictionaryUrl(params),
-  {
-    ...options,
-    method: 'GET'
-
-
-  }
-);}
-
-
-
-
-
-export const getGetDictionaryQueryKey = (params?: GetDictionaryParams,) => {
-    return [
-    `/api/dictionaries`, ...(params ? [params] : [])
-    ] as const;
-    }
-
-
-export const getGetDictionaryQueryOptions = <TData = Awaited<ReturnType<typeof getDictionary>>, TError = ErrorType<ErrorResponse>>(params: GetDictionaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDictionary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-) => {
-
-const {query: queryOptions, request: requestOptions} = options ?? {};
-
-  const queryKey =  queryOptions?.queryKey ?? getGetDictionaryQueryKey(params);
-
-
-
-    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDictionary>>> = ({ signal }) => getDictionary(params, { signal, ...requestOptions });
-
-
-
-
-
-   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDictionary>>, TError, TData> & { queryKey: QueryKey }
-}
-
-export type GetDictionaryQueryResult = NonNullable<Awaited<ReturnType<typeof getDictionary>>>
-export type GetDictionaryQueryError = ErrorType<ErrorResponse>
-
-
-/**
- * @summary Get dictionary items by type
- */
-
-export function useGetDictionary<TData = Awaited<ReturnType<typeof getDictionary>>, TError = ErrorType<ErrorResponse>>(
- params: GetDictionaryParams, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDictionary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
-
- ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-
-  const queryOptions = getGetDictionaryQueryOptions(params,options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 
@@ -489,3 +404,73 @@ export const useSaveDiagnosticAnswers = <TError = ErrorType<ErrorResponse>,
       return useMutation(getSaveDiagnosticAnswersMutationOptions(options));
     }
 
+export const getGetDiagnosticSchemaUrl = () => {
+
+
+
+
+  return `/api/diagnostic/schema`
+}
+
+/**
+ * @summary Get the canonical v3 diagnostic questions
+ */
+export const getDiagnosticSchema = async ( options?: RequestInit): Promise<DiagnosticSchemaQuestion[]> => {
+
+  return customFetch<DiagnosticSchemaQuestion[]>(getGetDiagnosticSchemaUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetDiagnosticSchemaQueryKey = () => {
+    return [
+    `/api/diagnostic/schema`
+    ] as const;
+    }
+
+
+export const getGetDiagnosticSchemaQueryOptions = <TData = Awaited<ReturnType<typeof getDiagnosticSchema>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDiagnosticSchema>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetDiagnosticSchemaQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getDiagnosticSchema>>> = ({ signal }) => getDiagnosticSchema({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getDiagnosticSchema>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetDiagnosticSchemaQueryResult = NonNullable<Awaited<ReturnType<typeof getDiagnosticSchema>>>
+export type GetDiagnosticSchemaQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get the canonical v3 diagnostic questions
+ */
+
+export function useGetDiagnosticSchema<TData = Awaited<ReturnType<typeof getDiagnosticSchema>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getDiagnosticSchema>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetDiagnosticSchemaQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}

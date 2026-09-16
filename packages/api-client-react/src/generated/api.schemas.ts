@@ -13,11 +13,6 @@ export interface ErrorResponse {
   error: string;
 }
 
-export interface DictionaryItem {
-  code: string;
-  name: string;
-}
-
 export interface SessionResult {
   sessionId: string;
   sessionKey: string;
@@ -53,16 +48,56 @@ export interface MessageResult {
   conversationId: string;
 }
 
+export type DiagnosticAnswersInputCurrentArea = typeof DiagnosticAnswersInputCurrentArea[keyof typeof DiagnosticAnswersInputCurrentArea];
+
+
+export const DiagnosticAnswersInputCurrentArea = {
+  construction_repair: 'construction_repair',
+  design_estimates: 'design_estimates',
+  construction_control: 'construction_control',
+  real_estate_valuation_law: 'real_estate_valuation_law',
+  other: 'other',
+} as const;
+
+export type DiagnosticAnswersInputCurrentRole = typeof DiagnosticAnswersInputCurrentRole[keyof typeof DiagnosticAnswersInputCurrentRole];
+
+
+export const DiagnosticAnswersInputCurrentRole = {
+  engineer_designer_estimator: 'engineer_designer_estimator',
+  foreman_master_site_specialist: 'foreman_master_site_specialist',
+  manager_owner: 'manager_owner',
+  valuer_lawyer_expert: 'valuer_lawyer_expert',
+  not_in_construction: 'not_in_construction',
+} as const;
+
+export type DiagnosticAnswersInputEducationStatus = typeof DiagnosticAnswersInputEducationStatus[keyof typeof DiagnosticAnswersInputEducationStatus];
+
+
+export const DiagnosticAnswersInputEducationStatus = {
+  higher: 'higher',
+  secondary_vocational: 'secondary_vocational',
+  currently_studying: 'currently_studying',
+  no_higher_or_secondary_vocational: 'no_higher_or_secondary_vocational',
+} as const;
+
+export type DiagnosticAnswersInputTargetTasks = typeof DiagnosticAnswersInputTargetTasks[keyof typeof DiagnosticAnswersInputTargetTasks];
+
+
+export const DiagnosticAnswersInputTargetTasks = {
+  defects_quality: 'defects_quality',
+  damage_loss: 'damage_loss',
+  apartment_house_acceptance: 'apartment_house_acceptance',
+  judicial_construction_expertise: 'judicial_construction_expertise',
+  explore: 'explore',
+} as const;
+
 export interface DiagnosticAnswersInput {
   conversationId: string;
-  experienceArea?: string;
-  experienceAreaRaw?: string;
-  experienceYears?: string;
-  experienceYearsRaw?: string;
-  educationType?: string;
-  educationTypeRaw?: string;
-  goal?: string;
-  goalRaw?: string;
+  current_area: DiagnosticAnswersInputCurrentArea;
+  current_area_other_text?: string;
+  current_role: DiagnosticAnswersInputCurrentRole;
+  education_status: DiagnosticAnswersInputEducationStatus;
+  target_tasks: DiagnosticAnswersInputTargetTasks;
 }
 
 export interface DiagnosticAnswersResult {
@@ -70,17 +105,30 @@ export interface DiagnosticAnswersResult {
   conversationId: string;
 }
 
-export type GetDictionaryParams = {
-type: GetDictionaryType;
-};
+export interface DiagnosticSchemaOption {
+  code: string;
+  label: string;
+  allowsFreeText: boolean;
+}
 
-export type GetDictionaryType = typeof GetDictionaryType[keyof typeof GetDictionaryType];
+export type DiagnosticSchemaQuestionField = typeof DiagnosticSchemaQuestionField[keyof typeof DiagnosticSchemaQuestionField];
 
 
-export const GetDictionaryType = {
-  experience_area: 'experience_area',
-  experience_years: 'experience_years',
-  education: 'education',
-  goals: 'goals',
+export const DiagnosticSchemaQuestionField = {
+  current_area: 'current_area',
+  current_role: 'current_role',
+  education_status: 'education_status',
+  target_tasks: 'target_tasks',
 } as const;
+
+export interface DiagnosticSchemaQuestion {
+  /**
+     * @minimum 1
+     * @maximum 4
+     */
+  questionNumber: number;
+  field: DiagnosticSchemaQuestionField;
+  questionText: string;
+  options: DiagnosticSchemaOption[];
+}
 

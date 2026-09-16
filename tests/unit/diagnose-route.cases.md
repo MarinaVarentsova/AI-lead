@@ -35,12 +35,12 @@ the existing SQL columns remain snake_case.
 | Valid answers → resolver → result | Complete row, provider returns validResult | 200; structuredResult matches provider; isAI=true; provider=yandex; sourceVersion=inobr-diagnostic-rules-v2; fallbackReason=null. Provider receives exactly the eight factsPacket keys and four rawAnswers keys, no conversationId/contact/lead. |
 | No diagnostic answers | DB returns [] | 404; no provider call or insert. |
 | Incomplete answers | Set each of the four code fields to null or empty string in turn | 400; error=DIAGNOSTIC_VALIDATION_ERROR; issues identifies required field; no provider call or insert. |
-| Unknown code | Set educationType to unknown_code | 400 with unknown_code issue; no provider call or insert. |
+| Unknown code | Set education_status to unknown_code | 400 with unknown_code issue; no provider call or insert. |
 | Invalid request | Missing body, null body, missing conversationId, numeric ID or invalid UUID | 400; no DB query, provider call or insert. |
 | Missing Yandex config | Complete row; new YandexAIProvider({}) | 200; isAI=false; provider=fallback; fallbackReason=AI_CONFIGURATION_ERROR; no fetch; result includes four resolved rules and a substantive recommendation; recommendedTrack=construction_expertise. |
-| School education guard | Set educationType=school_only; provider returns validResult with construction_expertise | Provider output rejected; 200 deterministic fallback, AI_INVALID_RESULT; recommendedTrack=not_defined; importantNote explains required professional/higher education. No positive recommendation of Стройэксперт. |
+| No professional education guard | Set education_status=no_higher_or_secondary_vocational; provider returns construction_expertise | Provider output rejected; 200 deterministic fallback, AI_INVALID_RESULT; recommendedTrack=apartment_acceptance; importantNote explains required professional/higher education. |
 | Apartment fallback | Set goal=apartment_acceptance; missing provider config | 200 fallback; recommendedTrack=apartment_acceptance. |
-| Unconfirmed education | Set educationType=diploma_not_available or need_clarification; missing config | 200 fallback; recommendedTrack=not_defined. |
+| Current student | Set education_status=currently_studying; missing config | 200 conditional fallback; completion-document note is present. |
 | Provider failure | Provider throws AI_REQUEST_FAILED or AI_REQUEST_TIMEOUT | 200 fallback; fallbackReason is the corresponding safe error code. |
 | Result saved | Run both valid AI and missing-config cases; insert returns an ID | Exactly one insert into ai_messages: same conversationId, role=assistant, step=diagnostic_result, message exactly equals response.result; insert completes before HTTP success. |
 | Save fails | Insert throws or returning yields [] | 500; no success payload and no DIAGNOSTIC_RESULT_SAVED event. No raw database error in logs or response. |

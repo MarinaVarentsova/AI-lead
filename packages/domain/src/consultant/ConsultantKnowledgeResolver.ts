@@ -1,6 +1,4 @@
-import {
-  EDUCATION_TYPE_CODES, EXPERIENCE_AREA_CODES, EXPERIENCE_YEARS_CODES, GOAL_CODES,
-} from "../diagnostic/diagnostic-types";
+import { CURRENT_AREA_CODES, CURRENT_ROLE_CODES, EDUCATION_STATUS_CODES, TARGET_TASKS_CODES } from "../diagnostic/diagnostic-schema";
 import { createConsultantSections } from "./consultant-sections";
 import { ConsultantValidationError, type ConsultantDiagnosticContext, type ConsultantInput,
   type ConsultantRetrievalPacket, type ConsultantSection } from "./consultant-types";
@@ -35,11 +33,11 @@ function context(input: unknown): ConsultantDiagnosticContext {
   };
   // Never spread caller context or return arbitrary text/PII.
   return {
-    program: read("program", ["construction_expertise", "apartment_acceptance", "house_acceptance", "house_control", "house_unspecified"] as const),
-    experienceArea: read("experienceArea", EXPERIENCE_AREA_CODES),
-    experienceYears: read("experienceYears", EXPERIENCE_YEARS_CODES),
-    educationType: read("educationType", EDUCATION_TYPE_CODES),
-    goal: read("goal", GOAL_CODES),
+    program: read("program", ["construction_expertise", "apartment_acceptance", "house_acceptance", "house_control", "house_unspecified", "acceptance_choice"] as const),
+    currentArea: read("currentArea", CURRENT_AREA_CODES),
+    currentRole: read("currentRole", CURRENT_ROLE_CODES),
+    educationStatus: read("educationStatus", EDUCATION_STATUS_CODES),
+    targetTasks: read("targetTasks", TARGET_TASKS_CODES),
     recommendedTrack: read("recommendedTrack", ["construction_expertise", "apartment_acceptance", "not_defined"] as const),
   };
 }
@@ -53,7 +51,7 @@ export class ConsultantKnowledgeResolver {
     // Stable content fingerprint, not a security hash. Changes invalidate the source version.
     let hash = 2166136261;
     for (const char of markdown.replace(/\r\n/g, "\n")) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-    this.sourceVersion = `inobr-artem-v2.2-${(hash >>> 0).toString(16)}`;
+    this.sourceVersion = `inobr-artem-v3.0-${(hash >>> 0).toString(16)}`;
   }
 
   resolve(input: ConsultantInput): ConsultantRetrievalPacket {
@@ -66,9 +64,10 @@ export class ConsultantKnowledgeResolver {
     const houseControl = diagnostic.program === "house_control" || (!houseAcceptance && ["вести стройк", "по этап", "сопровожден строительств", "строительн контрол ижс"].some(term => matches(question, term)));
     const choice = isConsultantChoiceQuestion(question);
     const hasTopic = !/погод|гороскоп/.test(question) && (choice || this.sections.some(section => section.keywords.some(keyword => matches(question, keyword))));
-    const school = diagnostic.educationType === "school_only" || matches(question, "у меня только аттестат") || matches(question, "у меня только школа");
-    const professional = ["higher_technical", "secondary_technical", "non_profile"].includes(diagnostic.educationType ?? "");
-    const explicitApartment = diagnostic.program === "apartment_acceptance" || (!diagnostic.program && diagnostic.goal === "apartment_acceptance") ||
+    const school = diagnostic.educationStatus === "no_higher_or_secondary_vocational" || matches(question, "у меня только аттестат") || matches(question, "у меня только школа");
+    const professional = ["higher", "secondary_vocational", "currently_studying"].includes(diagnostic.educationStatus ?? "");
+    const acceptanceChoice = diagnostic.program === "acceptance_choice" || diagnostic.targetTasks === "apartment_house_acceptance";
+    const explicitApartment = diagnostic.program === "apartment_acceptance" || acceptanceChoice ||
       ["хочу приемку квартир", "нужна приемка квартир", "только приемка квартир", "только принимать квартиры"].some(term => matches(question, term));
     const explicitHouse = matches(question, "ижс") && (matches(question, "мне нужен") || matches(question, "хочу")) &&
       ["контрол", "надзор", "приемк"].some(term => matches(question, term));
@@ -78,10 +77,12 @@ export class ConsultantKnowledgeResolver {
       required.add("admission"); required.add("comparison");
       if (stroyPriority) required.add("stroyexpert");
       if (explicitApartment) required.add("apartment_acceptance");
+      if (acceptanceChoice) required.add("house_acceptance");
     }
     if (houseAcceptance) required.add("house_acceptance");
     if (houseControl) required.add("house_control");
     if (explicitApartment) required.add("apartment_acceptance");
+    if (acceptanceChoice) required.add("house_acceptance");
     if (school) { required.add("school_restriction"); required.add("apartment_acceptance"); }
     const nonProfileQuestion = ["экономическ", "экономист", "непрофиль", "гуманитар", "педагог", "медицин"].some(term => matches(question, term));
     if (nonProfileQuestion && !school) {
@@ -103,9 +104,8 @@ export class ConsultantKnowledgeResolver {
         score += 1000; reason.push("school_guard_priority");
       }
       if (stroyPriority && section.id === "stroyexpert") { score += 30; reason.push("diagnostic_track_priority"); }
-      if (diagnostic.educationType === "non_profile" && section.id === "non_profile") { score += 5; reason.push("known_education"); }
-      if ((diagnostic.experienceArea === "no_experience" || diagnostic.experienceYears === "none") && section.id === "experience") { score += 5; reason.push("known_experience"); }
-      if ((diagnostic.goal === "apartment_acceptance" || diagnostic.recommendedTrack === "apartment_acceptance") && section.id === "apartment_acceptance") { score += 5; reason.push("known_track"); }
+      if (diagnostic.currentRole === "not_in_construction" && section.id === "experience") { score += 5; reason.push("known_experience"); }
+      if ((diagnostic.targetTasks === "apartment_house_acceptance" || diagnostic.recommendedTrack === "apartment_acceptance") && section.id === "apartment_acceptance") { score += 5; reason.push("known_track"); }
       return { section, score, reason, index };
     }).sort((a, b) => b.score - a.score || a.index - b.index);
     const selected = hasTopic ? ranked.filter(item => item.score > 0 &&
@@ -118,7 +118,7 @@ export class ConsultantKnowledgeResolver {
       }
     }
     const known = Object.entries(diagnostic).filter(([, value]) => value !== undefined).map(([key, value]) => `${key}=${value}`).join("; ");
-    const guard = school ? "school_only_no_dpo: Стройэксперт не рекомендовать; рассмотреть приёмку квартир." : "";
+    const guard = school ? "no_professional_education: Стройэксперт не рекомендовать; рассмотреть приёмку квартир." : "";
     return {
       matchedSections: selected.map(({ section, score, reason }) => ({
         id: section.id, title: section.title, content: section.content, score, reason,

@@ -5,15 +5,16 @@
  * API specification for AI Квалификатор ИНОБР
  * OpenAPI spec version: 0.3.0
  */
+import type { DiagnosticAnswersInputCurrentArea } from './diagnosticAnswersInputCurrentArea';
+import type { DiagnosticAnswersInputCurrentRole } from './diagnosticAnswersInputCurrentRole';
+import type { DiagnosticAnswersInputEducationStatus } from './diagnosticAnswersInputEducationStatus';
+import type { DiagnosticAnswersInputTargetTasks } from './diagnosticAnswersInputTargetTasks';
 
 export interface DiagnosticAnswersInput {
   conversationId: string;
-  experienceArea?: string;
-  experienceAreaRaw?: string;
-  experienceYears?: string;
-  experienceYearsRaw?: string;
-  educationType?: string;
-  educationTypeRaw?: string;
-  goal?: string;
-  goalRaw?: string;
+  current_area: DiagnosticAnswersInputCurrentArea;
+  current_area_other_text?: string;
+  current_role: DiagnosticAnswersInputCurrentRole;
+  education_status: DiagnosticAnswersInputEducationStatus;
+  target_tasks: DiagnosticAnswersInputTargetTasks;
 }

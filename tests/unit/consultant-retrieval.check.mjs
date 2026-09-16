@@ -25,7 +25,7 @@ const hooks = registerHooks({
 });
 try {
   const { ConsultantKnowledgeResolver, createConsultantSections } = await import(new URL("packages/domain/src/consultant/index.ts", root));
-  const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v2_2.md", root), "utf8");
+  const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3.md", root), "utf8");
   const resolver = new ConsultantKnowledgeResolver(markdown);
   const fixtures = JSON.parse(readFileSync(new URL("consultant-retrieval.fixtures.json", import.meta.url), "utf8"));
   for (const fixture of fixtures) {
@@ -38,7 +38,8 @@ try {
     assert.ok(JSON.stringify(result).length < markdown.length / 2);
     assert.deepEqual(result, resolver.resolve({ question: fixture.question }));
   }
-  const diagnosticContext = { experienceArea: "no_experience", experienceYears: "none", educationType: "non_profile", goal: "construction_expertise", recommendedTrack: "construction_expertise" };
+  const diagnosticContext = { currentArea: "construction_repair", currentRole: "foreman_master_site_specialist",
+    educationStatus: "higher", targetTasks: "defects_quality", recommendedTrack: "construction_expertise" };
   const priority = resolver.resolve({ question: "Сколько стоит обучение?", diagnosticContext });
   assert.ok(priority.matchedSections.some(s => s.id === "stroyexpert"));
   assert.ok(priority.contextSummary.includes("Приоритет — Стройэксперт"));
@@ -47,24 +48,26 @@ try {
   assert.equal(alternative.matchedSections[0].id, "house_control");
   assert.ok(!alternative.contextSummary.includes("Приоритет — Стройэксперт"));
   const { DiagnosticKnowledgeResolver } = await import(new URL("packages/domain/src/diagnostic/DiagnosticKnowledgeResolver.ts", root));
-  for (const [experienceArea, experienceYears, educationType, goal] of [
-    ["construction", "related_experience", "higher_technical", "research_only"],
-    ["no_experience", "none", "non_profile", "new_profession"],
-    ["construction", "more_than_10", "non_profile", "expand_services"],
-  ]) assert.equal(DiagnosticKnowledgeResolver.resolve({ experienceArea, experienceYears, educationType, goal }).recommendedTrackHint, "construction_expertise");
-  for (const educationType of ["higher_technical", "secondary_technical", "non_profile"]) {
-    for (const goal of ["extra_income", "new_profession", "expand_services", "research_only", "construction_expertise", "apartment_acceptance"]) {
-      const profile = { experienceArea: "no_experience", experienceYears: "none", educationType, goal };
-      const resolved = DiagnosticKnowledgeResolver.resolve(profile);
-      assert.equal(resolved.recommendedTrackHint, goal === "apartment_acceptance" ? "apartment_acceptance" : "construction_expertise");
+  for (const [current_area, current_role, education_status, target_tasks] of [
+    ["construction_repair", "foreman_master_site_specialist", "higher", "defects_quality"],
+    ["other", "not_in_construction", "secondary_vocational", "explore"],
+    ["real_estate_valuation_law", "valuer_lawyer_expert", "higher", "damage_loss"],
+  ]) assert.equal(DiagnosticKnowledgeResolver.resolve({ current_area, current_area_other_text: current_area === "other" ? "Другая сфера" : undefined,
+    current_role, education_status, target_tasks }).recommendedTrackHint, "construction_expertise");
+  for (const education_status of ["higher", "secondary_vocational", "currently_studying"]) {
+    for (const target_tasks of ["defects_quality", "damage_loss", "judicial_construction_expertise", "explore", "apartment_house_acceptance"]) {
+      const answers = { current_area: "construction_repair", current_role: "foreman_master_site_specialist", education_status, target_tasks };
+      const profile = { currentArea: answers.current_area, currentRole: answers.current_role, educationStatus: education_status,
+        targetTasks: target_tasks, recommendedTrack: target_tasks === "apartment_house_acceptance" ? "not_defined" : "construction_expertise" };
+      const resolved = DiagnosticKnowledgeResolver.resolve(answers);
+      assert.equal(resolved.recommendedTrackHint, target_tasks === "apartment_house_acceptance" ? null : "construction_expertise");
       const recommendation = resolver.resolve({ question: "Что мне подойдет?", diagnosticContext: profile });
-      assert.equal(recommendation.contextSummary.includes("Приоритет — Стройэксперт"), goal !== "apartment_acceptance");
+      assert.equal(recommendation.contextSummary.includes("Приоритет — Стройэксперт"), target_tasks !== "apartment_house_acceptance");
     }
   }
-  for (const educationType of ["school_only", "diploma_not_available", "need_clarification"]) {
-    assert.equal(DiagnosticKnowledgeResolver.resolve({ ...diagnosticContext, educationType }).recommendedTrackHint, null);
-  }
-  const school = resolver.resolve({ question: "Судебная экспертиза, заказы, клиенты, цены, Стройэксперт", diagnosticContext: { ...diagnosticContext, educationType: "school_only" } });
+  assert.equal(DiagnosticKnowledgeResolver.resolve({ current_area: "construction_repair", current_role: "foreman_master_site_specialist",
+    education_status: "no_higher_or_secondary_vocational", target_tasks: "defects_quality" }).recommendedTrackHint, "apartment_acceptance");
+  const school = resolver.resolve({ question: "Судебная экспертиза, заказы, клиенты, цены, Стройэксперт", diagnosticContext: { ...diagnosticContext, educationStatus: "no_higher_or_secondary_vocational" } });
   assert.ok(school.matchedSections.some(s => s.id === "school_restriction"));
   assert.ok(school.matchedSections.some(s => s.id === "apartment_acceptance"));
   assert.ok(!school.matchedSections.some(s => s.id === "stroyexpert"));
@@ -75,7 +78,7 @@ try {
   });
   for (const secret of ["Иван Петров", "+79999999999", "test@example.org", "@private_user", "PRIVATE_"]) assert.ok(!JSON.stringify(privateResult).includes(secret));
   assert.throws(() => resolver.resolve({ question: " " }), { code: "CONSULTANT_VALIDATION_ERROR" });
-  assert.throws(() => resolver.resolve({ question: "Привет", diagnosticContext: { educationType: "PRIVATE_VALUE" } }), { code: "CONSULTANT_VALIDATION_ERROR" });
+  assert.throws(() => resolver.resolve({ question: "Привет", diagnosticContext: { educationStatus: "PRIVATE_VALUE" } }), { code: "CONSULTANT_VALIDATION_ERROR" });
   assert.deepEqual(resolver.resolve({ question: "Погода на Марсе?" }).matchedSections.map(s => s.id), ["faq", "manager"]);
   const catalog = createConsultantSections(markdown);
   assert.equal(catalog.length, 22);

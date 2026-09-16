@@ -6,6 +6,7 @@ import { isConsultantChoiceQuestion } from "@workspace/domain/consultant";
 export const PROGRAM_NAMES: Record<ArtemProgram, string> = {
   construction_expertise: "Стройэксперт", apartment_acceptance: "Приёмка квартир",
   house_acceptance: "Приёмка ИЖС", house_control: "Строительный контроль ИЖС", house_unspecified: "ИЖС",
+  acceptance_choice: "Приёмка квартир и Приёмка ИЖС",
 };
 export const BENEFITS: Record<ArtemProgram, string> = {
   construction_expertise: "На программе можно учиться исследовать дефекты, работать с технической документацией и готовить экспертное заключение.",
@@ -13,12 +14,12 @@ export const BENEFITS: Record<ArtemProgram, string> = {
   house_acceptance: "Обучение посвящено разовым проверкам готового дома, оценке качества работ и фиксации недостатков.",
   house_control: "Можно осваивать сопровождение стройки по этапам, контроль подрядчиков, фиксацию дефектов и ведение документации.",
   house_unspecified: "Разовые проверки готовых домов и сопровождение стройки по этапам — разные задачи и программы.",
+  acceptance_choice: "«Приёмка квартир» — более простой первый этап, а «Приёмка ИЖС» посвящена более сложной проверке частного дома.",
 };
 export function diagnosticProgram(facts: DiagnosticFactsPacket): ArtemProgram {
-  const selected = explicitProgram(facts.rawAnswers.goal ?? "") ??
-    (facts.recommendedTrackHint === "apartment_acceptance" || /приёмк.*квартир/i.test(facts.goal) ? "apartment_acceptance" :
-      facts.guards.length ? "apartment_acceptance" : "construction_expertise");
-  return facts.guards.length && selected === "construction_expertise" ? "apartment_acceptance" : selected;
+  if (facts.answerCodes.educationStatus === "no_higher_or_secondary_vocational") return "apartment_acceptance";
+  if (facts.answerCodes.targetTasks === "apartment_house_acceptance") return "acceptance_choice";
+  return "construction_expertise";
 }
 export function currentProgram(initial: ArtemProgram, question: string, history: ConsultantExchange[]): ArtemProgram {
   let selected = initial;
@@ -40,7 +41,7 @@ export function contactRefused(question: string, history: ConsultantExchange[]):
 export function commercialText(markdown: string, program: ArtemProgram, question = ""): string {
   const commercial = knowledgeSections(markdown).get(12)!;
   const title = PROGRAM_NAMES[program];
-  if (program === "house_unspecified") return "Сначала нужно уточнить, речь о разовых проверках домов или сопровождении стройки: это разные программы.";
+  if (program === "house_unspecified" || program === "acceptance_choice") return "Сначала нужно уточнить, речь о приёмке квартиры или проверке частного дома: это разные программы.";
   const block = commercial.split("### " + title + "\n")[1]?.split("\n### ")[0] ?? "";
   const rows = block.split("\n").filter(line => line.startsWith("|") && /₽/.test(line)).map(line =>
     line.split("|").slice(1, -1).map(cell => cell.trim()));
@@ -89,8 +90,8 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
   if (/образован|поступ|аттестат|диплома.*нет|диплом не|экономическ.*диплом/.test(q)) {
     if (/иностран|зарубеж/.test(q + education)) return "По иностранному диплому нужна индивидуальная проверка. Признание документа заранее обещать нельзя; менеджер организует проверку.";
     if (/учусь|студент|получаю.*образован/.test(q + education)) return "Если вы сейчас учитесь в колледже или вузе, вариант с переподготовкой можно проверить отдельно. Менеджер уточнит порядок зачисления и выдачи диплома.";
-    if (/school_only|только (?:школ|аттестат)/.test(education + q)) return "Для «Стройэксперта» нужно СПО или высшее образование. Если сейчас у вас только школа, можно рассмотреть «Приёмку квартир» — осмотр и фиксацию дефектов; это не переподготовка строительного эксперта.";
-    if (/diploma_not_available|need_clarification/.test(education) || /диплома.*нет|диплом не/.test(q)) {
+    if (/no_higher_or_secondary_vocational|только (?:школ|аттестат)/.test(education + q)) return "Для «Стройэксперта» нужно СПО или высшее образование. Если сейчас у вас только школа, можно рассмотреть «Приёмку квартир» — осмотр и фиксацию дефектов; это не переподготовка строительного эксперта.";
+    if (/currently_studying/.test(education) || /диплома.*нет|диплом не/.test(q)) {
       if (!/окончил|получил|есть.*(?:спо|высшее)/.test(q + userHistory)) return "Вы окончили колледж или вуз, просто диплома сейчас нет под рукой, или такого образования нет?";
     }
     if (program === "construction_expertise") return "Для поступления на «Стройэксперт» достаточно СПО или высшего образования любого профиля. Строительный опыт не обязателен. Если образование получено, а документа нет под рукой, порядок подтверждения уточнит менеджер.";

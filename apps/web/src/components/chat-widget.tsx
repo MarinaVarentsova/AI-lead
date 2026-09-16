@@ -5,10 +5,6 @@ import inobrLogo from "@assets/image_1782127452755.png";
 import {
   useCreateSession,
   useCreateConversation,
-  useSaveDiagnosticAnswers,
-  useGetDictionary,
-  getGetDictionaryQueryKey,
-  GetDictionaryType,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,6 +16,7 @@ import {
   completeDiagnostic, DIAGNOSTIC_ERROR,
   type DiagnosticPayload, type DiagnoseResponse, type StructuredDiagnosticResult,
 } from "@/lib/diagnostic-result";
+import { getDiagnosticSchema, type DiagnosticSchemaQuestion } from "@/lib/diagnostic-schema";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -39,52 +36,6 @@ type DiagnosticAnswer = {
 type ContactPhase = "channel" | "details" | "submitted";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const QUESTIONS = [
-  { id: "q1", key: "experience_area" as GetDictionaryType },
-  { id: "q2", key: "experience_years" as GetDictionaryType },
-  { id: "q3", key: "education" as GetDictionaryType },
-  { id: "q4", key: "goals" as GetDictionaryType },
-] as const;
-
-// Короткие отображаемые метки чипов (код из БД не меняется)
-const DISPLAY_LABELS: Record<string, string> = {
-  // experience_area
-  construction: "Строительство",
-  design: "Проектирование / сметы",
-  supervision: "Технадзор / стройконтроль",
-  legal_expertise: "Юриспруденция / оценка",
-  no_experience: "Опыта пока нет",
-  other: "Другое",
-  // experience_years
-  none: "Нет опыта",
-  up_to_3: "До 3 лет",
-  from_3_to_10: "3–10 лет",
-  more_than_10: "Более 10 лет",
-  related_experience: "Смежный опыт",
-  need_clarification: "Нужно уточнить",
-  // education
-  higher_technical: "Высшее техническое",
-  secondary_technical: "Среднее техническое",
-  non_profile: "Непрофильное",
-  school_only: "Только школа",
-  diploma_not_available: "Диплом есть, но не на руках",
-  // goals
-  extra_income: "Дополнительный доход",
-  new_profession: "Новая профессия",
-  expand_services: "Расширить услуги",
-  apartment_acceptance: "Приемка квартир",
-  construction_expertise: "Строительная экспертиза",
-  research_only: "Пока изучаю",
-};
-
-// Фиксированные тексты вопросов диагностики (только вопрос, без вариантов)
-const QUESTION_TEXTS = [
-  "С какой сферой связан ваш опыт?",
-  "Какой у вас стаж?",
-  "Какое у вас образование?",
-  "Какая цель вам ближе?",
-];
 
 const CONTACT_CHANNELS = [
   { code: "call", label: "Звонок", placeholder: "Ваш номер телефона", type: "tel" },
@@ -179,6 +130,8 @@ export function ChatWidget() {
   const [customInput, setCustomInput] = useState("");
   const [activeCustomQ, setActiveCustomQ] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState(false);
+  const [diagnosticSchema, setDiagnosticSchema] = useState<DiagnosticSchemaQuestion[]>([]);
+  const [schemaLoading, setSchemaLoading] = useState(true);
 
   const [diagnosticStatus, setDiagnosticStatus] = useState<"idle" | "loading" | "error" | "success">("idle");
   const [diagnosticResult, setDiagnosticResult] = useState<DiagnoseResponse | null>(null);
@@ -220,34 +173,21 @@ export function ChatWidget() {
 
   const createSession = useCreateSession();
   const createConversation = useCreateConversation();
-  const saveDiagnosticAnswers = useSaveDiagnosticAnswers();
-
-  // Current question index (0-based) for chip loading
   const currentQIndex = step >= 2 && step <= 5 ? step - 2 : 0;
-  const dictionaryType = QUESTIONS[currentQIndex]?.key;
-
-  const { data: currentDictionary, isLoading: isDictLoading } = useGetDictionary(
-    { type: dictionaryType },
-    {
-      query: {
-        queryKey: getGetDictionaryQueryKey({ type: dictionaryType }),
-        enabled: step >= 2 && step <= 5,
-      },
-    }
-  );
 
   useEffect(() => {
     if (questionFocusGate.current.afterOptionsRender(
       currentQIndex,
-      isDictLoading,
-      currentDictionary?.length ?? 0,
+      schemaLoading,
+      diagnosticSchema[currentQIndex]?.options.length ?? 0,
     )) {
       showNextStep("question");
     }
-  }, [currentQIndex, currentDictionary, isDictLoading]);
+  }, [currentQIndex, diagnosticSchema, schemaLoading]);
 
   // Create session on mount
   useEffect(() => {
+    getDiagnosticSchema().then(setDiagnosticSchema).catch(() => setSessionError(true)).finally(() => setSchemaLoading(false));
     createSession.mutate(undefined, {
       onSuccess: (data) => setSessionId(data.sessionId),
       onError: () => setSessionError(true),
@@ -291,7 +231,7 @@ export function ChatWidget() {
   // ─── Welcome → Q1 ──────────────────────────────────────────────────────────
 
   const handleBeginQuestions = () => {
-    if (!sessionId) return;
+    if (!sessionId || diagnosticSchema.length !== 4) return;
     showNextStep();
     setIsTyping(true);
 
@@ -307,7 +247,7 @@ export function ChatWidget() {
           ]);
           setIsTyping(false);
           // Показываем Q1 напрямую — без вызова OpenAI
-          addBotMessage(QUESTION_TEXTS[0]);
+          addBotMessage(diagnosticSchema[0]?.questionText ?? "");
           setStep(2);
           showNextStep("question", false);
         },
@@ -324,7 +264,7 @@ export function ChatWidget() {
   const handleOptionSelect = (qIndex: number, code: string, displayName: string, isCustom: boolean) => {
     if (isCustom) {
       showNextStep();
-      setActiveCustomQ(QUESTIONS[qIndex].id);
+      setActiveCustomQ(`q${qIndex + 1}`);
       setCustomInput("");
       return;
     }
@@ -344,9 +284,7 @@ export function ChatWidget() {
     showNextStep("result");
     setDiagnosticStatus("loading");
     try {
-      const response = await completeDiagnostic(payload, (data) =>
-        saveDiagnosticAnswers.mutateAsync({ data }),
-      );
+      const response = await completeDiagnostic(payload);
       setDiagnosticResult(response);
       setDiagnosticStatus("success");
       showNextStep("result", false);
@@ -362,27 +300,25 @@ export function ChatWidget() {
     // Synchronous guards also cover repeated clicks before React re-renders.
     if (!conversationId || diagnosticBusy.current || qIndex !== answeredCount.current) return;
     answeredCount.current++;
-    const q = QUESTIONS[qIndex];
-    const newAnswer: DiagnosticAnswer = { questionNumber: qIndex + 1, questionKey: q.key, code, raw };
+    const q = diagnosticSchema[qIndex];
+    if (!q) return;
+    const newAnswer: DiagnosticAnswer = { questionNumber: q.questionNumber, questionKey: q.field, code, raw };
     const allAnswers = [...answers, newAnswer];
     setAnswers(allAnswers);
     setMessages((prev) => [...prev, { id: uid(), role: "user", content: raw }]);
     setStep(qIndex + 3);
 
-    if (qIndex < QUESTIONS.length - 1) {
+    if (qIndex < diagnosticSchema.length - 1) {
       questionFocusGate.current.afterAnswer(qIndex + 1);
-      addBotMessage(QUESTION_TEXTS[qIndex + 1]);
+      addBotMessage(diagnosticSchema[qIndex + 1]?.questionText ?? "");
     } else {
       void generateResult({
         conversationId,
-        experienceArea: allAnswers[0].code,
-        experienceAreaRaw: allAnswers[0].raw,
-        experienceYears: allAnswers[1].code,
-        experienceYearsRaw: allAnswers[1].raw,
-        educationType: allAnswers[2].code,
-        educationTypeRaw: allAnswers[2].raw,
-        goal: allAnswers[3].code,
-        goalRaw: allAnswers[3].raw,
+        current_area: allAnswers[0].code,
+        ...(allAnswers[0].code === "other" ? { current_area_other_text: allAnswers[0].raw } : {}),
+        current_role: allAnswers[1].code,
+        education_status: allAnswers[2].code,
+        target_tasks: allAnswers[3].code,
       });
     }
   };
@@ -455,11 +391,12 @@ export function ChatWidget() {
   // ─── Chips renderer ─────────────────────────────────────────────────────────
 
   const renderChips = (qIndex: number) => {
-    const q = QUESTIONS[qIndex];
+    const q = diagnosticSchema[qIndex];
+    if (!q) return null;
     if (step !== qIndex + 2) return null;
     if (isTyping) return null;
 
-    if (isDictLoading) {
+    if (schemaLoading) {
       return (
         <motion.div
           initial={{ opacity: 0 }}
@@ -472,7 +409,7 @@ export function ChatWidget() {
       );
     }
 
-    const dictItems = currentDictionary || [];
+    const dictItems = q.options;
 
     return (
       <motion.div
@@ -481,12 +418,12 @@ export function ChatWidget() {
         className="flex flex-wrap gap-2 mt-4 px-4"
       >
         {dictItems.map((opt) => {
-          const label = DISPLAY_LABELS[opt.code] ?? opt.name;
+          const label = opt.label;
           return (
             <button
               key={opt.code}
-              data-testid={`chip-${q.id}-${opt.code}`}
-              onClick={() => handleOptionSelect(qIndex, opt.code, label, false)}
+              data-testid={`chip-q${q.questionNumber}-${opt.code}`}
+              onClick={() => handleOptionSelect(qIndex, opt.code, label, opt.allowsFreeText)}
               aria-label={label}
               className="min-h-[44px] px-4 py-2 text-sm font-medium rounded-xl border-2 border-primary text-primary bg-white transition-all duration-150 hover:bg-secondary hover:text-primary active:bg-primary active:text-primary-foreground"
             >
@@ -495,20 +432,7 @@ export function ChatWidget() {
           );
         })}
 
-        <button
-          data-testid={`chip-${q.id}-other`}
-          onClick={() => handleOptionSelect(qIndex, "other", "Другое", true)}
-          aria-label="Другой вариант"
-          className={`min-h-[44px] px-4 py-2 text-sm font-medium rounded-xl border-2 transition-all duration-150 ${
-            activeCustomQ === q.id
-              ? "border-primary bg-primary text-primary-foreground"
-              : "border-primary text-primary bg-white hover:bg-secondary"
-          }`}
-        >
-          Другое
-        </button>
-
-        {activeCustomQ === q.id && (
+        {activeCustomQ === `q${q.questionNumber}` && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
@@ -516,7 +440,7 @@ export function ChatWidget() {
           >
             <div className="relative">
               <Textarea
-                data-testid={`input-${q.id}-custom`}
+                data-testid={`input-q${q.questionNumber}-custom`}
                 value={customInput}
                 onChange={(e) => setCustomInput(e.target.value)}
                 placeholder="Напишите ваш вариант..."

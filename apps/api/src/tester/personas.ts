@@ -1,4 +1,4 @@
-import { DiagnosticKnowledgeResolver, type DiagnosticAnswers, EDUCATION_TYPE_CODES, EXPERIENCE_YEARS_CODES } from "@workspace/domain/diagnostic";
+import { DiagnosticKnowledgeResolver, type DiagnosticAnswers, EDUCATION_STATUS_CODES } from "@workspace/domain/diagnostic";
 export interface Persona { label: string; answers: DiagnosticAnswers; questions: string[] }
 export function validateRunCount(value: unknown): number {
   if (!Number.isInteger(value) || (value as number) < 1 || (value as number) > 10) throw new Error("INVALID_CASE_COUNT");
@@ -7,33 +7,29 @@ export function validateRunCount(value: unknown): number {
 export function generatePersonas(count: number, random = Math.random): Persona[] {
   validateRunCount(count);
   const pick = <T>(items: readonly T[]) => items[Math.floor(random() * items.length)]!;
-  const templates = [
-    ["Опытный строитель", "construction", "more_than_10", "higher_technical", "expand_services", "Я уже много лет строитель. Зачем мне учиться?"],
-    ["Непрофильный диплом", "other", "related_experience", "non_profile", "new_profession", "Можно ли поступить с экономическим дипломом?"],
-    ["Без строительного опыта", "no_experience", "none", "non_profile", "new_profession", "У меня нет строительного опыта. Получится освоить программу?"],
-    ["Проектировщик", "design", "from_3_to_10", "higher_technical", "expand_services", "Как экспертная работа дополнит мои услуги проектирования?"],
-    ["Юрист или оценщик", "legal_expertise", "related_experience", "non_profile", "extra_income", "Можно потом работать судебным экспертом?"],
-    ["Только аттестат", "no_experience", "none", "school_only", "construction_expertise", "У меня только аттестат. Что мне выбрать?"],
-    ["Только приёмка квартир", "construction", "up_to_3", "secondary_technical", "apartment_acceptance", "Хочу только приёмку квартир. Чем она отличается от Стройэксперта?"],
-    ["ИЖС", "supervision", "more_than_10", "secondary_technical", "expand_services", "Мне нужен строительный контроль ИЖС: длительно сопровождать стройку по этапам."],
-    ["Пока изучает", "construction", "related_experience", "higher_technical", "research_only", "Кем быть в итоге, что выбрать?"],
-    ["Дополнительная деятельность", "other", "up_to_3", "secondary_technical", "extra_income", "Где брать заказы после обучения?"],
+  const templates: [string, string, string, string, string, string][] = [
+    ["Строитель: дефекты", "construction_repair", "foreman_master_site_specialist", "higher", "defects_quality", "Как обучение поможет работать с дефектами?"],
+    ["Проектировщик", "design_estimates", "engineer_designer_estimator", "secondary_vocational", "judicial_construction_expertise", "Что даст программа проектировщику?"],
+    ["Строительный контроль", "construction_control", "manager_owner", "higher", "defects_quality", "Как расширить задачи в контроле качества?"],
+    ["Оценщик ущерба", "real_estate_valuation_law", "valuer_lawyer_expert", "higher", "damage_loss", "Подходит ли программа для оценки ущерба?"],
+    ["Не в строительстве", "other", "not_in_construction", "secondary_vocational", "explore", "С чего начать без строительной практики?"],
+    ["Сейчас учится", "other", "not_in_construction", "currently_studying", "defects_quality", "Можно ли начать обучение сейчас?"],
+    ["Без СПО и высшего", "other", "not_in_construction", "no_higher_or_secondary_vocational", "judicial_construction_expertise", "Что доступно с моим образованием?"],
+    ["Приёмка объектов", "construction_repair", "foreman_master_site_specialist", "secondary_vocational", "apartment_house_acceptance", "Хочу заниматься приёмкой квартир и домов. Что выбрать?"],
+    ["Судебное направление", "real_estate_valuation_law", "valuer_lawyer_expert", "higher", "judicial_construction_expertise", "Можно потом работать судебным экспертом?"],
+    ["Пока изучает", "design_estimates", "engineer_designer_estimator", "higher", "explore", "Что мне выбрать?"],
   ];
-  // Shuffle without replacement: each ten-case run covers all ten scenario families.
-  for (let i = templates.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [templates[i], templates[j]] = [templates[j]!, templates[i]!]; }
-  return templates.slice(0, count).map((t, i) => {
-    const [label, experienceArea, experienceYears, educationType, goal, first] = t as [string,string,string,string,string,string];
-    const answers = { experienceArea, experienceYears, educationType, goal };
-    if (["Опытный строитель", "Проектировщик", "ИЖС", "Пока изучает"].includes(label)) {
-      answers.educationType = pick(["higher_technical", "secondary_technical", "non_profile"]);
-    }
-    if (["Проектировщик", "Юрист или оценщик"].includes(label)) answers.experienceYears = pick(["related_experience", "from_3_to_10", "more_than_10"]);
-    if (label === "Дополнительная деятельность") { answers.educationType = pick(EDUCATION_TYPE_CODES); answers.experienceYears = pick(EXPERIENCE_YEARS_CODES); }
+  for (let i = templates.length - 1; i >= 1; i--) { const j = Math.floor(random() * (i + 1)); [templates[i], templates[j]] = [templates[j]!, templates[i]!]; }
+  return templates.slice(0, count).map((template, index) => {
+    const [label, current_area, current_role, defaultEducation, target_tasks, first] = template;
+    const education_status = label === "Пока изучает" ? pick(EDUCATION_STATUS_CODES) : defaultEducation;
+    const answers: DiagnosticAnswers = { current_area, current_role, education_status, target_tasks,
+      ...(current_area === "other" ? { current_area_other_text: label === "Сейчас учится" ? "Другая сфера" : "Профессиональная сфера вне строительства" } : {}) };
     DiagnosticKnowledgeResolver.resolve(answers);
-    const questions = [label === "ИЖС" && random() < .5 ? "Мне нужна разовая проверка частного дома перед покупкой, а не сопровождение стройки." : first];
+    const questions: string[] = [first];
     const total = 1 + Math.floor(random() * 3);
     if (total >= 2) questions.push(pick(["Сколько стоит это обучение и есть ли рассрочка?", "Какой документ выдаётся?", "Можно ли рассчитывать на трудоустройство?", "Как искать первых клиентов?"]));
-    if (total === 3) questions.push(i % 3 === 0 ? "Вы гарантируете заказы и доход после обучения?" : pick(["Дорого. В чём практическая польза для моей ситуации?", "Я пока подумаю.", "Что мне выбрать с учётом моего опыта?"]));
+    if (total === 3) questions.push(index % 3 === 0 ? "Вы гарантируете заказы и доход после обучения?" : pick(["Дорого. В чём практическая польза?", "Я пока подумаю.", "Что мне выбрать?"]));
     return { label, answers, questions };
   });
 }

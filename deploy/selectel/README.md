@@ -20,7 +20,7 @@
 
 - Node.js 24; рабочая директория — корень проекта либо `apps/api`.
 - Сохранять весь каталог `apps/api/dist`: сборка содержит дополнительные файлы Pino.
-- Поставлять `knowledge/inobr/knowledge_base_inobr_ai_consultant_v1.md` вместе с приложением.
+- Поставлять `knowledge/inobr/artem_unified_knowledge_base_v3.md` вместе с приложением.
 - PORT и DATABASE_URL передаются через окружение; LOG_LEVEL опционален.
 - KNOWLEDGE_BASE_SOURCE=file; OPENAI_API_KEY пока нужен для существующих AI-маршрутов.
 - Переменные Yandex появятся после реализации соответствующего адаптера.

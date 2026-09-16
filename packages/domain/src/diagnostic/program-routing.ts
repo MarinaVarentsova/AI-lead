@@ -1,4 +1,4 @@
-export type ArtemProgram = "construction_expertise" | "apartment_acceptance" | "house_acceptance" | "house_control" | "house_unspecified";
+export type ArtemProgram = "construction_expertise" | "apartment_acceptance" | "house_acceptance" | "house_control" | "house_unspecified" | "acceptance_choice";
 
 /** Explicit user goals override the entry product; seniority never selects a product. */
 export function explicitProgram(value: string): ArtemProgram | undefined {

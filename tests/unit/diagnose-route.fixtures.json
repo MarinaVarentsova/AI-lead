@@ -1,25 +1,22 @@
 {
   "conversationId": "11111111-1111-4111-8111-111111111111",
   "row": {
-    "experienceArea": "construction",
-    "experienceAreaRaw": "Строительство",
-    "experienceYears": "more_than_10",
-    "experienceYearsRaw": "Более 10 лет",
-    "educationType": "non_profile",
-    "educationTypeRaw": "Непрофильное высшее образование",
-    "goal": "construction_expertise",
-    "goalRaw": "Строительная экспертиза"
+    "currentArea": "construction_repair",
+    "currentAreaOtherText": null,
+    "currentRole": "foreman_master_site_specialist",
+    "educationStatus": "higher",
+    "targetTasks": "defects_quality"
   },
   "validResult": {
-    "summary": "Вы рассматриваете строительную экспертизу с опытом работы в строительстве.",
-    "experience": "У вас есть практический опыт в строительстве.",
-    "experienceYears": "Ваш стаж превышает десять лет.",
-    "education": "Непрофильное высшее образование не препятствует поступлению на программу «Стройэксперт».",
-    "goal": "Ваша цель — строительная экспертиза.",
-    "recommendation": "Под вашу задачу подходит «Стройэксперт». У вас есть опыт в строительстве или ремонте. Ваша цель — строительная экспертиза. На программе можно осваивать исследование дефектов и подготовку заключения. Для уточнения тарифа нажмите «Связаться с менеджером».",
+    "summary": "Вы хотите работать с дефектами в строительстве.",
+    "currentArea": "Ваша текущая сфера — Строительство и ремонт.",
+    "currentRole": "Ваша роль — прораб, мастер или специалист на объекте.",
+    "education": "У вас высшее образование.",
+    "targetTasks": "Вы хотите работать с задачами: дефекты и качество строительных работ.",
+    "recommendation": "Стройэксперт подходит под вашу задачу. Ваша текущая сфера — Строительство и ремонт. Вы хотите работать с задачами: дефекты и качество строительных работ. На программе можно изучать дефекты и подготовку заключения. Для условий нажмите «Связаться с менеджером».",
     "recommendedTrack": "construction_expertise",
     "importantNote": null
   },
-  "factsPacketKeys": ["sourceVersion", "experience", "experienceYears", "education", "goal", "rawAnswers", "guards", "recommendedTrackHint"],
-  "expectedSourceVersion": "inobr-artem-v2.2"
+  "factsPacketKeys": ["sourceVersion", "currentArea", "currentRole", "education", "targetTasks", "rawAnswers", "answerCodes", "guards", "recommendedTrackHint"],
+  "expectedSourceVersion": "inobr-artem-v3.0"
 }

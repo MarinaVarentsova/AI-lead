@@ -8,22 +8,21 @@ import { DiagnosticAIError, hasSchoolGuard, validateDiagnosticResult,
 export function generateDiagnosticFallback(facts: DiagnosticFactsPacket): DiagnosticAIResult {
   const school = hasSchoolGuard(facts);
   const program = diagnosticProgram(facts);
-  const uncertain = !school && facts.recommendedTrackHint === null;
+  const conditional = facts.answerCodes.educationStatus === "currently_studying";
   const title = PROGRAM_NAMES[program];
   const conclusion = school ? "Если сейчас у вас только школьное образование, можно рассмотреть «Приёмку квартир»: для «Стройэксперта» нужно СПО или высшее образование." :
-    program === "house_unspecified" ? "По вашему интересу к ИЖС пока возможен условный выбор направления." :
-    uncertain && program === "construction_expertise" ? "Если СПО или высшее образование получено, можно рассмотреть «Стройэксперт»; статус диплома нужно уточнить." :
+    program === "acceptance_choice" ? "Вам можно рассмотреть два направления — «Приёмка квартир» и «Приёмка ИЖС»." :
+    conditional ? "По вашей задаче можно рассмотреть «Стройэксперт» и начать обучение уже сейчас; выпускные документы выдаются после предъявления оконченного диплома СПО или высшего образования." :
     `Под вашу задачу можно рассмотреть «${title}».`;
-  const next = program === "house_unspecified" ? "После заключения можно уточнить, интересуют ли вас разовые проверки или сопровождение стройки." :
-    uncertain && program === "construction_expertise" ? "После заключения можно уточнить, получено ли образование или только нет документа под рукой." :
+  const next = program === "acceptance_choice" ? "После заключения можно уточнить, хотите ли вы начать с квартир или сразу работать с частными домами." :
     "Для уточнения программы и условий нажмите «Связаться с менеджером».";
   return {
     summary: "Ваше персональное заключение после четырёх ответов.",
-    experience: facts.experience, experienceYears: facts.experienceYears, education: facts.education, goal: facts.goal,
-    recommendation: [conclusion, facts.experience, facts.goal, BENEFITS[program], school ? "Приёмка квартир не заменяет переподготовку строительного эксперта." : "", next].filter(Boolean).join(" "),
+    currentArea: facts.currentArea, currentRole: facts.currentRole, education: facts.education, targetTasks: facts.targetTasks,
+    recommendation: [conclusion, facts.education, facts.targetTasks, BENEFITS[program], school ? "Приёмка квартир не заменяет переподготовку строительного эксперта." : "", next].filter(Boolean).join(" "),
     recommendedTrack: facts.recommendedTrackHint ?? "not_defined",
-    importantNote: school ? "Для «Стройэксперта» требуется СПО или высшее образование; если вы сейчас учитесь, порядок зачисления уточнит менеджер." :
-      /иностран|зарубеж/i.test(facts.rawAnswers.educationType ?? "") ? "Документ требует индивидуальной проверки; признание заранее не обещается." : null,
+    importantNote: school ? "Для «Стройэксперта» требуется СПО или высшее образование." : conditional
+      ? "Выпускные документы выдаются после предъявления оконченного диплома СПО или высшего образования." : null,
   };
 }
 export interface DiagnosticResultOutcome {

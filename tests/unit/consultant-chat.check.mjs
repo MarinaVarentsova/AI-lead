@@ -159,12 +159,12 @@ try {
   assert.ok(examples[1].answer.includes("образования любого профиля"));
   assert.ok(examples[2].answer.includes("Автоматического назначения"));
   assert.ok(examples[3].answer.includes("Институт не гарантирует"));
-  const school = await run({ row: { ...fixture.row, educationType: "school_only" } });
+  const school = await run({ row: { ...fixture.row, educationStatus: "no_higher_or_secondary_vocational" } });
   assert.ok(school.message.includes("Приёмка квартир"));
   for (const message of ["", " ", null, "a".repeat(4001)]) await run({ message, status: 400 });
   await run({ conversationId: "invalid", status: 400 });
   await run({ row: null, status: 404 });
-  await run({ row: { ...fixture.row, goal: null }, status: 400 });
+  await run({ row: { ...fixture.row, targetTasks: null }, status: 400 });
   const ai = await run({ aiReply: "Стоимость зависит от выбранного тарифа и состава программы. Предусмотрена рассрочка на шесть месяцев." });
   assert.equal(ai.isAI, true);
   await run({ message: "Меня зовут Иван Петров. +79999999999 test@example.org @private_user. Сколько стоит обучение?",
@@ -184,21 +184,22 @@ try {
   assert.ok(persisted.length >= 8);
   assert.deepEqual(persisted.slice(0, 8).map(row => row.role), ["user", "assistant", "user", "assistant", "user", "assistant", "user", "assistant"]);
   assert.ok(persisted.slice(0, 8).every(row => row.conversationId === fixture.conversationId && row.step === "post_diagnostic_chat"));
-  const qualified = { ...fixture.row, educationType: "non_profile", goal: "research_only" };
+  const qualified = { ...fixture.row, educationStatus: "higher", targetTasks: "explore" };
   for (const message of ["что выбрать", "что мне выбрать", "кем быть", "кем стать", "какое направление", "какой курс", "что подходит", "что лучше для меня", "куда идти", "что в итоге выбрать", "кем быть в итоге что выбрать?"]) {
     const choice = await run({ message, row: qualified });
     assert.notEqual(choice.fallbackReason, "INSUFFICIENT_KNOWLEDGE");
     assert.ok(choice.message.includes("рассмотреть «Стройэксперт»"));
     for (const id of ["stroyexpert", "admission", "comparison"]) assert.ok(choice.matchedSectionIds.includes(id));
   }
-  const apartmentChoice = await run({ row: { ...qualified, goal: "apartment_acceptance", goalRaw: "Приёмка квартир" }, message: "что выбрать" });
-  assert.ok(!apartmentChoice.message.includes("рассмотреть «Стройэксперт»"));
+  const apartmentChoice = await run({ row: { ...qualified, targetTasks: "apartment_house_acceptance" }, message: "что выбрать" });
+  assert.ok(apartmentChoice.message.includes("Приёмка квартир"));
+  assert.ok(apartmentChoice.message.includes("Приёмка ИЖС"));
   assert.ok(apartmentChoice.matchedSectionIds.includes("apartment_acceptance"));
   const first = await run({ row: qualified });
   assert.ok(!first.message.includes("Если хотите"));
   const history = [{ role: "user", message: "Сколько стоит обучение?" }, { role: "assistant", message: first.message }];
   const second = await run({ row: qualified, history });
-  assert.ok(!second.message.includes("Если хотите"), "No mechanical second-turn CTA in v2.2");
+  assert.ok(!second.message.includes("Если хотите"), "No mechanical second-turn CTA in v3");
   const third = await run({ row: qualified, history: [...history, { role: "assistant", message: second.message }] });
   assert.ok(!third.message.includes("Если хотите"));
   const refusal = await run({ row: qualified, history, message: "Не хочу оставлять контакт. Сколько стоит обучение?" });
@@ -206,13 +207,13 @@ try {
   const offTopic = await run({ row: qualified, history, message: "Какая погода завтра?" });
   assert.equal(offTopic.fallbackReason, "INSUFFICIENT_KNOWLEDGE");
   assert.equal(captured, undefined);
-  const schoolChoice = await run({ row: { ...qualified, educationType: "school_only" }, message: "что выбрать" });
+  const schoolChoice = await run({ row: { ...qualified, educationStatus: "no_higher_or_secondary_vocational" }, message: "что выбрать" });
   assert.ok(!schoolChoice.message.includes("рассмотреть «Стройэксперт»"));
   assert.ok(schoolChoice.matchedSectionIds.includes("apartment_acceptance"));
   const completeHistory = [1,2].flatMap(n => [{ id: `u${n}`, role: "user", message: "Цена?" }, { id: `a${n}`, role: "assistant", message: "Ответ по программе." }]);
   const finalReply = await run({ row: qualified, history: completeHistory });
   assert.equal(finalReply.questionsUsed, 3); assert.equal(finalReply.limitReached, true);
-  assert.ok(!finalReply.message.includes("Дальше можно продолжить с менеджером"), "No mechanical third-turn CTA in v2.2");
+  assert.ok(!finalReply.message.includes("Дальше можно продолжить с менеджером"), "No mechanical third-turn CTA in v3");
   await run({ row: qualified, history: [...completeHistory, { role: "user", message: "Третий" }, { role: "assistant", message: "Третий ответ" }], status: 409 });
   const beforeFailedPair = persisted.length;
   await run({ row: qualified, assistantFailure: true, status: 500 });
@@ -232,11 +233,11 @@ try {
   try {
     const knowledgeDir = path.join(packaged, "knowledge");
     mkdirSync(knowledgeDir);
-    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v2_2.md", root), "utf8");
-    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v2_2.md"), markdown);
+    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3.md", root), "utf8");
+    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v3.md"), markdown);
     assert.equal(await loadArtemKnowledge(pathToFileURL(path.join(packaged, "index.mjs")).href), markdown);
     assert.ok(readFileSync(new URL("apps/api/build.mjs", root), "utf8")
-      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v2_2.md")'));
+      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v3.md")'));
   } finally {
     rmSync(packaged, { recursive: true, force: true });
   }
@@ -271,7 +272,7 @@ try {
     if (evaluatorAttempts === 1 || evaluatorAttempts === 3 || evaluatorAttempts === 4 || evaluatorAttempts === 5) throw new Error("Evaluator unavailable");
     return good;
   };
-  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v2_2.md", root), "utf8"), fakeProvider);
+  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3.md", root), "utf8"), fakeProvider);
   const productionBefore = persisted.length;
   const savedCases = [], progress = [];
   const summary = await runTester(2, runtime, { async saveCase(c) { savedCases.push(c); }, async progress(n) { progress.push(n); }, async finish() {} }, personas.slice(0, 2), { sleep: async () => {} });
@@ -338,7 +339,7 @@ try {
     return Response.json({ choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ message: "Проверочный ответ консультанта." }) } }] });
   };
   const provider = new YandexAIProvider({ AI_PROVIDER: "yandex", YANDEX_AI_BASE_URL: "https://example.invalid/v1", YANDEX_AI_API_KEY: "test-only", YANDEX_AI_MODEL: "gpt://test/model/latest" });
-  await provider.generateConsultantReply({ question: "Сколько стоит обучение? @private_user", diagnosticContext: "educationType=non_profile",
+  await provider.generateConsultantReply({ question: "Сколько стоит обучение? @private_user", diagnosticContext: "educationStatus=higher",
     matchedSections: [{ id: "prices", title: "Цена", content: "Только выбранная секция" }], contact: "PRIVATE_CONTACT", markdown: "PRIVATE_FULL_KB" });
   assert.ok(!JSON.stringify(outbound).includes("PRIVATE_"));
   assert.ok(!JSON.stringify(outbound).includes("@private_user"));

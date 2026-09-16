@@ -19,7 +19,7 @@ router.post("/conversations", async (req, res): Promise<void> => {
       .values({
         sessionId,
         status: "diagnostic_in_progress",
-        currentStep: "experience_area",
+        currentStep: "current_area",
       })
       .returning();
 

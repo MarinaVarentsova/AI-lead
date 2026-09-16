@@ -1,113 +1,61 @@
-import {
-  EDUCATION_TYPE_RULES, EXPERIENCE_AREA_RULES, EXPERIENCE_YEARS_RULES, GOAL_RULES,
-} from "./diagnostic-rules";
-import { explicitProgram } from "./program-routing";
-import {
-  DiagnosticValidationError, SOURCE_VERSION,
-  type DiagnosticAnswers, type DiagnosticFactsPacket, type DiagnosticValidationIssue,
-  type ResolvedAnswer, type ResolvedDiagnostic,
-} from "./diagnostic-types";
+import { CURRENT_AREA_CODES, CURRENT_ROLE_CODES, EDUCATION_STATUS_CODES, TARGET_TASKS_CODES, diagnosticOptionLabel,
+  type CurrentArea, type CurrentRole, type EducationStatus, type TargetTasks } from "./diagnostic-schema";
+import { DiagnosticValidationError, SOURCE_VERSION, type DiagnosticAnswers, type DiagnosticFactsPacket,
+  type DiagnosticValidationIssue, type ResolvedDiagnostic } from "./diagnostic-types";
 
-function readAnswer<Code extends string>(
-  input: DiagnosticAnswers,
-  field: "experienceArea" | "experienceYears" | "educationType" | "goal",
-  rawField: "experienceAreaRaw" | "experienceYearsRaw" | "educationTypeRaw" | "goalRaw",
-  rules: Readonly<Record<Code, string>>,
-  issues: DiagnosticValidationIssue[],
-): ResolvedAnswer<Code> | undefined {
-  const code: unknown = Object.hasOwn(input, field) ? input[field] : undefined;
-  const raw: unknown = Object.hasOwn(input, rawField) ? input[rawField] : undefined;
-  let valid = true;
-  if (code === undefined || code === null || code === "") {
-    issues.push({ field, code: "required" });
-    valid = false;
-  } else if (typeof code !== "string" || !Object.hasOwn(rules, code)) {
-    issues.push({ field, code: "unknown_code" });
-    valid = false;
-  }
-  if (raw !== undefined && raw !== null && typeof raw !== "string") {
-    issues.push({ field: rawField, code: "invalid_raw" });
-    valid = false;
-  }
-  if (!valid) return undefined;
-  // Membership was checked exactly; no trimming, inference or fallback is applied.
-  return { code: code as Code, raw: typeof raw === "string" ? raw : null };
+function readCode<Code extends string>(answers: DiagnosticAnswers, field: keyof DiagnosticAnswers,
+  allowed: readonly Code[], issues: DiagnosticValidationIssue[]): Code | undefined {
+  const value: unknown = Object.hasOwn(answers, field) ? answers[field] : undefined;
+  if (value === undefined || value === null || value === "") { issues.push({ field, code: "required" }); return; }
+  if (typeof value !== "string" || !allowed.includes(value as Code)) { issues.push({ field, code: "unknown_code" }); return; }
+  return value as Code;
 }
 
 export class DiagnosticKnowledgeResolver {
-  /** Throws DiagnosticValidationError for missing/invalid codes; returns exactly four rules. */
   static resolve(answers: DiagnosticAnswers): ResolvedDiagnostic {
-    if (answers === null || typeof answers !== "object" || Array.isArray(answers)) {
+    if (!answers || typeof answers !== "object" || Array.isArray(answers)) {
       throw new DiagnosticValidationError([{ field: "answers", code: "invalid_input" }]);
     }
     const issues: DiagnosticValidationIssue[] = [];
-    const experienceArea = readAnswer(answers, "experienceArea", "experienceAreaRaw", EXPERIENCE_AREA_RULES, issues);
-    const experienceYears = readAnswer(answers, "experienceYears", "experienceYearsRaw", EXPERIENCE_YEARS_RULES, issues);
-    const educationType = readAnswer(answers, "educationType", "educationTypeRaw", EDUCATION_TYPE_RULES, issues);
-    const goal = readAnswer(answers, "goal", "goalRaw", GOAL_RULES, issues);
-    if (!experienceArea || !experienceYears || !educationType || !goal) {
-      throw new DiagnosticValidationError(issues);
-    }
+    const currentArea = readCode(answers, "current_area", CURRENT_AREA_CODES, issues);
+    const currentRole = readCode(answers, "current_role", CURRENT_ROLE_CODES, issues);
+    const educationStatus = readCode(answers, "education_status", EDUCATION_STATUS_CODES, issues);
+    const targetTasks = readCode(answers, "target_tasks", TARGET_TASKS_CODES, issues);
+    const raw = answers.current_area_other_text;
+    let otherText: string | null = null;
+    if (currentArea === "other") {
+      if (typeof raw !== "string" || !raw.trim()) issues.push({ field: "current_area_other_text", code: "required" });
+      else if (raw.trim().length > 500) issues.push({ field: "current_area_other_text", code: "invalid_raw" });
+      else otherText = raw.trim();
+    } else if (raw !== undefined && raw !== null && raw !== "") issues.push({ field: "current_area_other_text", code: "unexpected" });
+    if (!currentArea || !currentRole || !educationStatus || !targetTasks || issues.length) throw new DiagnosticValidationError(issues);
 
     const guards: ResolvedDiagnostic["guards"] = [];
-    if (educationType.code === "school_only" && !/учусь|получаю.*образован|студент/i.test(educationType.raw ?? "")) {
-      guards.push({
-        code: "school_only_no_dpo",
-        severity: "hard",
-        rule: "Do not recommend SSTE/DPO as the primary training path.",
-      });
-    }
-    let recommendedTrackHint: ResolvedDiagnostic["recommendedTrackHint"] = null;
-    const explicit = explicitProgram(goal.raw ?? "");
-    if (explicit?.startsWith("house_")) {
-      recommendedTrackHint = null; // Existing API enum remains unchanged; text names the IЖС product.
-    } else if (explicit === "apartment_acceptance" || (!explicit && goal.code === "apartment_acceptance")) {
-      recommendedTrackHint = "apartment_acceptance";
-    } else if (
-      (educationType.code === "higher_technical" ||
-        educationType.code === "secondary_technical" ||
-        educationType.code === "non_profile")
-    ) {
-      recommendedTrackHint = "construction_expertise";
-    }
-    return {
-      sourceVersion: SOURCE_VERSION,
-      answers: { experienceArea, experienceYears, educationType, goal },
-      rules: {
-        experience: EXPERIENCE_AREA_RULES[experienceArea.code],
-        experienceYears: EXPERIENCE_YEARS_RULES[experienceYears.code],
-        education: EDUCATION_TYPE_RULES[educationType.code],
-        goal: explicit === "house_acceptance" ? "Ваша цель — разовые проверки готовых частных домов." :
-          explicit === "house_control" ? "Ваша цель — сопровождение стройки дома по этапам." :
-          explicit === "house_unspecified" ? "Вы интересуетесь обучением для работы с ИЖС." :
-          explicit === "apartment_acceptance" ? GOAL_RULES.apartment_acceptance :
-          explicit === "construction_expertise" ? GOAL_RULES.construction_expertise : GOAL_RULES[goal.code],
-      },
-      guards,
-      recommendedTrackHint,
-    };
+    if (educationStatus === "no_higher_or_secondary_vocational") guards.push({ code: "no_professional_education", severity: "hard",
+      rule: "Стройэксперт сейчас недоступен; основная стартовая альтернатива — Приёмка квартир." });
+    if (educationStatus === "currently_studying") guards.push({ code: "completion_document_pending", severity: "conditional",
+      rule: "Начать обучение можно; выпускные документы выдаются после предъявления оконченного диплома СПО или высшего образования." });
+    const recommendedTrackHint = educationStatus === "no_higher_or_secondary_vocational" ? "apartment_acceptance" :
+      targetTasks === "apartment_house_acceptance" ? null : "construction_expertise";
+    const areaLabel = diagnosticOptionLabel("current_area", currentArea)!;
+    return { sourceVersion: SOURCE_VERSION,
+      answers: { currentArea: { code: currentArea, otherText }, currentRole: { code: currentRole },
+        educationStatus: { code: educationStatus }, targetTasks: { code: targetTasks } },
+      facts: {
+        currentArea: currentArea === "other" ? `Ваша текущая сфера — ${otherText}.` : `Ваша текущая сфера — ${areaLabel}.`,
+        currentRole: `Ваша роль — ${diagnosticOptionLabel("current_role", currentRole)!.toLowerCase()}.`,
+        education: educationStatus === "currently_studying" ? "Вы сейчас учитесь в вузе или колледже." :
+          educationStatus === "no_higher_or_secondary_vocational" ? "У вас пока нет высшего или среднего профессионального образования." :
+          `У вас ${diagnosticOptionLabel("education_status", educationStatus)!.toLowerCase()} образование.`,
+        targetTasks: `Вы хотите работать с задачами: ${diagnosticOptionLabel("target_tasks", targetTasks)!.toLowerCase()}.`,
+      }, guards, recommendedTrackHint };
   }
-
-  static buildFactsPacket(resolvedDiagnostic: ResolvedDiagnostic): DiagnosticFactsPacket {
-    return buildFactsPacket(resolvedDiagnostic);
-  }
+  static buildFactsPacket(resolved: ResolvedDiagnostic): DiagnosticFactsPacket { return buildFactsPacket(resolved); }
 }
-
-/** Explicit allowlist: never spreads input objects or copies contact fields. */
 export function buildFactsPacket(resolved: ResolvedDiagnostic): DiagnosticFactsPacket {
-  return {
-    sourceVersion: resolved.sourceVersion,
-    experience: resolved.rules.experience,
-    experienceYears: resolved.rules.experienceYears,
-    education: resolved.rules.education,
-    goal: resolved.rules.goal,
-    rawAnswers: {
-      experienceArea: resolved.answers.experienceArea.raw,
-      experienceYears: resolved.answers.experienceYears.raw,
-      educationType: resolved.answers.educationType.raw,
-      goal: resolved.answers.goal.raw,
-    },
-    guards: resolved.guards.map(({ code, severity, rule }) => ({ code, severity, rule })),
-    recommendedTrackHint: resolved.recommendedTrackHint,
-  };
+  return { sourceVersion: resolved.sourceVersion, ...resolved.facts,
+    rawAnswers: { currentAreaOtherText: resolved.answers.currentArea.otherText },
+    answerCodes: { currentArea: resolved.answers.currentArea.code, currentRole: resolved.answers.currentRole.code,
+      educationStatus: resolved.answers.educationStatus.code, targetTasks: resolved.answers.targetTasks.code },
+    guards: resolved.guards.map(guard => ({ ...guard })), recommendedTrackHint: resolved.recommendedTrackHint };
 }

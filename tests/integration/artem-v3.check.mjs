@@ -1,0 +1,96 @@
+// v3 A–O: production and tester use the same runtime and canonical knowledge.
+import assert from "node:assert/strict";
+import { existsSync, readFileSync } from "node:fs";
+import { createRequire, registerHooks } from "node:module";
+
+const root = new URL("../../", import.meta.url);
+const require = createRequire(new URL("package.json", root));
+const ts = require("typescript");
+const read = path => readFileSync(new URL(path, root), "utf8");
+const hooks = registerHooks({
+  resolve(specifier, context, next) {
+    if (specifier.startsWith(".") && context.parentURL?.startsWith("file:")) {
+      for (const suffix of [".ts", "/index.ts"]) {
+        const url = new URL(specifier + suffix, context.parentURL);
+        if (existsSync(url)) return { url: url.href, shortCircuit: true };
+      }
+    }
+    return next(specifier, context);
+  },
+  load(url, context, next) {
+    if (url.startsWith("file:") && url.endsWith(".ts")) return { format: "module", shortCircuit: true,
+      source: ts.transpileModule(readFileSync(new URL(url), "utf8"), {
+        compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+      }).outputText };
+    return next(url, context);
+  },
+});
+
+try {
+  const { createArtemRuntime, loadArtemKnowledge } = await import(new URL("apps/api/src/ai/artem-runtime.ts", root));
+  const { YandexAIProvider } = await import(new URL("apps/api/src/ai/yandex-provider.ts", root));
+  const { runTester } = await import(new URL("apps/api/src/tester/runner.ts", root));
+  const { CRITERIA, EVALUATOR_PROMPT } = await import(new URL("apps/api/src/tester/evaluator.ts", root));
+  const canonical = read("knowledge/inobr/artem_unified_knowledge_base_v3.md");
+  assert.equal((await loadArtemKnowledge()).replace(/\r\n/g, "\n").trim(), canonical.replace(/\r\n/g, "\n").trim());
+  assert.throws(() => createArtemRuntime("# Устаревшая база"));
+
+  const base = { current_area: "construction_repair", current_role: "foreman_master_site_specialist",
+    education_status: "higher", target_tasks: "defects_quality" };
+  const cases = [
+    ["A дефекты", base, ["Что мне выбрать?"]],
+    ["B ущерб", { ...base, target_tasks: "damage_loss" }, ["Чем поможет обучение?"]],
+    ["C судебная", { ...base, target_tasks: "judicial_construction_expertise" }, ["Можно работать судебным экспертом?"]],
+    ["D изучает", { ...base, target_tasks: "explore" }, ["Что выбрать?"]],
+    ["E приёмка", { ...base, target_tasks: "apartment_house_acceptance" }, ["Что выбрать?"]],
+    ["F студент", { ...base, education_status: "currently_studying" }, ["Можно начать сейчас?"]],
+    ["G без СПО", { ...base, education_status: "no_higher_or_secondary_vocational" }, ["Что доступно?"]],
+    ["H СПО", { ...base, education_status: "secondary_vocational" }, ["Подхожу ли я?"]],
+    ["I проектировщик", { ...base, current_area: "design_estimates", current_role: "engineer_designer_estimator" }, ["Что даст программа?"]],
+    ["J контроль", { ...base, current_area: "construction_control", current_role: "manager_owner" }, ["Как расширить задачи?"]],
+    ["K оценщик", { ...base, current_area: "real_estate_valuation_law", current_role: "valuer_lawyer_expert", target_tasks: "damage_loss" }, ["Подойдёт ли мне?"]],
+    ["L другая сфера", { ...base, current_area: "other", current_area_other_text: "Промышленная безопасность", current_role: "not_in_construction" }, ["С чего начать?"]],
+    ["M память", base, ["Мне нужна Приёмка ИЖС", "Сколько стоит это обучение?"]],
+    ["N отказ", base, ["Не хочу оставлять контакт, просто ответьте", "Какой документ?"]],
+    ["O неизвестное", base, ["Какой номер лицензии?"]],
+  ].map(([label, answers, questions]) => ({ label, answers, questions }));
+
+  const provider = new YandexAIProvider({});
+  provider.generateStructured = async prompt => {
+    if (prompt.includes("systemicProblems")) throw new Error("summary unavailable");
+    return { criteria: Object.fromEntries(CRITERIA.map(key => [key, 90])), strengths: ["v3"], problems: [],
+      recommendedFixes: [], funnelAssessment: "Корректно", groundingAssessment: "Только v3" };
+  };
+  const runtime = createArtemRuntime(canonical, provider);
+  const direct = [];
+  for (const persona of cases) {
+    const diagnostic = await runtime.diagnostic.generateDiagnosticResult(persona.answers);
+    assert.ok(diagnostic.result.recommendation.trim(), persona.label);
+    const history = [];
+    for (const question of persona.questions) {
+      const reply = await runtime.reply(runtime.prepare(persona.answers, question, history), history);
+      assert.ok(reply.message.trim(), persona.label);
+      assert.doesNotMatch(reply.message, /recommendedTrack|education_status|target_tasks|в базе знаний/i);
+      history.push({ role: "user", message: question }, { role: "assistant", message: reply.message });
+    }
+    direct.push({ diagnostic: diagnostic.result, history });
+  }
+  const saved = [];
+  for (const group of [cases.slice(0, 10), cases.slice(10)]) {
+    const summary = await runTester(group.length, runtime, { async saveCase(value) { saved.push(value); }, async progress() {}, async finish() {} }, group, { sleep: async () => {} });
+    assert.equal(summary.TECH_ERROR, 0);
+    assert.equal(summary.averageScore, 90);
+  }
+  saved.forEach((result, index) => {
+    assert.deepEqual(result.diagnosticResult.result, direct[index].diagnostic, cases[index].label);
+    assert.deepEqual(result.transcript.slice(1), direct[index].history, cases[index].label);
+  });
+  assert.match(direct[4].diagnostic.recommendation, /Приёмка квартир.*Приёмка ИЖС/);
+  assert.match(direct[5].diagnostic.recommendation, /выпускные документы/i);
+  assert.match(direct[6].diagnostic.recommendation, /Приёмка квартир/);
+  for (const turn of direct[13].history.filter(turn => turn.role === "assistant")) assert.doesNotMatch(turn.message, /оставьте (?:контакт|телефон)|нажмите «Связаться|свяжитесь с менеджером/i);
+  assert.match(EVALUATOR_PROMPT, /KB v3\.0/);
+  console.log("PASS: v3 A–O, canonical source, prod/tester runtime parity, education guards, acceptance choice, refusal and evaluator contract.");
+} finally {
+  hooks.deregister();
+}

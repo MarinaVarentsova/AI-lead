@@ -7,8 +7,8 @@ import { fallbackReply } from "./artem-policy";
 import { loadArtemKnowledge } from "./artem-knowledge";
 
 export function consultantFallback(input: ConsultantProviderInput, markdown: string): string {
-  const program = /program=(construction_expertise|apartment_acceptance|house_acceptance|house_control|house_unspecified)/.exec(input.diagnosticContext)?.[1] as ArtemProgram | undefined;
-  return fallbackReply(markdown, program ?? (/goal=apartment_acceptance|school_only_no_dpo/.test(input.diagnosticContext) ? "apartment_acceptance" : "construction_expertise"),
+  const program = /program=(construction_expertise|apartment_acceptance|house_acceptance|house_control|house_unspecified|acceptance_choice)/.exec(input.diagnosticContext)?.[1] as ArtemProgram | undefined;
+  return fallbackReply(markdown, program ?? (/targetTasks=apartment_house_acceptance|no_professional_education/.test(input.diagnosticContext) ? "apartment_acceptance" : "construction_expertise"),
     input.question, input.history ?? [], input.diagnosticContext);
 }
 export class ConsultantChatService {
@@ -26,8 +26,8 @@ export class ConsultantChatService {
       if (unknown) throw new Error("INSUFFICIENT_KNOWLEDGE");
       const message = await this.provider.generateConsultantReply(selectConsultantInput(facts));
       if (typeof message !== "string" || !message.trim() || message.length > 6000 ||
-        /в базе знаний|Пользователь имеет|рекомендация должна|school_only|recommendedTrack|diagnosticContext/i.test(message)) throw new DiagnosticAIError("AI_INVALID_RESULT");
-      if (facts.diagnosticContext.includes("school_only_no_dpo") &&
+        /в базе знаний|Пользователь имеет|рекомендация должна|no_professional_education|recommendedTrack|diagnosticContext/i.test(message)) throw new DiagnosticAIError("AI_INVALID_RESULT");
+      if (facts.diagnosticContext.includes("no_professional_education") &&
         /(?:рекомендую|вам подходит|можете поступить)[^.!?]{0,60}Стройэксперт/i.test(message)) throw new DiagnosticAIError("AI_INVALID_RESULT");
       return { message: message.trim(), isAI: true, provider: "yandex",
         matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null };

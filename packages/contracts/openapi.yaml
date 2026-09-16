@@ -10,8 +10,6 @@ servers:
 tags:
   - name: health
     description: Health operations
-  - name: dictionaries
-    description: Reference dictionary lookups
   - name: sessions
     description: Session management
   - name: conversations
@@ -33,38 +31,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
-
-  /dictionaries:
-    get:
-      operationId: getDictionary
-      tags: [dictionaries]
-      summary: Get dictionary items by type
-      parameters:
-        - name: type
-          in: query
-          required: true
-          schema:
-            type: string
-            enum:
-              - experience_area
-              - experience_years
-              - education
-              - goals
-      responses:
-        "200":
-          description: Dictionary items
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/DictionaryItem"
-        "400":
-          description: Invalid type
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
 
   /sessions:
     post:
@@ -154,6 +120,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /diagnostic/schema:
+    get:
+      operationId: getDiagnosticSchema
+      tags: [diagnostic]
+      summary: Get the canonical v3 diagnostic questions
+      responses:
+        "200":
+          description: Four diagnostic questions in display order
+          content:
+            application/json:
+              schema:
+                type: array
+                minItems: 4
+                maxItems: 4
+                items:
+                  $ref: "#/components/schemas/DiagnosticSchemaQuestion"
+
 components:
   schemas:
     HealthStatus:
@@ -168,15 +151,6 @@ components:
       required: [error]
       properties:
         error:
-          type: string
-
-    DictionaryItem:
-      type: object
-      required: [code, name]
-      properties:
-        code:
-          type: string
-        name:
           type: string
 
     SessionResult:
@@ -236,27 +210,25 @@ components:
 
     DiagnosticAnswersInput:
       type: object
-      required: [conversationId]
+      required: [conversationId, current_area, current_role, education_status, target_tasks]
       properties:
         conversationId:
           type: string
           format: uuid
-        experienceArea:
+        current_area:
           type: string
-        experienceAreaRaw:
+          enum: [construction_repair, design_estimates, construction_control, real_estate_valuation_law, other]
+        current_area_other_text:
           type: string
-        experienceYears:
+        current_role:
           type: string
-        experienceYearsRaw:
+          enum: [engineer_designer_estimator, foreman_master_site_specialist, manager_owner, valuer_lawyer_expert, not_in_construction]
+        education_status:
           type: string
-        educationType:
+          enum: [higher, secondary_vocational, currently_studying, no_higher_or_secondary_vocational]
+        target_tasks:
           type: string
-        educationTypeRaw:
-          type: string
-        goal:
-          type: string
-        goalRaw:
-          type: string
+          enum: [defects_quality, damage_loss, apartment_house_acceptance, judicial_construction_expertise, explore]
 
     DiagnosticAnswersResult:
       type: object
@@ -267,3 +239,32 @@ components:
         conversationId:
           type: string
           format: uuid
+
+    DiagnosticSchemaOption:
+      type: object
+      required: [code, label, allowsFreeText]
+      properties:
+        code:
+          type: string
+        label:
+          type: string
+        allowsFreeText:
+          type: boolean
+
+    DiagnosticSchemaQuestion:
+      type: object
+      required: [questionNumber, field, questionText, options]
+      properties:
+        questionNumber:
+          type: integer
+          minimum: 1
+          maximum: 4
+        field:
+          type: string
+          enum: [current_area, current_role, education_status, target_tasks]
+        questionText:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: "#/components/schemas/DiagnosticSchemaOption"

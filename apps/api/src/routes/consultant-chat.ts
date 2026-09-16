@@ -28,10 +28,10 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
     const result = await db.transaction(async tx => {
       await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${conversationId}))`);
       phase = "load_context";
-      const [row] = await tx.select({ experienceArea: aiDiagnosticAnswers.experienceArea,
-        experienceYears: aiDiagnosticAnswers.experienceYears, educationType: aiDiagnosticAnswers.educationType,
-        goal: aiDiagnosticAnswers.goal, goalRaw: aiDiagnosticAnswers.goalRaw,
-        educationTypeRaw: aiDiagnosticAnswers.educationTypeRaw }).from(aiDiagnosticAnswers).where(eq(aiDiagnosticAnswers.conversationId, conversationId)).limit(1);
+      const [row] = await tx.select({ currentArea: aiDiagnosticAnswers.experienceArea,
+        currentAreaOtherText: aiDiagnosticAnswers.experienceAreaRaw, currentRole: aiDiagnosticAnswers.experienceYears,
+        educationStatus: aiDiagnosticAnswers.educationType, targetTasks: aiDiagnosticAnswers.goal })
+        .from(aiDiagnosticAnswers).where(eq(aiDiagnosticAnswers.conversationId, conversationId)).limit(1);
       if (!row) return { status: 404, body: { error: "Diagnostic answers not found.", code: "DIAGNOSTIC_ANSWERS_NOT_FOUND" } };
       const history = await tx.select({ id: aiMessages.id, role: aiMessages.role, message: aiMessages.message }).from(aiMessages)
         .where(and(eq(aiMessages.conversationId, conversationId), eq(aiMessages.step, "post_diagnostic_chat")))
@@ -48,9 +48,9 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
       req.log.info({ requestId, stage: phase, provider }, "CONSULTANT_CONTEXT_LOADED");
       phase = "load_runtime";
       const runtime = await getArtemRuntime();
-      const facts = runtime.prepare({ experienceArea: row.experienceArea ?? "", experienceYears: row.experienceYears ?? "",
-        educationType: row.educationType ?? "", educationTypeRaw: row.educationTypeRaw,
-        goal: row.goal ?? "", goalRaw: row.goalRaw }, message, history);
+      const facts = runtime.prepare({ current_area: row.currentArea ?? "", current_area_other_text: row.currentAreaOtherText,
+        current_role: row.currentRole ?? "", education_status: row.educationStatus ?? "",
+        target_tasks: row.targetTasks ?? "" }, message, history);
       req.log.info({ requestId, stage: phase, provider, sectionIds: facts.matchedSections.map(s => s.id) }, "CONSULTANT_KNOWLEDGE_RESOLVED");
       phase = "save_user";
       const [user] = await tx.insert(aiMessages).values({ id: requestId, conversationId, role: "user", step: "post_diagnostic_chat", message, createdAt: new Date() }).returning({ id: aiMessages.id });

@@ -36,11 +36,11 @@ try {
   assert.match(readFileSync(new URL("apps/api/src/routes/tester.ts", root), "utf8"),
     /AI_REQUEST_TIMEOUT_MS:\s*String\(TESTER_AI_TIMEOUT_MS\)/);
 
-  const answers = { experienceArea: "construction", experienceYears: "more_than_10",
-    educationType: "higher_technical", goal: "construction_expertise" };
+  const answers = { current_area: "construction_repair", current_role: "foreman_master_site_specialist",
+    education_status: "higher", target_tasks: "defects_quality" };
   const personas = [1, 2].map(number => ({ label: `Case ${number}`, answers, questions: [`Question ${number}`] }));
-  const diagnosticResult = { summary: "Summary", experience: "Experience", experienceYears: "Years",
-    education: "Education", goal: "Goal", recommendation: "Recommendation",
+  const diagnosticResult = { summary: "Summary", currentArea: "Area", currentRole: "Role",
+    education: "Education", targetTasks: "Tasks", recommendation: "Recommendation",
     recommendedTrack: "construction_expertise", importantNote: null };
   const evaluation = { criteria: Object.fromEntries(CRITERIA.map(key => [key, 90])), strengths: ["Stable"],
     problems: [], recommendedFixes: [], funnelAssessment: "Stable", groundingAssessment: "Grounded" };
@@ -51,7 +51,7 @@ try {
   function runtimeFor(overrides = {}) {
     const counters = { diagnostic: 0, reply: 0, evaluator: 0, summary: 0 };
     const runtime = {
-      markdown: "## 1. Canonical v2.2\nConfirmed knowledge.",
+      markdown: "## 1. Canonical v3.0\nConfirmed knowledge.",
       diagnostic: { async generate() {
         counters.diagnostic++;
         return overrides.diagnostic ? overrides.diagnostic(counters.diagnostic) : { result: diagnosticResult, source: "ai" };

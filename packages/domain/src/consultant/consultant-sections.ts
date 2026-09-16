@@ -1,13 +1,13 @@
 import type { ConsultantSection } from "./consultant-types";
 export const UNKNOWN_KNOWLEDGE = "Этот конкретный параметр требует проверки. Индивидуальные условия можно уточнить у менеджера.";
 export function createConsultantSections(markdown: string): readonly ConsultantSection[] {
-  if (!markdown.includes("Версия 2.2 · 15 сентября 2026 года.")) throw new Error("Artem v2.2 source required");
+  if (!markdown.includes("Версия 3.0 · 16 сентября 2026 года.")) throw new Error("Artem v3 source required");
   const blocks = new Map<string, string>();
   for (const block of markdown.replace(/\r\n/g, "\n").split(/(?=^## \d+\.)/m)) {
     const id = /^## (\d+)\./.exec(block)?.[1];
     if (id) blocks.set(id, block.trim());
   }
-  const read = (...ids: string[]) => ids.map(id => { const text = blocks.get(id); if (!text) throw new Error("Missing v2.2 section " + id); return text; }).join("\n\n");
+  const read = (...ids: string[]) => ids.map(id => { const text = blocks.get(id); if (!text) throw new Error("Missing v3 section " + id); return text; }).join("\n\n");
   const price = (name: string) => read("12").split("### " + name + "\n")[1]?.split("\n### ")[0] ?? "";
   const s = (id: string, title: string, keywords: string[], sources: string[], content = read(...sources)): ConsultantSection =>
     Object.freeze({ id, title, keywords, sources, content });

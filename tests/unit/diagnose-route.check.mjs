@@ -124,7 +124,7 @@ try {
       assert.deepEqual(state.writes, [{ conversationId: fixture.conversationId, role: "assistant",
         step: "diagnostic_result", message: res.body.result }]);
       assert.equal(res.body.sourceVersion, fixture.expectedSourceVersion);
-      for (const key of ["summary", "experience", "experienceYears", "education", "goal", "recommendation"]) {
+      for (const key of ["summary", "currentArea", "currentRole", "education", "targetTasks", "recommendation"]) {
         assert.ok(res.body.structuredResult[key].trim());
         assert.ok(res.body.result.includes(res.body.structuredResult[key]));
       }
@@ -154,22 +154,24 @@ try {
     assert.equal(state.reads, 0);
   }
   await run({ row: null, status: 404 });
-  for (const key of ["experienceArea", "experienceYears", "educationType", "goal"]) {
+  const answerFields = { currentArea: "current_area", currentRole: "current_role",
+    educationStatus: "education_status", targetTasks: "target_tasks" };
+  for (const [key, issueField] of Object.entries(answerFields)) {
     for (const value of [null, "", "unknown_code"]) {
       const result = await run({ row: { ...fixture.row, [key]: value }, status: 400 });
       assert.equal(result.error, "DIAGNOSTIC_VALIDATION_ERROR");
-      assert.ok(result.issues.some(issue => issue.field === key));
+      assert.ok(result.issues.some(issue => issue.field === issueField));
     }
   }
-  const schoolRow = { ...fixture.row, educationType: "school_only", educationTypeRaw: "Школа" };
+  const schoolRow = { ...fixture.row, educationStatus: "no_higher_or_secondary_vocational" };
   for (const providerResult of [undefined, fixture.validResult]) {
     const school = await run({ row: schoolRow, providerResult });
-    assert.equal(school.structuredResult.recommendedTrack, "not_defined");
+    assert.equal(school.structuredResult.recommendedTrack, "apartment_acceptance");
     assert.ok(school.structuredResult.importantNote);
     assert.ok(!school.result.includes("construction_expertise"));
     assert.equal(school.isAI, false);
   }
-  const apartment = await run({ row: { ...fixture.row, goal: "apartment_acceptance", goalRaw: "Приёмка квартир" } });
+  const apartment = await run({ row: { ...fixture.row, educationStatus: "no_higher_or_secondary_vocational" } });
   assert.equal(apartment.structuredResult.recommendedTrack, "apartment_acceptance");
   const success = await run({ providerResult: fixture.validResult });
   assert.equal(success.isAI, true);
@@ -180,12 +182,16 @@ try {
   await run({ loadFailure: true, status: 500 });
 
   await run({ row: { ...fixture.row,
-    experienceAreaRaw: "PRIVATE_RAW_ANSWER",
+    currentArea: "other", currentAreaOtherText: "PRIVATE_RAW_ANSWER",
     contact: { phone: "PRIVATE_PHONE", email: "PRIVATE_EMAIL", telegram: "PRIVATE_TELEGRAM", name: "PRIVATE_NAME" },
   } });
   assert.ok(!JSON.stringify(state.logs).includes("PRIVATE_"));
 
-  const facts = DiagnosticKnowledgeResolver.buildFactsPacket(DiagnosticKnowledgeResolver.resolve(fixture.row));
+  const facts = DiagnosticKnowledgeResolver.buildFactsPacket(DiagnosticKnowledgeResolver.resolve({
+    current_area: fixture.row.currentArea, current_area_other_text: fixture.row.currentAreaOtherText,
+    current_role: fixture.row.currentRole, education_status: fixture.row.educationStatus,
+    target_tasks: fixture.row.targetTasks,
+  }));
   assert.deepEqual(parseDiagnosticResult("```json\n" + JSON.stringify(fixture.validResult) + "\n```", facts), fixture.validResult);
   assert.throws(() => parseDiagnosticResult("not json", facts), { code: "AI_INVALID_RESULT" });
   assert.throws(() => parseDiagnosticResult(JSON.stringify({

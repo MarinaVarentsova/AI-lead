@@ -1,14 +1,11 @@
 import { Router, type IRouter } from "express";
 import { db, aiDiagnosticAnswers, aiConversations } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { DiagnosticKnowledgeResolver, DiagnosticValidationError, type DiagnosticAnswers } from "@workspace/domain/diagnostic";
 
 const router: IRouter = Router();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-function str(v: unknown): string | null {
-  return typeof v === "string" && v.trim().length > 0 ? v.trim() : null;
-}
 
 router.post("/diagnostic-answers", async (req, res): Promise<void> => {
   const body = req.body as Record<string, unknown>;
@@ -19,19 +16,18 @@ router.post("/diagnostic-answers", async (req, res): Promise<void> => {
     return;
   }
 
-  const values = {
-    conversationId,
-    experienceArea: str(body.experienceArea),
-    experienceAreaRaw: str(body.experienceAreaRaw),
-    experienceYears: str(body.experienceYears),
-    experienceYearsRaw: str(body.experienceYearsRaw),
-    educationType: str(body.educationType),
-    educationTypeRaw: str(body.educationTypeRaw),
-    goal: str(body.goal),
-    goalRaw: str(body.goalRaw),
-  };
+  const answers: DiagnosticAnswers = { current_area: body.current_area as string,
+    current_area_other_text: body.current_area_other_text as string | null | undefined,
+    current_role: body.current_role as string, education_status: body.education_status as string,
+    target_tasks: body.target_tasks as string };
 
   try {
+    DiagnosticKnowledgeResolver.resolve(answers);
+    // Until the additive DB migration block, the unchanged physical columns are storage slots only.
+    const values = { conversationId, experienceArea: answers.current_area,
+      experienceAreaRaw: answers.current_area_other_text ?? null, experienceYears: answers.current_role,
+      experienceYearsRaw: null, educationType: answers.education_status, educationTypeRaw: null,
+      goal: answers.target_tasks, goalRaw: null };
     await db
       .insert(aiDiagnosticAnswers)
       .values(values)
@@ -58,6 +54,7 @@ router.post("/diagnostic-answers", async (req, res): Promise<void> => {
     req.log.info({ conversationId }, "Diagnostic answers saved");
     res.status(201).json({ saved: true, conversationId });
   } catch (err: unknown) {
+    if (err instanceof DiagnosticValidationError) { res.status(400).json({ error: err.code, issues: err.issues }); return; }
     const e = err as Error & { cause?: Error & { code?: string; message?: string } };
     req.log.error(
       { pgCode: e.cause?.code, pgMessage: e.cause?.message, msg: e.message },

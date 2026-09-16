@@ -5,8 +5,9 @@
  * API specification for AI Квалификатор ИНОБР
  * OpenAPI spec version: 0.3.0
  */
-import type { GetDictionaryType } from './getDictionaryType';
 
-export type GetDictionaryParams = {
-type: GetDictionaryType;
-};
+export interface DiagnosticSchemaOption {
+  code: string;
+  label: string;
+  allowsFreeText: boolean;
+}

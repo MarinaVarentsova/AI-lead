@@ -5,10 +5,10 @@ export type { DiagnosticFactsPacket };
 
 export interface DiagnosticAIResult {
   summary: string;
-  experience: string;
-  experienceYears: string;
+  currentArea: string;
+  currentRole: string;
   education: string;
-  goal: string;
+  targetTasks: string;
   recommendation: string;
   recommendedTrack: "construction_expertise" | "apartment_acceptance" | "not_defined";
   importantNote: string | null;
@@ -30,7 +30,7 @@ export class DiagnosticAIError extends Error {
 
 export function hasSchoolGuard(facts: DiagnosticFactsPacket): boolean {
   return facts.guards.some(({ code, severity }) =>
-    code === "school_only_no_dpo" && severity === "hard");
+    code === "no_professional_education" && severity === "hard");
 }
 
 export function validateDiagnosticResult(value: unknown, facts: DiagnosticFactsPacket): DiagnosticAIResult {
@@ -57,25 +57,25 @@ export function validateDiagnosticResult(value: unknown, facts: DiagnosticFactsP
   const normalize = (text: string) => text.toLowerCase().replace(/ё/g, "е").replace(/приемку/g, "приемка").replace(/[«»".,;:!?]/g, "").replace(/\s+/g, " ").trim();
   const publicText = normalize(recommendation);
   if (!normalize(recommendation.split(/[.!?]/)[0] ?? "").includes(normalize(PROGRAM_NAMES[diagnosticProgram(facts)]))) return invalid();
-  const confirmed = [facts.experience, facts.experienceYears, facts.education, facts.goal]
+  const confirmed = [facts.currentArea, facts.currentRole, facts.education, facts.targetTasks]
     .filter(fact => publicText.includes(normalize(fact)));
   if (confirmed.length < 2 || !publicText.includes(normalize(PROGRAM_NAMES[diagnosticProgram(facts)])) ||
     !/дефект|документац|исследова|заключени|осмотр|проверк|стройк|подрядчик/i.test(recommendation) ||
     !/Связаться с менеджером|уточни/i.test(recommendation)) return invalid();
   if (facts.recommendedTrackHint === null && !hasSchoolGuard(facts) && diagnosticProgram(facts) === "construction_expertise" &&
     !/если|условн|уточни/i.test(recommendation)) return invalid();
-  if (["summary", "experience", "experienceYears", "education", "goal", "recommendation"].some(key =>
-    /Пользователь имеет|Рекомендация должна|recommendedTrack|school_only|diploma_not_available/i.test(readText(key)))) return invalid();
+  if (["summary", "currentArea", "currentRole", "education", "targetTasks", "recommendation"].some(key =>
+    /Пользователь имеет|Рекомендация должна|recommendedTrack|education_status|target_tasks/i.test(readText(key)))) return invalid();
   if (/Пользователь имеет|Рекомендация должна учитывать/iu.test(recommendation) ||
     !/(?:у вас|ваш|вам|в вашем|с вашим)/iu.test(recommendation)) {
     return invalid();
   }
   return {
     summary: readText("summary"),
-    experience: readText("experience"),
-    experienceYears: readText("experienceYears"),
+    currentArea: readText("currentArea"),
+    currentRole: readText("currentRole"),
     education: readText("education"),
-    goal: readText("goal"),
+    targetTasks: readText("targetTasks"),
     recommendation,
     recommendedTrack: track,
     importantNote: record.importantNote === null ? null : readText("importantNote"),

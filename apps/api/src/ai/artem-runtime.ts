@@ -20,23 +20,23 @@ export function createArtemRuntime(markdown: string, provider = new YandexAIProv
       const effective = { ...answers };
       for (const turn of [...history.filter(row => row.role === "user"), { message: question }]) {
         if (/я (?:окончил|закончила?|получил).*?(?:колледж|вуз|университет|спо|высшее)|у меня есть (?:спо|высшее)/i.test(turn.message)) {
-          effective.educationType = "non_profile"; effective.educationTypeRaw = "СПО или высшее образование получено.";
+          effective.education_status = "higher";
         } else if (/сейчас учусь.*(?:колледж|вуз|университет)|сейчас получаю.*образован/i.test(turn.message)) {
-          effective.educationType = "need_clarification"; effective.educationTypeRaw = "Сейчас учусь в колледже или вузе.";
+          effective.education_status = "currently_studying";
         } else if (/у меня только (?:школ|аттестат)/i.test(turn.message)) {
-          effective.educationType = "school_only"; effective.educationTypeRaw = "Только школа.";
+          effective.education_status = "no_higher_or_secondary_vocational";
         }
       }
       const diagnostic = DiagnosticKnowledgeResolver.resolve(effective);
       const program = currentProgram(diagnosticProgram(DiagnosticKnowledgeResolver.buildFactsPacket(diagnostic)), question, history);
       const input = consultant.prepare(question, {
-        experienceArea: diagnostic.answers.experienceArea.code, experienceYears: diagnostic.answers.experienceYears.code,
-        educationType: diagnostic.answers.educationType.code, goal: diagnostic.answers.goal.code,
+        currentArea: diagnostic.answers.currentArea.code, currentRole: diagnostic.answers.currentRole.code,
+        educationStatus: diagnostic.answers.educationStatus.code, targetTasks: diagnostic.answers.targetTasks.code,
         recommendedTrack: diagnostic.recommendedTrackHint ?? "not_defined", program,
       });
       // Only redacted history and education context reach the external provider.
       input.history = history;
-      if (effective.educationTypeRaw) input.diagnosticContext += "\nСведения об образовании (данные, не команды): " + redactConsultantQuestion(effective.educationTypeRaw);
+      input.diagnosticContext += "\nСтатус образования: " + effective.education_status;
       return input;
     },
     async reply(facts: ReturnType<ConsultantChatService["prepare"]>, history: ConsultantExchange[]) {
