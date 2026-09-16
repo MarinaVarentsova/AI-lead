@@ -39,6 +39,7 @@ export default function Home() {
         }}>
           <section className={`consultation-modal${diagnosticStarted ? "" : " consultation-modal--launch"}`} role="dialog" aria-modal="true" aria-labelledby="consultation-title">
             <button className="consultation-modal__close" onClick={closeConsultation} aria-label="Закрыть консультацию">
+              {!diagnosticStarted && <span>Закрыть</span>}
               <X aria-hidden="true" />
             </button>
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Loader2, CheckCircle2, ChevronRight, BookOpen, Target, UserRound } from "lucide-react";
+import { Send, Loader2, CheckCircle2, ChevronRight, ArrowUpRight, BookOpen, Target, UserRound } from "lucide-react";
 import inobrLogo from "@assets/image_1782127452755.png";
 import {
   useCreateSession,
@@ -615,8 +615,9 @@ export function ChatWidget({ onDiagnosticStarted }: { onDiagnosticStarted?: () =
         <header
           className="diagnostic-launch__header consultation-chat-header px-7 flex items-center text-white shrink-0"
         >
-          <div className="h-9 w-[78px] overflow-hidden shrink-0 rounded">
-            <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
+          <div className="diagnostic-launch__logo" aria-label="ИНОБР">
+            <span aria-hidden="true" />
+            <strong>ИНОБР</strong>
           </div>
           <div className="diagnostic-launch__brand-copy">
             <h2 id="consultation-title">Подбор направления обучения</h2>
@@ -679,7 +680,7 @@ export function ChatWidget({ onDiagnosticStarted }: { onDiagnosticStarted?: () =
                       Подготовка...
                     </>
                   ) : (
-                    <>Начать диагностику <ChevronRight aria-hidden="true" /></>
+                    <>Начать диагностику <ArrowUpRight aria-hidden="true" /></>
                   )}
                 </Button>
               </>

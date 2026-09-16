@@ -25,6 +25,9 @@ assert.ok(home.includes("Артём Экспертович"));
 assert.ok(home.includes("Персональный консультант ИНОБР"));
 assert.ok(home.includes("Знания сегодня."));
 assert.ok(home.includes('onClick={closeConsultation}'));
+assert.ok(home.includes("<span>Закрыть</span>"));
+assert.ok(widget.includes('<div className="diagnostic-launch__logo" aria-label="ИНОБР">'));
+assert.ok(widget.includes('<ArrowUpRight aria-hidden="true" />'));
 assert.ok(existsSync(new URL("apps/web/public/artem-expertovich.jpg", root)));
 
 console.log("PASS: launch content/photo, existing start handler and close wiring.");
