@@ -254,9 +254,9 @@
     linear-gradient(#ffffff, #f6f8f5);
 }
 .consultation-modal--launch {
-  width: min(1180px, calc(100vw - 32px));
+  width: min(1150px, calc(100vw - 40px));
   height: min(600px, calc(var(--chat-viewport-height, 100dvh) - 32px));
-  grid-template-columns: minmax(0, 2fr) minmax(320px, 1fr);
+  grid-template-columns: minmax(0, 67fr) minmax(340px, 33fr);
   border-radius: 8px;
 }
 .diagnostic-launch__header {
@@ -283,49 +283,49 @@
   padding: 29px clamp(38px, 4.3vw, 58px) 24px;
   text-align: left;
 }
-.diagnostic-launch__progress { display: flex; align-items: center; gap: 20px; max-width: 390px; }
+.diagnostic-launch__progress { display: flex; align-items: center; gap: 24px; max-width: 470px; }
 .diagnostic-launch__progress strong {
-  flex: 0 0 auto; padding: 5px 9px; border-radius: 6px; color: #345c52; background: #edf4ef;
-  font-size: 12px; line-height: 1; letter-spacing: .03em;
+  flex: 0 0 auto; padding: 7px 11px; border-radius: 6px; color: #345c52; background: #edf4ef;
+  font-size: 14px; line-height: 1; letter-spacing: .03em;
 }
-.diagnostic-launch__progress div { width: min(250px, 100%); display: flex; align-items: center; }
-.diagnostic-launch__progress span { width: 10px; height: 10px; flex: 0 0 auto; border: 2px solid #c7d3ce; border-radius: 999px; background: white; }
+.diagnostic-launch__progress div { width: min(315px, 100%); display: flex; align-items: center; }
+.diagnostic-launch__progress span { width: 13px; height: 13px; flex: 0 0 auto; border: 2px solid #c7d3ce; border-radius: 999px; background: white; }
 .diagnostic-launch__progress i { height: 2px; flex: 1 1 auto; background: #d8e1dd; }
 .diagnostic-launch__copy { margin-top: 27px; max-width: 650px; }
 .diagnostic-launch__copy h1 {
-  color: #102d27; font-size: clamp(38px, 4.2vw, 50px); font-weight: 790; line-height: 1.04; letter-spacing: -.045em;
+  color: #102d27; font-size: 52px; font-weight: 790; line-height: 1.06; letter-spacing: -.045em;
 }
-.diagnostic-launch__copy p { margin-top: 17px; max-width: 560px; color: #64746f; font-size: 15px; line-height: 1.5; }
-.diagnostic-launch__action { margin-top: 21px; width: min(330px, 100%); }
+.diagnostic-launch__copy p { margin-top: 18px; max-width: 610px; color: #64746f; font-size: 19px; line-height: 1.45; }
+.diagnostic-launch__action { margin-top: 24px; width: min(360px, 100%); }
 .diagnostic-launch__button {
-  width: 100%; min-height: 58px !important; padding: 0 24px !important; justify-content: space-between;
+  width: 100%; min-height: 70px !important; padding: 0 28px !important; justify-content: space-between;
   border: 1px solid #d19319 !important; border-radius: 13px !important; color: #18332d !important;
-  background: linear-gradient(135deg, #f5bd34, #e9a921) !important; font-size: 16px !important; font-weight: 760 !important;
+  background: linear-gradient(135deg, #f5bd34, #e9a921) !important; font-size: 18px !important; font-weight: 760 !important;
   box-shadow: 0 10px 20px rgba(167,119,19,.16);
 }
 .diagnostic-launch__button:hover { background: linear-gradient(135deg, #f6c956, #e7b43d) !important; }
-.diagnostic-launch__button svg { width: 18px; height: 18px; }
+.diagnostic-launch__button svg { width: 24px; height: 24px; stroke-width: 2.2; }
 .diagnostic-launch__benefits {
   margin-top: auto; padding-top: 25px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
   border-top: 1px solid #e4ebe7;
 }
-.diagnostic-launch__benefits div { display: flex; align-items: center; gap: 12px; color: #34554c; font-size: 12px; line-height: 1.25; }
-.diagnostic-launch__benefits div + div { padding-left: 16px; border-left: 1px solid #e4ebe7; }
-.diagnostic-launch__benefits svg { width: 26px; height: 26px; flex: 0 0 auto; color: #0b6553; stroke-width: 1.8; }
+.diagnostic-launch__benefits div { display: flex; align-items: center; gap: 14px; color: #34554c; font-size: 14px; line-height: 1.3; }
+.diagnostic-launch__benefits div + div { padding-left: 24px; border-left: 1px solid #e4ebe7; }
+.diagnostic-launch__benefits svg { width: 32px; height: 32px; flex: 0 0 auto; color: #0b6553; stroke-width: 1.8; }
 .diagnostic-launch-person { min-width: 0; display: grid; grid-template-rows: 78px minmax(0, 1fr); color: #173c34; background: #f7faf8; }
 .diagnostic-launch-person__motto {
   display: flex; align-items: center; padding: 0 64px 0 24px; color: rgba(255,255,255,.88); background: #073d33;
   font-size: 13px; font-weight: 650; line-height: 1.35;
 }
-.diagnostic-launch-person__card { min-height: 0; padding: 22px 26px; overflow-y: auto; }
+.diagnostic-launch-person__card { min-height: 0; padding: 18px 28px; overflow-y: auto; }
 .diagnostic-launch-person__card img {
-  display: block; width: 100%; height: 278px; object-fit: cover; object-position: center 32%;
+  display: block; width: 100%; height: 286px; object-fit: cover; object-position: center 32%;
   border-radius: 25px 25px 8px 25px; box-shadow: none;
 }
-.diagnostic-launch-person__card h2 { margin-top: 14px; color: #143d34; font-size: 21px; font-weight: 780; line-height: 1.15; }
-.diagnostic-launch-person__card span { display: block; margin-top: 4px; color: #6f827b; font-size: 12px; font-weight: 600; }
+.diagnostic-launch-person__card h2 { margin-top: 13px; color: #143d34; font-size: 25px; font-weight: 780; line-height: 1.12; }
+.diagnostic-launch-person__card span { display: block; margin-top: 5px; color: #6f827b; font-size: 14px; font-weight: 600; }
 .diagnostic-launch-person__card p {
-  position: relative; margin-top: 20px; padding-left: 23px; color: #536b64; font-size: 13px; line-height: 1.5;
+  position: relative; margin-top: 17px; padding-left: 25px; color: #536b64; font-size: 15px; line-height: 1.45;
 }
 .diagnostic-launch-person__card p::before { content: "“"; position: absolute; left: 0; top: -7px; color: #c39a3c; font-size: 29px; font-weight: 750; }
 .consultation-modal--launch .consultation-modal__close {
@@ -376,6 +376,10 @@
   .diagnostic-launch-person__motto { min-height: 70px; padding-left: 24px; }
   .diagnostic-launch-person__card { padding: 22px; }
   .diagnostic-launch-person__card img { height: min(58vw, 340px); }
+  .diagnostic-launch__copy h1 { font-size: clamp(38px, 6vw, 46px); }
+  .diagnostic-launch__copy p { font-size: 17px; }
+  .diagnostic-launch__action { width: min(340px, 100%); }
+  .diagnostic-launch__button { min-height: 62px !important; font-size: 17px !important; }
 }
 @media (max-width: 639px) {
   .consultation-stage { padding: 0; }

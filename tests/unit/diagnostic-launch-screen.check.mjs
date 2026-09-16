@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 const root = new URL("../../", import.meta.url);
 const widget = readFileSync(new URL("apps/web/src/components/chat-widget.tsx", root), "utf8");
 const home = readFileSync(new URL("apps/web/src/pages/home.tsx", root), "utf8");
+const styles = readFileSync(new URL("apps/web/src/index.css", root), "utf8");
 
 for (const content of [
   "00 / 04",
@@ -29,5 +30,10 @@ assert.ok(home.includes("<span>Закрыть</span>"));
 assert.ok(widget.includes('<div className="diagnostic-launch__logo" aria-label="ИНОБР">'));
 assert.ok(widget.includes('<ArrowUpRight aria-hidden="true" />'));
 assert.ok(existsSync(new URL("apps/web/public/artem-expertovich.jpg", root)));
+assert.match(styles, /\.consultation-modal--launch\s*\{[\s\S]*?width:\s*min\(1150px,[\s\S]*?height:\s*min\(600px/);
+assert.match(styles, /\.diagnostic-launch__copy h1\s*\{[\s\S]*?font-size:\s*52px/);
+assert.match(styles, /\.diagnostic-launch__copy p\s*\{[^}]*font-size:\s*19px/);
+assert.match(styles, /\.diagnostic-launch__button\s*\{[\s\S]*?min-height:\s*70px[^}]*font-size:\s*18px/);
+assert.match(styles, /\.diagnostic-launch-person__card img\s*\{[\s\S]*?height:\s*286px/);
 
 console.log("PASS: launch content/photo, existing start handler and close wiring.");
