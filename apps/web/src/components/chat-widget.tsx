@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Loader2, CheckCircle2, ChevronRight } from "lucide-react";
+import { Send, Loader2, CheckCircle2, ChevronRight, BookOpen, Target, UserRound } from "lucide-react";
 import inobrLogo from "@assets/image_1782127452755.png";
 import {
   useCreateSession,
@@ -122,7 +122,7 @@ function ResultCard({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ChatWidget() {
+export function ChatWidget({ onDiagnosticStarted }: { onDiagnosticStarted?: () => void }) {
   const [step, setStep] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -230,6 +230,7 @@ export function ChatWidget() {
   // ─── Launch screen → Welcome ────────────────────────────────────────────────
 
   const handleStart = () => {
+    onDiagnosticStarted?.();
     showNextStep();
     setStep(1);
     addBotMessage(
@@ -609,37 +610,39 @@ export function ChatWidget() {
 
   if (step === 0) {
     return (
-      <div className="chat-widget flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
+      <div className="chat-widget diagnostic-launch flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
         {/* Header */}
         <header
-          className="consultation-chat-header px-5 pr-16 flex items-center gap-3 text-white shrink-0"
-          style={{ minHeight: "72px" }}
+          className="diagnostic-launch__header consultation-chat-header px-7 flex items-center text-white shrink-0"
         >
-          <div className="h-8 w-[70px] overflow-hidden shrink-0 rounded">
+          <div className="h-9 w-[78px] overflow-hidden shrink-0 rounded">
             <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
           </div>
-          <div>
-            <h2 id="consultation-title" className="font-semibold text-[15px] text-white leading-tight">Подбор направления обучения</h2>
-            <p className="text-[11px] text-white/65">Персональная диагностика ИНОБР</p>
+          <div className="diagnostic-launch__brand-copy">
+            <h2 id="consultation-title">Подбор направления обучения</h2>
+            <p>Стройэксперт</p>
           </div>
         </header>
 
         {/* Body */}
-        <div className="consultation-chat-intro flex flex-col items-center justify-start sm:justify-center flex-1 min-h-0 overflow-y-auto px-6 py-6 text-center">
-          <div className="h-14 w-[120px] overflow-hidden rounded-lg mb-6">
-            <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
+        <div className="diagnostic-launch__body consultation-chat-intro flex-1 min-h-0 overflow-y-auto">
+          <div className="diagnostic-launch__progress" aria-label="Прогресс диагностики: 0 из 4">
+            <strong>00 / 04</strong>
+            <div aria-hidden="true">
+              <span /><i /><span /><i /><span /><i /><span />
+            </div>
           </div>
 
-          <div className="space-y-3 max-w-[320px] mb-8">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground leading-snug">
-              Подбор направления обучения
+          <div className="diagnostic-launch__copy">
+            <h1>
+              Подберём программу<br />под ваш опыт и цели
             </h1>
-            <p className="text-muted-foreground text-sm leading-relaxed">
-              Ответьте на 4 коротких вопроса — система подготовит предварительную рекомендацию.
+            <p>
+              Ответьте на 4 коротких вопроса — Артём подготовит предварительную рекомендацию.
             </p>
           </div>
 
-          <div className="w-full max-w-[260px] space-y-2">
+          <div className="diagnostic-launch__action">
             {sessionError ? (
               <div className="space-y-3">
                 <p className="text-sm text-destructive">
@@ -667,7 +670,7 @@ export function ChatWidget() {
                   onClick={handleStart}
                   size="lg"
                   aria-label="Начать диагностику"
-                  className="w-full rounded-lg font-semibold px-6 py-3 bg-primary hover:bg-primary/90 text-primary-foreground transition-all text-sm uppercase tracking-wide"
+                  className="diagnostic-launch__button"
                   disabled={!sessionId}
                 >
                   {!sessionId ? (
@@ -676,14 +679,17 @@ export function ChatWidget() {
                       Подготовка...
                     </>
                   ) : (
-                    "Пройти диагностику"
+                    <>Начать диагностику <ChevronRight aria-hidden="true" /></>
                   )}
                 </Button>
-                <p className="text-xs text-muted-foreground hidden sm:block">
-                  Это займёт около 2 минут.
-                </p>
               </>
             )}
+          </div>
+
+          <div className="diagnostic-launch__benefits" aria-label="Преимущества диагностики">
+            <div><BookOpen aria-hidden="true" /><span>Актуальные<br />программы</span></div>
+            <div><Target aria-hidden="true" /><span>Под ваш опыт<br />и цели</span></div>
+            <div><UserRound aria-hidden="true" /><span>Рекомендации<br />от эксперта</span></div>
           </div>
         </div>
       </div>

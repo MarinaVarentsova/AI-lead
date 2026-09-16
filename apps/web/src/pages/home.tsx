@@ -5,6 +5,8 @@ import { ChatWidget } from "@/components/chat-widget";
 export default function Home() {
   const pageRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(true);
+  const [diagnosticStarted, setDiagnosticStarted] = useState(false);
+  const closeConsultation = () => { setIsOpen(false); setDiagnosticStarted(false); };
   useEffect(() => {
     const viewport = window.visualViewport;
     const resize = () => pageRef.current?.style.setProperty("--chat-viewport-height", `${viewport?.height ?? window.innerHeight}px`);
@@ -15,7 +17,7 @@ export default function Home() {
   }, []);
   useEffect(() => {
     if (!isOpen) return;
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setIsOpen(false); };
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") closeConsultation(); };
     document.addEventListener("keydown", closeOnEscape);
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -27,24 +29,34 @@ export default function Home() {
         <div className="consultation-stage__mark">ИНОБР</div>
         <div className="consultation-stage__lines"><span /><span /><span /></div>
       </div>
-      <button className="consultation-stage__trigger" onClick={() => setIsOpen(true)}>
+      <button className="consultation-stage__trigger" onClick={() => { setDiagnosticStarted(false); setIsOpen(true); }}>
         Получить консультацию
       </button>
 
       {isOpen && (
         <div className="consultation-overlay" role="presentation" onMouseDown={(event) => {
-          if (event.target === event.currentTarget) setIsOpen(false);
+          if (event.target === event.currentTarget) closeConsultation();
         }}>
-          <section className="consultation-modal" role="dialog" aria-modal="true" aria-labelledby="consultation-title">
-            <button className="consultation-modal__close" onClick={() => setIsOpen(false)} aria-label="Закрыть консультацию">
+          <section className={`consultation-modal${diagnosticStarted ? "" : " consultation-modal--launch"}`} role="dialog" aria-modal="true" aria-labelledby="consultation-title">
+            <button className="consultation-modal__close" onClick={closeConsultation} aria-label="Закрыть консультацию">
               <X aria-hidden="true" />
             </button>
 
             <div className="consultation-modal__workspace">
-              <ChatWidget />
+              <ChatWidget onDiagnosticStarted={() => setDiagnosticStarted(true)} />
             </div>
 
-            <aside className="consultation-info" aria-label="О консультации">
+            {!diagnosticStarted ? (
+              <aside className="diagnostic-launch-person" aria-label="Персональный консультант">
+                <p className="diagnostic-launch-person__motto">Знания сегодня.<br />Сильная отрасль завтра.</p>
+                <div className="diagnostic-launch-person__card">
+                  <img src="/artem-expertovich.jpg" alt="Артём Экспертович, персональный консультант ИНОБР" />
+                  <h2>Артём Экспертович</h2>
+                  <span>Персональный консультант ИНОБР</span>
+                  <p>«Помогу разобраться в направлениях и подобрать программу под ваши задачи.»</p>
+                </div>
+              </aside>
+            ) : <aside className="consultation-info" aria-label="О консультации">
               <div className="consultation-info__heading">
                 <span className="consultation-info__icon"><GraduationCap aria-hidden="true" /></span>
                 <div>
@@ -74,7 +86,7 @@ export default function Home() {
                 <span />
                 <p>Начните с короткой диагностики — рекомендация появится прямо в диалоге.</p>
               </div>
-            </aside>
+            </aside>}
           </section>
         </div>
       )}
