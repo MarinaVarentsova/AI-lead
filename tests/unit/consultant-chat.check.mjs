@@ -64,9 +64,12 @@ const db = {
   },
 };
 globalThis.__diagnoseCheckDB = db;
+globalThis.__diagnoseCheckState = () => state;
+globalThis.__diagnoseCheckPersisted = persisted;
 const hooks = registerHooks({
   resolve(specifier, context, nextResolve) {
     if (specifier === "@workspace/db") return { url: "diagnose-check:db", shortCircuit: true };
+    if (specifier === "../persistence/artem-repository") return { url: "diagnose-check:persistence", shortCircuit: true };
     if (specifier.startsWith(".") && context.parentURL?.startsWith("file:")) {
       const url = new URL(specifier, context.parentURL);
       for (const suffix of [".ts", "/index.ts"]) {
@@ -78,9 +81,45 @@ const hooks = registerHooks({
   },
   load(url, context, nextLoad) {
     if (url === "diagnose-check:db") {
-      return { format: "module", shortCircuit: true, source:
-        `export const db = globalThis.__diagnoseCheckDB;
-         export { aiDiagnosticAnswers, aiMessages } from ${JSON.stringify(new URL("packages/db/src/schema/ai-sessions.ts", root).href)};` };
+      return { format: "module", shortCircuit: true, source: `export const db = globalThis.__diagnoseCheckDB;` };
+    }
+    if (url === "diagnose-check:persistence") {
+      return { format: "module", shortCircuit: true, source: `
+        const current = () => globalThis.__diagnoseCheckState();
+        export const withDialogueLock = async (_sessionId, action) => globalThis.__diagnoseCheckDB.transaction(action);
+        export const readDialogue = async () => {
+          const state = current();
+          state.reads++;
+          if (state.loadFailure) throw new Error("private database detail");
+          if (!state.row) return [];
+          return (state.history ?? []).map((item, index) => ({ id: item.id ?? "history-" + index,
+            sessionId: state.row.conversationId, messageOrder: index + 1,
+            speaker: item.role === "user" ? "user" : "artem", stage: "consultation",
+            messageType: item.role === "user" ? "user_question" : "artem_answer", text: item.message }));
+        };
+        export const diagnosticAnswersFromDialogue = () => {
+          const row = current().row;
+          if (!row) throw new Error("DIAGNOSTIC_ANSWERS_NOT_FOUND");
+          return { current_area: row.currentArea, current_area_other_text: row.currentAreaOtherText,
+            current_role: row.currentRole, education_status: row.educationStatus, target_tasks: row.targetTasks };
+        };
+        export const consultationRows = rows => rows;
+        export const appendDialogueLocked = async (_tx, conversationId, messages) => {
+          const state = current();
+          const saved = [];
+          for (const message of messages) {
+            const role = message.speaker === "user" ? "user" : "assistant";
+            const value = { ...(message.id ? { id: message.id } : {}), conversationId, role,
+              step: "post_diagnostic_chat", message: message.text };
+            state.writes.push(value);
+            if (state.saveFailure || (state.assistantFailure && role === "assistant")) throw new Error("private database detail");
+            state.saved = true;
+            globalThis.__diagnoseCheckPersisted.push(value);
+            saved.push({ id: message.id ?? "22222222-2222-4222-8222-222222222222" });
+          }
+          return saved;
+        };
+      ` };
     }
     if (url.startsWith("file:") && url.endsWith(".ts")) {
       return { format: "module", shortCircuit: true, source: ts.transpileModule(
@@ -350,6 +389,8 @@ try {
   hooks.deregister();
   globalThis.fetch = originalFetch;
   delete globalThis.__diagnoseCheckDB;
+  delete globalThis.__diagnoseCheckState;
+  delete globalThis.__diagnoseCheckPersisted;
   for (const key of envNames) {
     if (savedEnv[key] === undefined) delete process.env[key];
     else process.env[key] = savedEnv[key];

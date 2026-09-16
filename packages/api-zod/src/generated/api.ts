@@ -25,16 +25,6 @@ export const CreateConversationBody = zod.object({
 
 
 /**
- * @summary Save a single chat message
- */
-export const SaveMessageBody = zod.object({
-  "conversationId": zod.string().uuid(),
-  "role": zod.enum(['user', 'assistant', 'system']),
-  "message": zod.string()
-})
-
-
-/**
  * @summary Save diagnostic answers as a single flat record
  */
 export const SaveDiagnosticAnswersBody = zod.object({

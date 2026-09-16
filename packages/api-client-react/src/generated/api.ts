@@ -27,8 +27,6 @@ import type {
   DiagnosticSchemaQuestion,
   ErrorResponse,
   HealthStatus,
-  MessageInput,
-  MessageResult,
   SessionResult
 } from './api.schemas';
 
@@ -260,77 +258,6 @@ export const useCreateConversation = <TError = ErrorType<ErrorResponse>,
         TContext
       > => {
       return useMutation(getCreateConversationMutationOptions(options));
-    }
-
-export const getSaveMessageUrl = () => {
-
-
-
-
-  return `/api/messages`
-}
-
-/**
- * @summary Save a single chat message
- */
-export const saveMessage = async (messageInput: MessageInput, options?: RequestInit): Promise<MessageResult> => {
-
-  return customFetch<MessageResult>(getSaveMessageUrl(),
-  {
-    ...options,
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
-    body: JSON.stringify(
-      messageInput,)
-  }
-);}
-
-
-
-
-export const getSaveMessageMutationOptions = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveMessage>>, TError,{data: BodyType<MessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof saveMessage>>, TError,{data: BodyType<MessageInput>}, TContext> => {
-
-const mutationKey = ['saveMessage'];
-const {mutation: mutationOptions, request: requestOptions} = options ?
-      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
-      options
-      : {...options, mutation: {...options.mutation, mutationKey}}
-      : {mutation: { mutationKey, }, request: undefined};
-
-
-
-
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof saveMessage>>, {data: BodyType<MessageInput>}> = (props) => {
-          const {data} = props ?? {};
-
-          return  saveMessage(data,requestOptions)
-        }
-
-
-
-
-
-
-  return  { mutationFn, ...mutationOptions }}
-
-    export type SaveMessageMutationResult = NonNullable<Awaited<ReturnType<typeof saveMessage>>>
-    export type SaveMessageMutationBody = BodyType<MessageInput>
-    export type SaveMessageMutationError = ErrorType<ErrorResponse>
-
-    /**
- * @summary Save a single chat message
- */
-export const useSaveMessage = <TError = ErrorType<ErrorResponse>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof saveMessage>>, TError,{data: BodyType<MessageInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
- ): UseMutationResult<
-        Awaited<ReturnType<typeof saveMessage>>,
-        TError,
-        {data: BodyType<MessageInput>},
-        TContext
-      > => {
-      return useMutation(getSaveMessageMutationOptions(options));
     }
 
 export const getSaveDiagnosticAnswersUrl = () => {

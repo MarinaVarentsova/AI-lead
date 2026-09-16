@@ -47,7 +47,7 @@ try {
   const schema = await import(new URL("packages/db/src/schema/ai-sessions.ts", root));
   // Materialize the repository schema, including actual column names and FK constraints.
   const dialect = new PgDialect();
-  for (const table of [schema.aiSessions, schema.aiConversations, schema.aiDiagnosticAnswers, schema.aiMessages, schema.aiContacts]) {
+  for (const table of [schema.aiSessions, schema.aiDialogue, schema.aiEvents]) {
     const config = getTableConfig(table);
     const columns = config.columns.map(column => {
       let ddl = `"${column.name}" ${column.getSQLType()}`;
@@ -74,7 +74,7 @@ try {
     req.log = Object.fromEntries(["info", "warn", "error"].map(level => [level, (data, message) => logs.push({ data, message })]));
     next();
   });
-  for (const route of ["sessions", "conversations", "diagnostic-answers", "consultant-chat", "contacts"]) {
+  for (const route of ["sessions", "conversations", "diagnostic-answers", "consultant-chat"]) {
     app.use("/api", (await import(new URL(`apps/api/src/routes/${route}.ts`, root))).default);
   }
   server = app.listen(0, "127.0.0.1");
@@ -111,17 +111,14 @@ try {
     Uint8Array, Response, console: { info: (...args) => clientLogs.push(args), error: (...args) => clientLogs.push(args) },
     fetch, conversationId, questionDraft: "Сколько стоит обучение?",
     consultantLimitReached: false, consultantBusy: { current: false }, consultantRequest: { current: null },
-    failedQuestion: { current: null }, contactBusy: { current: false }, selectedChannel: "email",
-    contactInput: "codex-regression@example.invalid", uid: randomUUID, showNextStep() {},
+    failedQuestion: { current: null }, uid: randomUUID, showNextStep() {},
     setConsultantLoading() {}, setConsultantMessages() {}, setQuestionDraft() {},
     setConsultantLimitReached(value) { context.consultantLimitReached = value; },
     setConsultantError(value) { context.consultantError = value; },
-    setContactError(value) { context.contactError = value; }, setContactSubmitting() {},
-    setContactPhase(value) { context.contactPhase = value; },
   };
   // Load actual transport + helpers into the same insecure context.
   const helperCode = [read("apps/web/src/lib/api.ts").replace("import.meta.env.VITE_API_BASE_URL", JSON.stringify(base)),
-    read("apps/web/src/lib/consultant-chat.ts"), read("apps/web/src/lib/contact.ts")]
+    read("apps/web/src/lib/consultant-chat.ts")]
     .map(source => transpile(source).replace(/^import .*;\r?\n/gm, "").replace(/\bexport /g, "")).join("\n");
   const setup = helperCode + "\n";
   // Baseline proof: old handler raises before HTTP fetch in this same context.
@@ -149,44 +146,9 @@ try {
   }
   const fourth = await post("/api/consultant-chat", { conversationId, message: "Четвёртый?", requestId: randomUUID() });
   assert.equal(fourth.status, 409); assert.equal(fourth.body.error, "FOLLOW_UP_LIMIT");
-  assert.equal((await pg.query("SELECT count(*)::int AS n FROM ai_messages WHERE step='post_diagnostic_chat' AND role='user'")).rows[0].n, 3);
-
-  await invokeWidget("handleSubmitContact");
-  assert.equal(context.contactPhase, "submitted"); assert.equal(context.contactError, false);
-  const rows = (await pg.query("SELECT * FROM ai_contacts")).rows;
-  assert.equal(rows.length, 1); assert.equal(rows[0].email, context.contactInput);
-  assert.equal(rows[0].contact_channel, "email"); assert.equal(rows[0].conversation_id, conversationId);
-  const telegram = await post("/api/contacts", { conversationId, contactChannel: "telegram", telegram: "@regression_test" });
-  assert.equal(telegram.status, 201); assert.equal(telegram.body.conversationId, conversationId);
-  const saved = (await pg.query("SELECT * FROM ai_contacts WHERE id=$1", [telegram.body.contactId])).rows[0];
-  assert.equal(saved.telegram, "@regression_test"); assert.equal(saved.contact_channel, "telegram"); assert.equal(saved.phone, null);
-  context.selectedChannel = "call"; context.contactInput = "+79999999999";
-  await invokeWidget("handleSubmitContact");
-  assert.equal((await pg.query("SELECT phone FROM ai_contacts WHERE contact_channel='call'")).rows[0].phone, context.contactInput);
-  context.contactPhase = "details"; context.selectedChannel = "unknown";
-  await invokeWidget("handleSubmitContact");
-  assert.equal(context.contactPhase, "details"); assert.equal(context.contactError, true);
-  context.selectedChannel = "email";
-  // Real SQL error, not a mocked rejected promise. Restore column afterwards.
-  await pg.exec("ALTER TABLE ai_contacts RENAME COLUMN contact_channel TO unavailable_channel");
-  await invokeWidget("handleSubmitContact");
-  assert.equal(context.contactPhase, "details"); assert.equal(context.contactError, true);
-  assert.equal((await pg.query("SELECT count(*)::int AS n FROM ai_contacts")).rows[0].n, 3);
-  await pg.exec("ALTER TABLE ai_contacts RENAME COLUMN unavailable_channel TO contact_channel");
-  const failure = logs.find(log => log.message === "CONTACT_REQUEST_FAILED");
-  assert.equal(failure.data.stage, "insert"); assert.equal(failure.data.errorCode, "42703");
-  assert.equal(failure.data.httpStatus, 500);
-  for (const { data, message } of logs.filter(log => log.message.startsWith("CONTACT_"))) {
-    assert.ok(Object.keys(data).every(key => ["requestId", "stage", "errorCode", "httpStatus", "constraint"].includes(key)));
-    assert.ok(!JSON.stringify({ data, message }).includes(context.contactInput));
-  }
-  for (const [, data] of clientLogs) {
-    assert.ok(Object.keys(data).every(key => ["stage", "errorCode", "httpStatus"].includes(key)));
-  }
-  assert.ok(!JSON.stringify(clientLogs).includes("@"));
-  assert.ok(clientLogs.some(([message, data]) => message === "CONTACT_CLIENT_FAILED" && data.httpStatus === 400));
-  assert.ok(clientLogs.some(([message, data]) => message === "CONTACT_CLIENT_FAILED" && data.httpStatus === 500));
-  console.log("PASS: actual widget handlers without randomUUID → HTTP POST → PostgreSQL; chat 200/retry/200/200/409, exactly 3 questions; email/telegram/phone persisted, 201 receipt; validation and real DB failure never confirm success. External AI stubbed; production untouched.");
+  assert.equal((await pg.query("SELECT count(*)::int AS n FROM ai_dialogue WHERE stage='consultation' AND speaker='user'")).rows[0].n, 3);
+  assert.equal((await pg.query("SELECT count(*)::int AS n FROM ai_dialogue WHERE stage='diagnostic'")).rows[0].n, 8);
+  console.log("PASS: actual insecure-context widget handler → HTTP POST → unified dialogue; retry idempotency and 3-question limit preserved.");
 } finally {
   if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
   hooks.deregister(); delete globalThis.__postDiagnosticDb; await pg.close();

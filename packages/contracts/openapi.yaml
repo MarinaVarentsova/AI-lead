@@ -14,8 +14,6 @@ tags:
     description: Session management
   - name: conversations
     description: Conversation management
-  - name: messages
-    description: Message persistence
   - name: diagnostic
     description: Diagnostic answer submission
 paths:
@@ -63,31 +61,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ConversationResult"
-        "400":
-          description: Invalid input
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-
-  /messages:
-    post:
-      operationId: saveMessage
-      tags: [messages]
-      summary: Save a single chat message
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/MessageInput"
-      responses:
-        "201":
-          description: Message saved
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResult"
         "400":
           description: Invalid input
           content:
@@ -183,30 +156,6 @@ components:
           format: uuid
         currentStep:
           type: string
-
-    MessageInput:
-      type: object
-      required: [conversationId, role, message]
-      properties:
-        conversationId:
-          type: string
-          format: uuid
-        role:
-          type: string
-          enum: [user, assistant, system]
-        message:
-          type: string
-
-    MessageResult:
-      type: object
-      required: [messageId, conversationId]
-      properties:
-        messageId:
-          type: string
-          format: uuid
-        conversationId:
-          type: string
-          format: uuid
 
     DiagnosticAnswersInput:
       type: object

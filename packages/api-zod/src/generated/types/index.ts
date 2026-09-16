@@ -19,7 +19,4 @@ export * from './diagnosticSchemaQuestion';
 export * from './diagnosticSchemaQuestionField';
 export * from './errorResponse';
 export * from './healthStatus';
-export * from './messageInput';
-export * from './messageInputRole';
-export * from './messageResult';
 export * from './sessionResult';

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, aiConversations } from "@workspace/db";
+import { findSession } from "../persistence/artem-repository";
 
 const router: IRouter = Router();
 
@@ -14,28 +14,17 @@ router.post("/conversations", async (req, res): Promise<void> => {
   }
 
   try {
-    const [conversation] = await db
-      .insert(aiConversations)
-      .values({
-        sessionId,
-        status: "diagnostic_in_progress",
-        currentStep: "current_area",
-      })
-      .returning();
-
-    req.log.info({ conversationId: conversation.id }, "Conversation created");
+    const session = await findSession(sessionId);
+    if (!session) { res.status(404).json({ error: "Session not found." }); return; }
+    req.log.info({ sessionId }, "SESSION_DIALOGUE_READY");
     res.status(201).json({
-      conversationId: conversation.id,
-      sessionId: conversation.sessionId,
-      currentStep: conversation.currentStep,
+      conversationId: session.id,
+      sessionId: session.id,
+      currentStep: "current_area",
     });
   } catch (err: unknown) {
-    const e = err as Error & { cause?: Error & { code?: string; message?: string } };
-    req.log.error(
-      { pgCode: e.cause?.code, pgMessage: e.cause?.message, msg: e.message },
-      "Conversation insert failed"
-    );
-    res.status(500).json({ error: e.message, pgCode: e.cause?.code, pgMessage: e.cause?.message });
+    req.log.error({ sessionId, stage: "session_lookup", errorCode: "SESSION_LOOKUP_FAILED", httpStatus: 500 }, "SESSION_LOOKUP_FAILED");
+    res.status(500).json({ error: "Unable to find session." });
   }
 });
 

@@ -1,7 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, aiDiagnosticAnswers, aiConversations } from "@workspace/db";
-import { eq } from "drizzle-orm";
 import { DiagnosticKnowledgeResolver, DiagnosticValidationError, type DiagnosticAnswers } from "@workspace/domain/diagnostic";
+import { findSession, saveDiagnosticDialogue } from "../persistence/artem-repository";
 
 const router: IRouter = Router();
 
@@ -23,44 +22,16 @@ router.post("/diagnostic-answers", async (req, res): Promise<void> => {
 
   try {
     DiagnosticKnowledgeResolver.resolve(answers);
-    // Until the additive DB migration block, the unchanged physical columns are storage slots only.
-    const values = { conversationId, experienceArea: answers.current_area,
-      experienceAreaRaw: answers.current_area_other_text ?? null, experienceYears: answers.current_role,
-      experienceYearsRaw: null, educationType: answers.education_status, educationTypeRaw: null,
-      goal: answers.target_tasks, goalRaw: null };
-    await db
-      .insert(aiDiagnosticAnswers)
-      .values(values)
-      .onConflictDoUpdate({
-        target: aiDiagnosticAnswers.conversationId,
-        set: {
-          experienceArea: values.experienceArea,
-          experienceAreaRaw: values.experienceAreaRaw,
-          experienceYears: values.experienceYears,
-          experienceYearsRaw: values.experienceYearsRaw,
-          educationType: values.educationType,
-          educationTypeRaw: values.educationTypeRaw,
-          goal: values.goal,
-          goalRaw: values.goalRaw,
-          updatedAt: new Date(),
-        },
-      });
-
-    await db
-      .update(aiConversations)
-      .set({ status: "diagnostic_completed", currentStep: "diagnostic_completed", updatedAt: new Date() })
-      .where(eq(aiConversations.id, conversationId));
+    if (!await findSession(conversationId)) { res.status(404).json({ error: "Session not found." }); return; }
+    await saveDiagnosticDialogue(conversationId, answers);
 
     req.log.info({ conversationId }, "Diagnostic answers saved");
     res.status(201).json({ saved: true, conversationId });
   } catch (err: unknown) {
     if (err instanceof DiagnosticValidationError) { res.status(400).json({ error: err.code, issues: err.issues }); return; }
-    const e = err as Error & { cause?: Error & { code?: string; message?: string } };
-    req.log.error(
-      { pgCode: e.cause?.code, pgMessage: e.cause?.message, msg: e.message },
-      "Diagnostic answers save failed"
-    );
-    res.status(500).json({ error: e.message, pgCode: e.cause?.code, pgMessage: e.cause?.message });
+    const code = err instanceof Error && err.message === "DIAGNOSTIC_DIALOGUE_CONFLICT" ? err.message : "DIALOGUE_INSERT_FAILED";
+    req.log.error({ sessionId: conversationId, stage: "diagnostic", errorCode: code, httpStatus: code.endsWith("CONFLICT") ? 409 : 500 }, "DIAGNOSTIC_DIALOGUE_FAILED");
+    res.status(code.endsWith("CONFLICT") ? 409 : 500).json({ error: code });
   }
 });
 

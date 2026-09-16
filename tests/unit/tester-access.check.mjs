@@ -26,7 +26,7 @@ try {
   assert.ok(routes.indexOf('router.use("/tester", internalTesterAccess)') < routes.indexOf('router.post('));
   const index = read("apps/api/src/routes/index.ts");
   assert.ok(!index.includes("internalTesterAccess"));
-  for (const path of ["health", "diagnose", "consultant-chat", "contacts"]) assert.ok(!read(`apps/api/src/routes/${path}.ts`).includes("internalTesterAccess"));
+  for (const path of ["health", "diagnose", "consultant-chat", "sessions"]) assert.ok(!read(`apps/api/src/routes/${path}.ts`).includes("internalTesterAccess"));
   const storage = new Map();
   globalThis.sessionStorage = { getItem: key => storage.get(key) ?? null, setItem: (key,value) => storage.set(key,value), removeItem: key => storage.delete(key) };
   const events = [];

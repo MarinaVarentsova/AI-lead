@@ -28,26 +28,6 @@ export interface ConversationResult {
   currentStep: string;
 }
 
-export type MessageInputRole = typeof MessageInputRole[keyof typeof MessageInputRole];
-
-
-export const MessageInputRole = {
-  user: 'user',
-  assistant: 'assistant',
-  system: 'system',
-} as const;
-
-export interface MessageInput {
-  conversationId: string;
-  role: MessageInputRole;
-  message: string;
-}
-
-export interface MessageResult {
-  messageId: string;
-  conversationId: string;
-}
-
 export type DiagnosticAnswersInputCurrentArea = typeof DiagnosticAnswersInputCurrentArea[keyof typeof DiagnosticAnswersInputCurrentArea];
 
 

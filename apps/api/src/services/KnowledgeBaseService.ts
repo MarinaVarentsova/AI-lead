@@ -5,7 +5,7 @@ import { logger } from "../lib/logger";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type KnowledgeSource = "file" | "database";
+export type KnowledgeSource = "file";
 
 export interface KnowledgeEntry {
   id: string;
@@ -67,10 +67,7 @@ class KnowledgeBaseService {
    * Does not throw — returns status object for diagnostic use.
    */
   async checkStatus(): Promise<KnowledgeBaseStatus> {
-    if (this.source === "file") {
-      return this.checkFileStatus();
-    }
-    return this.checkDatabaseStatus();
+    return this.checkFileStatus();
   }
 
   /**
@@ -84,11 +81,7 @@ class KnowledgeBaseService {
       return this.cache;
     }
 
-    if (this.source === "file") {
-      this.cache = await this.loadFromFile();
-    } else {
-      this.cache = await this.loadFromDatabase();
-    }
+    this.cache = await this.loadFromFile();
 
     logger.info(
       { source: this.source, count: this.cache.length },
@@ -139,26 +132,6 @@ class KnowledgeBaseService {
     ];
   }
 
-  // ─── Database source ─────────────────────────────────────────────────────────
-
-  private async checkDatabaseStatus(): Promise<KnowledgeBaseStatus> {
-    // Phase 2: implement DB query to count ai_knowledge rows
-    return {
-      source: "database",
-      available: false,
-      entryCount: 0,
-      error: "Database source not yet implemented — coming in Phase 2",
-    };
-  }
-
-  private async loadFromDatabase(): Promise<KnowledgeEntry[]> {
-    // Phase 2: query ai_knowledge table via Drizzle ORM
-    // import { db, aiKnowledge } from "@workspace/db";
-    // const rows = await db.select().from(aiKnowledge).where(eq(aiKnowledge.isActive, true));
-    // return rows.map(r => ({ id: String(r.id), title: r.title, content: r.content, ... }));
-    logger.warn("Database knowledge source not yet implemented");
-    return [];
-  }
 }
 
 // ─── Singleton ────────────────────────────────────────────────────────────────

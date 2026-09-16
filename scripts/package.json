@@ -4,14 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "seed:dictionaries": "tsx ./src/seed-dictionaries.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
-    "@types/node": "catalog:",
-    "tsx": "catalog:"
-  },
-  "dependencies": {
-    "@workspace/db": "workspace:*"
+    "@types/node": "catalog:"
   }
 }

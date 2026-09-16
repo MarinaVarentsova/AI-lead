@@ -1,12 +1,12 @@
 /** POST /api/diagnose: resolve verified facts, generate a result and persist it. */
 import { Router, type IRouter } from "express";
-import { db, aiDiagnosticAnswers, aiMessages } from "@workspace/db";
+import { db } from "@workspace/db";
 import {
   DiagnosticKnowledgeResolver, DiagnosticValidationError, buildFactsPacket,
   type DiagnosticAnswers,
 } from "@workspace/domain/diagnostic";
-import { eq } from "drizzle-orm";
 import { getArtemRuntime } from "../ai/artem-runtime";
+import { appendDialogueLocked, diagnosticAnswersFromDialogue, readDialogue, withDialogueLock } from "../persistence/artem-repository";
 
 const router: IRouter = Router();
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -26,28 +26,15 @@ router.post("/diagnose", async (req, res): Promise<void> => {
     }
 
     phase = "load_answers";
-    const [row] = await db.select({
-      currentArea: aiDiagnosticAnswers.experienceArea,
-      currentAreaOtherText: aiDiagnosticAnswers.experienceAreaRaw,
-      currentRole: aiDiagnosticAnswers.experienceYears,
-      educationStatus: aiDiagnosticAnswers.educationType,
-      targetTasks: aiDiagnosticAnswers.goal,
-    }).from(aiDiagnosticAnswers)
-      .where(eq(aiDiagnosticAnswers.conversationId, conversationId)).limit(1);
-    req.log.info({ found: Boolean(row) }, "DIAGNOSTIC_ANSWERS_LOADED");
-    if (!row) {
+    const dialogue = await readDialogue(db, conversationId);
+    req.log.info({ found: dialogue.some(row => row.messageType === "diagnostic_answer") }, "DIAGNOSTIC_ANSWERS_LOADED");
+    if (!dialogue.some(row => row.messageType === "diagnostic_answer")) {
       res.status(404).json({ error: "Diagnostic answers not found for this conversation." });
       return;
     }
 
     phase = "resolve_answers";
-    // Drizzle maps the existing snake_case columns to these camelCase properties.
-    // Empty codes remain invalid; the resolver reports all missing/unknown codes.
-    const answers: DiagnosticAnswers = {
-      current_area: row.currentArea ?? "", current_area_other_text: row.currentAreaOtherText,
-      current_role: row.currentRole ?? "", education_status: row.educationStatus ?? "",
-      target_tasks: row.targetTasks ?? "",
-    };
+    const answers: DiagnosticAnswers = diagnosticAnswersFromDialogue(dialogue);
     const resolved = DiagnosticKnowledgeResolver.resolve(answers);
     const facts = buildFactsPacket(resolved);
     req.log.info({
@@ -71,13 +58,12 @@ router.post("/diagnose", async (req, res): Promise<void> => {
     }
 
     phase = "save_result";
-    const [saved] = await db.insert(aiMessages).values({
-      conversationId,
-      role: "assistant",
-      step: "diagnostic_result",
-      message: result,
-    }).returning({ id: aiMessages.id });
-    if (!saved) throw new Error("Diagnostic result was not saved");
+    await withDialogueLock(conversationId, async tx => {
+      const current = await readDialogue(tx, conversationId);
+      if (!current.some(row => row.stage === "recommendation" && row.messageType === "recommendation")) {
+        await appendDialogueLocked(tx, conversationId, [{ speaker: "artem", stage: "recommendation", messageType: "recommendation", text: result }]);
+      }
+    });
     req.log.info("DIAGNOSTIC_RESULT_SAVED");
 
     res.status(200).json({

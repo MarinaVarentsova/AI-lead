@@ -1,10 +1,9 @@
 import { Router, type IRouter } from "express";
 import { randomUUID } from "node:crypto";
-import { db, aiDiagnosticAnswers, aiMessages } from "@workspace/db";
-import { and, asc, eq, sql } from "drizzle-orm";
 import { DiagnosticValidationError } from "@workspace/domain/diagnostic";
 import { ConsultantValidationError } from "@workspace/domain/consultant";
 import { getArtemRuntime, followUpCount, MAX_FOLLOW_UPS } from "../ai/artem-runtime";
+import { appendDialogueLocked, consultationRows, diagnosticAnswersFromDialogue, readDialogue, withDialogueLock } from "../persistence/artem-repository";
 const router: IRouter = Router();
 const uuid = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
 router.post("/consultant-chat", async (req, res): Promise<void> => {
@@ -23,19 +22,15 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
     }
     const message = value.trim();
     const requestId = suppliedId ?? randomUUID();
-    // PostgreSQL lock serializes this conversation across processes. Both messages commit
-    // together; failed transactions consume no questions. requestId is the user message UUID.
-    const result = await db.transaction(async tx => {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${conversationId}))`);
+    // The session lock serializes message_order and keeps each user/Artem pair atomic.
+    const result = await withDialogueLock(conversationId, async tx => {
       phase = "load_context";
-      const [row] = await tx.select({ currentArea: aiDiagnosticAnswers.experienceArea,
-        currentAreaOtherText: aiDiagnosticAnswers.experienceAreaRaw, currentRole: aiDiagnosticAnswers.experienceYears,
-        educationStatus: aiDiagnosticAnswers.educationType, targetTasks: aiDiagnosticAnswers.goal })
-        .from(aiDiagnosticAnswers).where(eq(aiDiagnosticAnswers.conversationId, conversationId)).limit(1);
-      if (!row) return { status: 404, body: { error: "Diagnostic answers not found.", code: "DIAGNOSTIC_ANSWERS_NOT_FOUND" } };
-      const history = await tx.select({ id: aiMessages.id, role: aiMessages.role, message: aiMessages.message }).from(aiMessages)
-        .where(and(eq(aiMessages.conversationId, conversationId), eq(aiMessages.step, "post_diagnostic_chat")))
-        .orderBy(asc(aiMessages.createdAt), asc(aiMessages.id));
+      const dialogue = await readDialogue(tx, conversationId);
+      let answers;
+      try { answers = diagnosticAnswersFromDialogue(dialogue); }
+      catch { return { status: 404, body: { error: "Diagnostic answers not found.", code: "DIAGNOSTIC_ANSWERS_NOT_FOUND" } }; }
+      const consultation = consultationRows(dialogue);
+      const history = consultation.map(row => ({ id: row.id, role: row.speaker === "user" ? "user" as const : "assistant" as const, message: row.text }));
       const count = followUpCount(history);
       const existing = history.findIndex(item => item.id === requestId && item.role === "user");
       if (existing >= 0) {
@@ -48,12 +43,12 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
       req.log.info({ requestId, stage: phase, provider }, "CONSULTANT_CONTEXT_LOADED");
       phase = "load_runtime";
       const runtime = await getArtemRuntime();
-      const facts = runtime.prepare({ current_area: row.currentArea ?? "", current_area_other_text: row.currentAreaOtherText,
-        current_role: row.currentRole ?? "", education_status: row.educationStatus ?? "",
-        target_tasks: row.targetTasks ?? "" }, message, history);
+      const facts = runtime.prepare(answers, message, history);
       req.log.info({ requestId, stage: phase, provider, sectionIds: facts.matchedSections.map(s => s.id) }, "CONSULTANT_KNOWLEDGE_RESOLVED");
       phase = "save_user";
-      const [user] = await tx.insert(aiMessages).values({ id: requestId, conversationId, role: "user", step: "post_diagnostic_chat", message, createdAt: new Date() }).returning({ id: aiMessages.id });
+      const [user] = await appendDialogueLocked(tx, conversationId, [
+        { id: requestId, speaker: "user", stage: "consultation", messageType: "user_question", text: message },
+      ]);
       if (!user) throw new Error("SAVE_FAILED");
       phase = "generate";
       req.log.info({ requestId, stage: phase, provider }, "CONSULTANT_AI_CALL_START");
@@ -65,8 +60,9 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
         req.log.info({ requestId, stage: phase, provider, errorCode: response.fallbackReason }, "CONSULTANT_FALLBACK_USED");
       }
       phase = "save_assistant";
-      const [assistant] = await tx.insert(aiMessages).values({ conversationId, role: "assistant", step: "post_diagnostic_chat", message: response.message,
-        createdAt: new Date(Date.now() + 1) }).returning({ id: aiMessages.id });
+      const [assistant] = await appendDialogueLocked(tx, conversationId, [
+        { speaker: "artem", stage: "consultation", messageType: "artem_answer", text: response.message },
+      ]);
       if (!assistant) throw new Error("SAVE_FAILED");
       return { status: 200, body: response };
     });
