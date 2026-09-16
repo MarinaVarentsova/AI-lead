@@ -33,7 +33,7 @@ assert.ok(home.includes("<span>Закрыть</span>"));
 assert.ok(widget.includes('<div className="diagnostic-launch__logo" aria-label="ИНОБР">'));
 assert.ok(widget.includes('<ArrowUpRight aria-hidden="true" />'));
 assert.ok(existsSync(new URL("apps/web/public/artem-expertovich.jpg", root)));
-assert.match(styles, /\.consultation-modal--launch,[\s\S]*?\.consultation-modal--diagnostic\s*\{[\s\S]*?width:\s*min\(1150px,[\s\S]*?height:\s*min\(600px/);
+assert.match(styles, /\.consultation-modal--launch,[\s\S]*?\.consultation-modal--diagnostic,[\s\S]*?\.consultation-modal--recommendation\s*\{[\s\S]*?width:\s*min\(1150px,[\s\S]*?height:\s*min\(600px/);
 assert.match(styles, /\.diagnostic-launch__copy h1\s*\{[\s\S]*?font-size:\s*52px/);
 assert.match(styles, /\.diagnostic-launch__copy p\s*\{[^}]*font-size:\s*19px/);
 assert.match(styles, /\.diagnostic-launch__button\s*\{[\s\S]*?min-height:\s*70px[^}]*font-size:\s*18px/);
@@ -47,5 +47,7 @@ assert.ok(widget.includes("handleDiagnosticNext(displayedQIndex)"));
 assert.ok(widget.includes("pendingAnswer.code !== \"other\" || customInput.trim()"));
 assert.match(styles, /\.diagnostic-question__options > button\.is-selected\s*\{[^}]*background:\s*#f2b631/);
 assert.ok(home.includes('!diagnosticCompleted ? " consultation-modal--diagnostic"'));
+assert.ok(home.includes('" consultation-modal--recommendation"'));
+assert.ok(home.includes("!diagnosticCompleted || recommendationActive"));
 
 console.log("PASS: launch content/photo, existing start handler and close wiring.");

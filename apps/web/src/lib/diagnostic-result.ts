@@ -2,6 +2,7 @@ import { apiFetch } from "./api";
 
 export interface StructuredDiagnosticResult {
   recommendation: string;
+  recommendedTrack: "construction_expertise" | "apartment_acceptance" | "not_defined";
 }
 
 export interface DiagnoseResponse {
@@ -32,8 +33,12 @@ function text(value: unknown): string {
 export function parseDiagnoseResponse(value: unknown): DiagnoseResponse {
   const response = record(value);
   const result = record(response.structuredResult);
+  const track = result.recommendedTrack;
+  if (track !== "construction_expertise" && track !== "apartment_acceptance" && track !== "not_defined") {
+    throw new Error(DIAGNOSTIC_ERROR);
+  }
   return {
-    structuredResult: { recommendation: text(result.recommendation) },
+    structuredResult: { recommendation: text(result.recommendation), recommendedTrack: track },
   };
 }
 

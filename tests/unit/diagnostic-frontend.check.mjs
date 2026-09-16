@@ -52,7 +52,8 @@ const response = {
   isAI: false, provider: "fallback", sourceVersion: fixture.expectedSourceVersion,
   fallbackReason: "AI_CONFIGURATION_ERROR",
 };
-const visibleResponse = { structuredResult: { recommendation: fixture.validResult.recommendation } };
+const visibleResponse = { structuredResult: { recommendation: fixture.validResult.recommendation,
+  recommendedTrack: fixture.validResult.recommendedTrack } };
 const schema = [
   { questionNumber: 1, field: "current_area", questionText: "Сфера?", options: [
     { code: "construction_repair", label: "Строительство", allowsFreeText: false },
@@ -153,7 +154,11 @@ try {
   assert.match(widget, /current_role:\s*allAnswers\[1\]\.code/);
   assert.match(widget, /education_status:\s*allAnswers\[2\]\.code/);
   assert.match(widget, /target_tasks:\s*allAnswers\[3\]\.code/);
-  assert.ok(widget.includes("<p>{result.recommendation}</p>"));
+  assert.ok(widget.includes('className="diagnostic-recommendation__text">{result.recommendation}</p>'));
+  assert.ok(widget.includes("260–520 академических часов"));
+  assert.ok(widget.includes("Связаться с менеджером"));
+  assert.ok(widget.includes("Задать вопрос"));
+  assert.ok(widget.includes("<ProgressBar current={4} total={4} />"));
   assert.ok(widget.includes("onClick={onGetConsultation}"));
   assert.ok(widget.includes("await recordManagerContactClick(conversationId)"));
   assert.ok(widget.includes('onGetConsultation={() => { void handleManagerContactClick(); }}'));

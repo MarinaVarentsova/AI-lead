@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Loader2, CheckCircle2, ChevronRight, ArrowUpRight, BookOpen, Target, UserRound } from "lucide-react";
+import { Send, Loader2, CheckCircle2, ChevronRight, ArrowUpRight, BookOpen, Target, UserRound,
+  FileText, Users, ChartNoAxesColumnIncreasing } from "lucide-react";
 import inobrLogo from "@assets/image_1782127452755.png";
 import {
   useCreateSession,
@@ -70,11 +71,45 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
   );
 }
 
-function ResultCard({
+function RecommendationCard({
   result,
   onAskQuestion,
   onGetConsultation,
 }: {
+  result: StructuredDiagnosticResult;
+  onAskQuestion: () => void;
+  onGetConsultation: () => void;
+}) {
+  const presentation = result.recommendedTrack === "construction_expertise"
+    ? { title: "Стройэксперт", duration: "260–520 академических часов" }
+    : result.recommendedTrack === "apartment_acceptance"
+      ? { title: "Приёмка квартир", duration: "Продолжительность уточнит менеджер" }
+      : { title: "Приёмка квартир и Приёмка ИЖС", duration: "Продолжительность уточнит менеджер" };
+  return (
+    <div className="diagnostic-recommendation__card">
+      <span className="diagnostic-recommendation__badge">Ваша рекомендация</span>
+      <h1>{presentation.title} <i>·</i> {presentation.duration}</h1>
+      <p className="diagnostic-recommendation__text">{result.recommendation}</p>
+      <div className="diagnostic-recommendation__benefits" aria-label="Преимущества программы">
+        <div><FileText aria-hidden="true" /><span>Практические навыки<br />на реальных задачах</span></div>
+        <div><Users aria-hidden="true" /><span>Поддержка экспертов<br />на всех этапах</span></div>
+        <div><ChartNoAxesColumnIncreasing aria-hidden="true" /><span>Знания для развития<br />в выбранном направлении</span></div>
+      </div>
+      <div className="diagnostic-recommendation__actions">
+        <Button data-testid="button-get-consultation" onClick={onGetConsultation}
+          className="diagnostic-recommendation__primary">
+          Связаться с менеджером <ArrowUpRight aria-hidden="true" />
+        </Button>
+        <Button data-testid="button-ask-question" variant="outline" onClick={onAskQuestion}
+          className="diagnostic-recommendation__secondary">
+          Задать вопрос
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ResultCard({ result, onAskQuestion, onGetConsultation }: {
   result: StructuredDiagnosticResult;
   onAskQuestion: () => void;
   onGetConsultation: () => void;
@@ -85,27 +120,12 @@ function ResultCard({
         <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
         <span className="font-semibold text-[15px] text-foreground">Ваша рекомендация</span>
       </div>
-
-      <div className="text-sm text-foreground leading-[1.6] whitespace-pre-wrap">
-        <p>{result.recommendation}</p>
-      </div>
-
-
-      <Button
-        data-testid="button-ask-question"
-        variant="outline"
-        onClick={onAskQuestion}
-        className="w-full rounded-lg text-sm font-medium border-primary text-primary"
-      >
-        Задать вопрос
-      </Button>
-      <Button
-        data-testid="button-get-consultation"
-        onClick={onGetConsultation}
-        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium"
-      >
-        Связаться с менеджером
-        <ChevronRight className="w-4 h-4 ml-1" />
+      <p className="text-sm text-foreground leading-[1.6] whitespace-pre-wrap">{result.recommendation}</p>
+      <Button data-testid="button-ask-question" variant="outline" onClick={onAskQuestion}
+        className="w-full rounded-lg text-sm font-medium border-primary text-primary">Задать вопрос</Button>
+      <Button data-testid="button-get-consultation" onClick={onGetConsultation}
+        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium">
+        Связаться с менеджером <ChevronRight className="w-4 h-4 ml-1" />
       </Button>
     </div>
   );
@@ -113,9 +133,10 @@ function ResultCard({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted }: {
+export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onRecommendationAction }: {
   onDiagnosticStarted?: () => void;
   onDiagnosticCompleted?: () => void;
+  onRecommendationAction?: () => void;
 }) {
   const [step, setStep] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -133,6 +154,7 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted }: {
 
   const [diagnosticStatus, setDiagnosticStatus] = useState<"idle" | "loading" | "error" | "success">("idle");
   const [diagnosticResult, setDiagnosticResult] = useState<DiagnoseResponse | null>(null);
+  const [recommendationViewActive, setRecommendationViewActive] = useState(false);
   const [postDiagnosticState, setPostDiagnosticState] = useState<"result" | "post-diagnostic-ready">("result");
   const [questionDraft, setQuestionDraft] = useState("");
   const [consultantMessages, setConsultantMessages] = useState<Message[]>([]);
@@ -329,6 +351,7 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted }: {
         questionFocusGate.current.afterAnswer(qIndex + 1);
         addBotMessage(next.questionText);
       } else {
+        setRecommendationViewActive(true);
         onDiagnosticCompleted?.();
         void generateResult({ conversationId, current_area: allAnswers[0].code,
           ...(allAnswers[0].code === "other" ? { current_area_other_text: allAnswers[0].raw } : {}),
@@ -734,9 +757,45 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted }: {
             </Button>
             <Button onClick={() => handleDiagnosticNext(displayedQIndex)} disabled={!canContinue || isTyping}
               className="diagnostic-question__next">
-              Далее <ArrowUpRight aria-hidden="true" />
+              {displayedQIndex === 3 && !reviewing ? "Получить рекомендацию" : "Далее"}
+              <ArrowUpRight aria-hidden="true" />
             </Button>
           </nav>
+        </main>
+      </div>
+    );
+  }
+
+  if (recommendationViewActive) {
+    return (
+      <div className="chat-widget diagnostic-recommendation flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
+        <header className="diagnostic-launch__header consultation-chat-header px-7 flex items-center text-white shrink-0">
+          <div className="diagnostic-launch__logo" aria-label="ИНОБР"><span aria-hidden="true" /><strong>ИНОБР</strong></div>
+          <div className="diagnostic-launch__brand-copy">
+            <h2 id="consultation-title">Подбор направления обучения</h2><p>Стройэксперт</p>
+          </div>
+        </header>
+        <main className="diagnostic-recommendation__body">
+          <ProgressBar current={4} total={4} />
+          {diagnosticStatus === "loading" && <div className="diagnostic-recommendation__loading" role="status">
+            <Loader2 aria-hidden="true" /> Формируем персональную рекомендацию...
+          </div>}
+          {diagnosticStatus === "error" && <div className="diagnostic-recommendation__error" role="alert">
+            <p>{DIAGNOSTIC_ERROR}</p>
+            <Button onClick={() => { if (pendingDiagnostic.current) void generateResult(pendingDiagnostic.current); }}>
+              Повторить
+            </Button>
+          </div>}
+          {diagnosticStatus === "success" && diagnosticResult && (
+            <RecommendationCard result={diagnosticResult.structuredResult}
+              onAskQuestion={() => {
+                setRecommendationViewActive(false); onRecommendationAction?.();
+                showNextStep("input"); setPostDiagnosticState("post-diagnostic-ready");
+              }}
+              onGetConsultation={() => {
+                setRecommendationViewActive(false); onRecommendationAction?.(); void handleManagerContactClick();
+              }} />
+          )}
         </main>
       </div>
     );
