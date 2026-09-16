@@ -223,21 +223,11 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted }: {
     setMessages((prev) => [...prev, { id: uid(), role: "bot", content }]);
   };
 
-  // ─── Launch screen → Welcome ────────────────────────────────────────────────
+  // ─── Launch screen → Q1 ────────────────────────────────────────────────────
 
   const handleStart = () => {
-    onDiagnosticStarted?.();
-    showNextStep();
-    setStep(1);
-    addBotMessage(
-      "Здравствуйте.\n\nЯ помогу понять, подходит ли вам обучение по строительной экспертизе и какой вариант стоит рассмотреть.\n\nСначала задам 4 коротких вопроса.\n\nЭто займет около 2 минут."
-    );
-  };
-
-  // ─── Welcome → Q1 ──────────────────────────────────────────────────────────
-
-  const handleBeginQuestions = () => {
     if (!sessionId || diagnosticSchema.length !== 4) return;
+    onDiagnosticStarted?.();
     showNextStep();
     setIsTyping(true);
 
@@ -676,9 +666,9 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted }: {
                   size="lg"
                   aria-label="Начать диагностику"
                   className="diagnostic-launch__button"
-                  disabled={!sessionId}
+                  disabled={!sessionId || diagnosticSchema.length !== 4}
                 >
-                  {!sessionId ? (
+                  {!sessionId || schemaLoading ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       Подготовка...
@@ -901,24 +891,6 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted }: {
           {consultantLimitReached && <div ref={limitCtaRef} className="chat-focus-target"><Button className="w-full" onClick={() => {
             showNextStep("contact"); setContactPhase(phase => phase ?? "channel");
           }}>Продолжить с менеджером</Button></div>}
-
-          {/* "Начать" button (step 1) */}
-          {step === 1 && !isTyping && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="pl-9"
-            >
-              <Button
-                data-testid="button-begin-questions"
-                onClick={handleBeginQuestions}
-                aria-label="Начать диагностику"
-                className="rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground px-5 py-2 text-sm font-medium"
-              >
-                Начать
-              </Button>
-            </motion.div>
-          )}
 
           {/* Forms share the same viewport, so long results cannot squeeze them out. */}
           {contactPhase && <div ref={contactFormRef} className="chat-focus-target">{renderContactSection()}</div>}

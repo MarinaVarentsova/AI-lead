@@ -20,7 +20,10 @@ for (const content of [
 ]) assert.ok(widget.includes(content), `missing launch content: ${content}`);
 
 assert.match(widget, /onClick=\{handleStart\}/);
-assert.match(widget, /const handleStart = \(\) => \{\s*onDiagnosticStarted\?\.\(\);\s*showNextStep\(\);\s*setStep\(1\)/);
+assert.match(widget, /const handleStart = \(\) => \{\s*if \(!sessionId \|\| diagnosticSchema\.length !== 4\) return;\s*onDiagnosticStarted\?\.\(\)/);
+assert.ok(!widget.includes("Здравствуйте."));
+assert.ok(!widget.includes('data-testid="button-begin-questions"'));
+assert.ok(!widget.includes("handleBeginQuestions"));
 assert.ok(home.includes('src="/artem-expertovich.jpg"'));
 assert.ok(home.includes("Артём Экспертович"));
 assert.ok(home.includes("Персональный консультант ИНОБР"));
