@@ -8,8 +8,10 @@ export default function Home() {
   const [diagnosticStarted, setDiagnosticStarted] = useState(false);
   const [diagnosticCompleted, setDiagnosticCompleted] = useState(false);
   const [recommendationActive, setRecommendationActive] = useState(false);
+  const [consultationActive, setConsultationActive] = useState(false);
   const closeConsultation = () => {
-    setIsOpen(false); setDiagnosticStarted(false); setDiagnosticCompleted(false); setRecommendationActive(false);
+    setIsOpen(false); setDiagnosticStarted(false); setDiagnosticCompleted(false);
+    setRecommendationActive(false); setConsultationActive(false);
   };
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -34,7 +36,8 @@ export default function Home() {
         <div className="consultation-stage__lines"><span /><span /><span /></div>
       </div>
       <button className="consultation-stage__trigger" onClick={() => {
-        setDiagnosticStarted(false); setDiagnosticCompleted(false); setRecommendationActive(false); setIsOpen(true);
+        setDiagnosticStarted(false); setDiagnosticCompleted(false); setRecommendationActive(false);
+        setConsultationActive(false); setIsOpen(true);
       }}>
         Получить консультацию
       </button>
@@ -45,7 +48,8 @@ export default function Home() {
         }}>
           <section className={`consultation-modal${!diagnosticStarted ? " consultation-modal--launch" :
             !diagnosticCompleted ? " consultation-modal--diagnostic" : recommendationActive
-              ? " consultation-modal--recommendation" : ""}`} role="dialog" aria-modal="true" aria-labelledby="consultation-title">
+              ? " consultation-modal--recommendation" : consultationActive
+                ? " consultation-modal--consultation" : ""}`} role="dialog" aria-modal="true" aria-labelledby="consultation-title">
             <button className="consultation-modal__close" onClick={closeConsultation} aria-label="Закрыть консультацию">
               {!diagnosticStarted && <span>Закрыть</span>}
               <X aria-hidden="true" />
@@ -54,10 +58,13 @@ export default function Home() {
             <div className="consultation-modal__workspace">
               <ChatWidget onDiagnosticStarted={() => setDiagnosticStarted(true)}
                 onDiagnosticCompleted={() => { setDiagnosticCompleted(true); setRecommendationActive(true); }}
-                onRecommendationAction={() => setRecommendationActive(false)} />
+                onPostDiagnosticViewChange={(view) => {
+                  setRecommendationActive(false);
+                  setConsultationActive(view === "consultation");
+                }} />
             </div>
 
-            {!diagnosticCompleted || recommendationActive ? (
+            {!diagnosticCompleted || recommendationActive || consultationActive ? (
               <aside className="diagnostic-launch-person" aria-label="Персональный консультант">
                 <p className="diagnostic-launch-person__motto">Знания сегодня.<br />Сильная отрасль завтра.</p>
                 <div className="diagnostic-launch-person__card">

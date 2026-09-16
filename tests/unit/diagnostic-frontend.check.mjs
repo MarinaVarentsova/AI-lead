@@ -162,6 +162,15 @@ try {
   assert.ok(widget.includes("onClick={onGetConsultation}"));
   assert.ok(widget.includes("await recordManagerContactClick(conversationId)"));
   assert.ok(widget.includes('onGetConsultation={() => { void handleManagerContactClick(); }}'));
+  assert.ok(widget.includes('onPostDiagnosticViewChange?.("consultation")'));
+  assert.ok(widget.includes('const consultantAnswerCount = consultantMessages.filter((message) => message.role === "bot").length'));
+  assert.ok(widget.includes('const questionNumber = Math.min(consultantAnswerCount + 1, 3)'));
+  assert.ok(widget.includes('const canAskQuestion = consultantAnswerCount < 3 && !consultantLimitReached'));
+  assert.ok(widget.includes('Вопрос {questionNumber} из 3'));
+  assert.ok(widget.includes('className="diagnostic-consultation__history"'));
+  assert.ok(widget.includes('setConsultantMessages((previous) => [...previous, { id: uid(), role: "bot", content: reply.message }])'));
+  assert.match(widget, /canAskQuestion \? \([\s\S]*diagnostic-consultation__composer[\s\S]*\) : \([\s\S]*diagnostic-consultation__complete/);
+  assert.match(widget, /diagnostic-consultation__manager[\s\S]*handleManagerContactClick/);
   for (const legacyBlock of ["result.currentArea", "result.currentRole", "result.education", "result.targetTasks"]) {
     assert.ok(!widget.includes(legacyBlock));
   }

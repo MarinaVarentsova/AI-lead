@@ -133,10 +133,10 @@ function ResultCard({ result, onAskQuestion, onGetConsultation }: {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onRecommendationAction }: {
+export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostDiagnosticViewChange }: {
   onDiagnosticStarted?: () => void;
   onDiagnosticCompleted?: () => void;
-  onRecommendationAction?: () => void;
+  onPostDiagnosticViewChange?: (view: "consultation" | "default") => void;
 }) {
   const [step, setStep] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -155,6 +155,7 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onRecom
   const [diagnosticStatus, setDiagnosticStatus] = useState<"idle" | "loading" | "error" | "success">("idle");
   const [diagnosticResult, setDiagnosticResult] = useState<DiagnoseResponse | null>(null);
   const [recommendationViewActive, setRecommendationViewActive] = useState(false);
+  const [consultationViewActive, setConsultationViewActive] = useState(false);
   const [postDiagnosticState, setPostDiagnosticState] = useState<"result" | "post-diagnostic-ready">("result");
   const [questionDraft, setQuestionDraft] = useState("");
   const [consultantMessages, setConsultantMessages] = useState<Message[]>([]);
@@ -789,12 +790,75 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onRecom
           {diagnosticStatus === "success" && diagnosticResult && (
             <RecommendationCard result={diagnosticResult.structuredResult}
               onAskQuestion={() => {
-                setRecommendationViewActive(false); onRecommendationAction?.();
+                setRecommendationViewActive(false); setConsultationViewActive(true);
+                onPostDiagnosticViewChange?.("consultation");
                 showNextStep("input"); setPostDiagnosticState("post-diagnostic-ready");
               }}
               onGetConsultation={() => {
-                setRecommendationViewActive(false); onRecommendationAction?.(); void handleManagerContactClick();
+                setRecommendationViewActive(false); onPostDiagnosticViewChange?.("default"); void handleManagerContactClick();
               }} />
+          )}
+        </main>
+      </div>
+    );
+  }
+
+  if (consultationViewActive) {
+    const consultantAnswerCount = consultantMessages.filter((message) => message.role === "bot").length;
+    const questionNumber = Math.min(consultantAnswerCount + 1, 3);
+    const canAskQuestion = consultantAnswerCount < 3 && !consultantLimitReached;
+
+    return (
+      <div className="chat-widget diagnostic-consultation flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
+        <header className="diagnostic-launch__header consultation-chat-header px-7 flex items-center text-white shrink-0">
+          <div className="diagnostic-launch__logo" aria-label="ИНОБР"><span aria-hidden="true" /><strong>ИНОБР</strong></div>
+          <div className="diagnostic-launch__brand-copy">
+            <h2 id="consultation-title">Подбор направления обучения</h2><p>Стройэксперт</p>
+          </div>
+        </header>
+        <main className="diagnostic-consultation__body">
+          <div className="diagnostic-consultation__heading">
+            <span>Вопрос {questionNumber} из 3</span>
+            <h1>{consultantAnswerCount === 0 ? "Что хотите уточнить?" : "Продолжим консультацию"}</h1>
+          </div>
+
+          <div className="diagnostic-consultation__history" aria-live="polite">
+            {consultantMessages.map((message) => (
+              <article key={message.id} className={`diagnostic-consultation__message diagnostic-consultation__message--${message.role}`}>
+                <strong>{message.role === "user" ? "Ваш вопрос" : "Артём Экспертович"}</strong>
+                <p>{message.content}</p>
+              </article>
+            ))}
+            {consultantLoading && <div role="status" className="diagnostic-consultation__loading">
+              <Loader2 aria-hidden="true" /> Готовим ответ Артёма...
+            </div>}
+          </div>
+
+          {canAskQuestion ? (
+            <div className="diagnostic-consultation__composer">
+              <Textarea ref={postDiagnosticInputRef} value={questionDraft} disabled={consultantLoading}
+                maxLength={4000} onChange={(event) => setQuestionDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                    event.preventDefault(); void handleConsultantSubmit();
+                  }
+                }}
+                placeholder="Введите ваш вопрос" aria-label="Введите ваш вопрос" />
+              {consultantError && <p role="alert" className="diagnostic-consultation__error">{CONSULTANT_ERROR}</p>}
+              <Button onClick={() => void handleConsultantSubmit()}
+                disabled={consultantLoading || !questionDraft.trim() || !conversationId}
+                className="diagnostic-consultation__submit">
+                {consultantLoading ? <Loader2 className="animate-spin" /> : consultantError ? "Повторить" : "Задать вопрос"}
+                {!consultantLoading && <ArrowUpRight aria-hidden="true" />}
+              </Button>
+            </div>
+          ) : (
+            <div className="diagnostic-consultation__complete" ref={limitCtaRef}>
+              <Button className="diagnostic-consultation__manager" onClick={() => {
+                setConsultationViewActive(false); onPostDiagnosticViewChange?.("default");
+                void handleManagerContactClick();
+              }}>Связаться с менеджером <ArrowUpRight aria-hidden="true" /></Button>
+            </div>
           )}
         </main>
       </div>

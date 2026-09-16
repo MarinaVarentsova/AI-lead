@@ -255,7 +255,8 @@
 }
 .consultation-modal--launch,
 .consultation-modal--diagnostic,
-.consultation-modal--recommendation {
+.consultation-modal--recommendation,
+.consultation-modal--consultation {
   width: min(1150px, calc(100vw - 40px));
   height: min(600px, calc(var(--chat-viewport-height, 100dvh) - 32px));
   grid-template-columns: minmax(0, 67fr) minmax(340px, 33fr);
@@ -432,6 +433,55 @@
 .diagnostic-recommendation__loading { display: flex; align-items: center; gap: 10px; }
 .diagnostic-recommendation__loading svg { width: 22px; height: 22px; animation: spin 1s linear infinite; }
 .diagnostic-recommendation__error { display: grid; justify-items: start; gap: 16px; }
+.diagnostic-consultation__body {
+  min-height: 0; flex: 1; display: flex; flex-direction: column; padding: 24px 44px 26px; overflow: hidden;
+  background: linear-gradient(145deg, #fff 72%, #f7faf8);
+}
+.diagnostic-consultation__heading span {
+  display: inline-flex; padding: 6px 10px; border-radius: 5px; color: #17362f; background: #f2b631;
+  font-size: 12px; font-weight: 800; letter-spacing: .035em; text-transform: uppercase;
+}
+.diagnostic-consultation__heading h1 {
+  margin-top: 10px; color: #112f28; font-size: 34px; font-weight: 780; line-height: 1.08; letter-spacing: -.035em;
+}
+.diagnostic-consultation__history {
+  min-height: 0; margin-top: 16px; padding-right: 8px; display: grid; align-content: start; gap: 10px;
+  flex: 1 1 auto; overflow-y: auto; scrollbar-gutter: stable;
+}
+.diagnostic-consultation__message {
+  max-width: 88%; padding: 12px 16px; border: 1px solid #d7e3de; border-radius: 12px;
+  color: #2d5047; background: white; box-shadow: 0 6px 15px rgba(7,61,51,.045);
+}
+.diagnostic-consultation__message--user { margin-left: auto; border-color: #ead49e; background: #fff8e4; }
+.diagnostic-consultation__message strong { display: block; margin-bottom: 4px; color: #0f594b; font-size: 11px; letter-spacing: .025em; }
+.diagnostic-consultation__message p { white-space: pre-wrap; font-size: 14px; line-height: 1.45; }
+.diagnostic-consultation__loading { display: flex; align-items: center; gap: 8px; color: #60736c; font-size: 14px; }
+.diagnostic-consultation__loading svg { width: 18px; height: 18px; animation: spin 1s linear infinite; }
+.diagnostic-consultation__composer {
+  margin-top: 14px; padding-top: 15px; display: grid; grid-template-columns: minmax(0, 1fr) 210px;
+  align-items: end; gap: 12px; border-top: 1px solid #e2e9e5;
+}
+.diagnostic-consultation__composer textarea {
+  min-height: 74px; max-height: 112px; padding: 13px 15px; resize: vertical; border: 2px solid #8dafaa;
+  border-radius: 10px; color: #173c34; background: white; font-size: 15px;
+}
+.diagnostic-consultation__composer textarea:focus { border-color: #176553; box-shadow: none; }
+.diagnostic-consultation__error { grid-column: 1 / -1; color: hsl(var(--destructive)); font-size: 13px; }
+.diagnostic-consultation__submit,
+.diagnostic-consultation__manager {
+  min-height: 62px !important; padding: 0 22px !important; justify-content: space-between;
+  border: 1px solid #d19319 !important; border-radius: 11px !important; color: #17362f !important;
+  background: linear-gradient(135deg, #f5bd34, #e9a921) !important; font-size: 17px !important; font-weight: 760 !important;
+  box-shadow: 0 9px 18px rgba(167,119,19,.15);
+}
+.diagnostic-consultation__submit svg,
+.diagnostic-consultation__manager svg { width: 22px; height: 22px; }
+.diagnostic-consultation__submit:disabled { border-color: #d9dfdc !important; background: #e8ecea !important; box-shadow: none; opacity: .7; }
+.diagnostic-consultation__complete {
+  margin-top: 16px; padding-top: 16px; display: flex; align-items: center; justify-content: flex-end;
+  border-top: 1px solid #e2e9e5;
+}
+.diagnostic-consultation__manager { width: 280px; flex: 0 0 auto; }
 .consultation-modal .chat-dialogue { background: #f2f6f3; }
 .consultation-modal .chat-widget { color: #152b25; }
 .consultation-modal .chat-widget .bg-white { box-shadow: 0 8px 24px rgba(7,61,51,.055); }
@@ -467,13 +517,15 @@
   .consultation-info__person-copy strong { font-size: 15px; }
   .consultation-info__person-copy p { display: none; }
   .consultation-modal--launch, .consultation-modal--diagnostic,
-  .consultation-modal--recommendation { display: block; overflow-y: auto; }
+  .consultation-modal--recommendation, .consultation-modal--consultation { display: block; overflow-y: auto; }
   .consultation-modal--launch .consultation-modal__workspace,
   .consultation-modal--diagnostic .consultation-modal__workspace,
-  .consultation-modal--recommendation .consultation-modal__workspace { height: auto; overflow: visible; }
+  .consultation-modal--recommendation .consultation-modal__workspace,
+  .consultation-modal--consultation .consultation-modal__workspace { height: auto; overflow: visible; }
   .consultation-modal--launch .diagnostic-launch,
   .consultation-modal--diagnostic .diagnostic-question,
-  .consultation-modal--recommendation .diagnostic-recommendation { min-height: 570px; }
+  .consultation-modal--recommendation .diagnostic-recommendation,
+  .consultation-modal--consultation .diagnostic-consultation { min-height: 570px; }
   .diagnostic-launch-person { display: block; }
   .diagnostic-launch-person__motto { min-height: 70px; padding-left: 24px; }
   .diagnostic-launch-person__card { padding: 22px; }
@@ -486,6 +538,7 @@
   .diagnostic-question__content h1 { font-size: 34px; }
   .diagnostic-question__options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .diagnostic-recommendation__body { padding: 24px 28px; }
+  .diagnostic-consultation__body { min-height: 492px; padding: 24px 28px; }
 }
 @media (max-width: 639px) {
   .consultation-stage { padding: 0; }
@@ -526,6 +579,12 @@
   .diagnostic-recommendation__card h1 { font-size: 29px; }
   .diagnostic-recommendation__benefits { grid-template-columns: 1fr; gap: 12px; }
   .diagnostic-recommendation__actions { grid-template-columns: 1fr; gap: 10px; }
+  .diagnostic-consultation__body { padding: 22px 18px; }
+  .diagnostic-consultation__heading h1 { font-size: 29px; }
+  .diagnostic-consultation__composer { grid-template-columns: 1fr; }
+  .diagnostic-consultation__submit { width: 100%; }
+  .diagnostic-consultation__complete { align-items: stretch; flex-direction: column; }
+  .diagnostic-consultation__manager { width: 100%; }
 }
 @media (max-height: 680px) and (max-width: 899px) {
   .consultation-info__person { display: none; }
