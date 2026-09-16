@@ -66,13 +66,14 @@ try {
   `);
 
   const [{ default: sessions }, { default: conversations }, { default: diagnosticTurns }, { default: diagnosticAnswers },
-    { default: diagnose }, { default: consultant }, repository, { YandexAIProvider }] = await Promise.all([
+    { default: diagnose }, { default: consultant }, { default: events }, repository, { YandexAIProvider }] = await Promise.all([
     import(new URL("apps/api/src/routes/sessions.ts", root)),
     import(new URL("apps/api/src/routes/conversations.ts", root)),
     import(new URL("apps/api/src/routes/diagnostic-turns.ts", root)),
     import(new URL("apps/api/src/routes/diagnostic-answers.ts", root)),
     import(new URL("apps/api/src/routes/diagnose.ts", root)),
     import(new URL("apps/api/src/routes/consultant-chat.ts", root)),
+    import(new URL("apps/api/src/routes/events.ts", root)),
     import(new URL("apps/api/src/persistence/artem-repository.ts", root)),
     import(new URL("apps/api/src/ai/yandex-provider.ts", root)),
   ]);
@@ -155,12 +156,14 @@ try {
     ["user", "consultation", "user_question"], ["artem", "consultation", "artem_answer"],
   ]);
 
-  // J: generic event persistence writes the supplied type/data without touching dialogue.
-  await repository.recordEvent(sessionId, "manager_contact_click", { source: "integration" });
-  const events = (await pg.query("SELECT * FROM ai_events WHERE session_id=$1", [sessionId])).rows;
-  assert.equal(events.length, 1);
-  assert.equal(events[0].event_type, "manager_contact_click");
-  assert.deepEqual(events[0].event_data, { source: "integration" });
+  // J: the click endpoint writes the event for the supplied session without touching dialogue.
+  const event = await invoke(events, "/events", { sessionId, eventType: "manager_contact_click" });
+  assert.equal(event.statusCode, 201);
+  assert.equal(event.body.sessionId, sessionId);
+  const eventRows = (await pg.query("SELECT * FROM ai_events WHERE session_id=$1", [sessionId])).rows;
+  assert.equal(eventRows.length, 1);
+  assert.equal(eventRows[0].event_type, "manager_contact_click");
+  assert.equal(eventRows[0].event_data, null);
 
   // K: production runtime must not reference tables removed from the prepared database.
   const productionRoots = ["apps/api/src/routes", "apps/api/src/persistence", "apps/api/src/services"];

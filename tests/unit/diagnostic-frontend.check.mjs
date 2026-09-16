@@ -35,6 +35,14 @@ const dialogueCompiled = ts.transpileModule(dialogueSource, { compilerOptions: {
 const { recordDiagnosticQuestion, recordDiagnosticAnswer } = await import(
   "data:text/javascript;base64," + Buffer.from(dialogueCompiled).toString("base64")
 );
+const eventsSource = readFileSync(new URL("apps/web/src/lib/events.ts", root), "utf8")
+  .replace('"./api"', JSON.stringify(apiModule));
+const eventsCompiled = ts.transpileModule(eventsSource, { compilerOptions: {
+  module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022,
+} }).outputText;
+const { recordManagerContactClick } = await import(
+  "data:text/javascript;base64," + Buffer.from(eventsCompiled).toString("base64")
+);
 const fixture = JSON.parse(readFileSync(new URL("diagnose-route.fixtures.json", import.meta.url), "utf8"));
 const payload = { conversationId: fixture.conversationId, current_area: fixture.row.currentArea,
   current_role: fixture.row.currentRole, education_status: fixture.row.educationStatus,
@@ -87,6 +95,20 @@ try {
     { conversationId: fixture.conversationId, questionNumber: 1, kind: "answer", answerCode: "other", otherText: "Банковская сфера" },
   ]);
 
+  let eventCalls = 0;
+  globalThis.fetch = async (url, options) => {
+    eventCalls++;
+    assert.equal(url, "/api/events");
+    assert.equal(options.method, "POST");
+    assert.deepEqual(JSON.parse(options.body), {
+      sessionId: fixture.conversationId, eventType: "manager_contact_click",
+    });
+    return Response.json({ recorded: true }, { status: 201 });
+  };
+  assert.equal(eventCalls, 0, "rendering/importing must not record an event");
+  await recordManagerContactClick(fixture.conversationId);
+  assert.equal(eventCalls, 1, "one actual click records one event");
+
   globalThis.fetch = async (url, options) => {
     calls.push(url);
     assert.equal(url, "/api/diagnose");
@@ -131,6 +153,9 @@ try {
   assert.match(widget, /education_status:\s*allAnswers\[2\]\.code/);
   assert.match(widget, /target_tasks:\s*allAnswers\[3\]\.code/);
   assert.ok(widget.includes("<p>{result.recommendation}</p>"));
+  assert.ok(widget.includes("onClick={onGetConsultation}"));
+  assert.ok(widget.includes("await recordManagerContactClick(conversationId)"));
+  assert.ok(widget.includes('onGetConsultation={() => { void handleManagerContactClick(); }}'));
   for (const legacyBlock of ["result.currentArea", "result.currentRole", "result.education", "result.targetTasks"]) {
     assert.ok(!widget.includes(legacyBlock));
   }

@@ -8,6 +8,7 @@ import diagnosticTurnsRouter from "./diagnostic-turns";
 import knowledgeBaseRouter from "./knowledge-base";
 import diagnoseRouter from "./diagnose";
 import consultantChatRouter from "./consultant-chat";
+import eventsRouter from "./events";
 
 import testerRouter from "./tester";
 
@@ -22,6 +23,7 @@ router.use(diagnosticTurnsRouter);
 router.use(knowledgeBaseRouter);
 router.use(diagnoseRouter);
 router.use(consultantChatRouter);
+router.use(eventsRouter);
 router.use(testerRouter);
 
 export default router;

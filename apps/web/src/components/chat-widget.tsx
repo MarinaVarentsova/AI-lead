@@ -18,6 +18,7 @@ import {
 } from "@/lib/diagnostic-result";
 import { getDiagnosticSchema, type DiagnosticSchemaQuestion } from "@/lib/diagnostic-schema";
 import { recordDiagnosticAnswer, recordDiagnosticQuestion } from "@/lib/diagnostic-dialogue";
+import { recordManagerContactClick } from "@/lib/events";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -365,6 +366,18 @@ export function ChatWidget() {
       consultantBusy.current = false;
       setConsultantLoading(false);
     }
+  };
+
+  const handleManagerContactClick = async () => {
+    if (conversationId) {
+      try {
+        await recordManagerContactClick(conversationId);
+      } catch (error) {
+        console.error("MANAGER_CONTACT_EVENT_FAILED", error);
+      }
+    }
+    showNextStep("contact");
+    setContactPhase((phase) => phase ?? "channel");
   };
 
   // ─── Contact form ────────────────────────────────────────────────────────────
@@ -785,7 +798,7 @@ export function ChatWidget() {
             <ResultCard
               result={diagnosticResult.structuredResult}
               onAskQuestion={() => { showNextStep("input"); setPostDiagnosticState("post-diagnostic-ready"); }}
-              onGetConsultation={() => { showNextStep("contact"); setContactPhase((phase) => phase ?? "channel"); }}
+              onGetConsultation={() => { void handleManagerContactClick(); }}
             />
           )}
           </div>
