@@ -1,23 +1,11 @@
 import { apiFetch } from "./api";
 
 export interface StructuredDiagnosticResult {
-  summary: string;
-  currentArea: string;
-  currentRole: string;
-  education: string;
-  targetTasks: string;
   recommendation: string;
-  recommendedTrack: "construction_expertise" | "apartment_acceptance" | "not_defined";
-  importantNote: string | null;
 }
 
 export interface DiagnoseResponse {
-  result: string;
   structuredResult: StructuredDiagnosticResult;
-  isAI: boolean;
-  provider: "yandex" | "fallback";
-  sourceVersion: string;
-  fallbackReason: string | null;
 }
 
 export interface DiagnosticPayload {
@@ -44,25 +32,8 @@ function text(value: unknown): string {
 export function parseDiagnoseResponse(value: unknown): DiagnoseResponse {
   const response = record(value);
   const result = record(response.structuredResult);
-  const track = result.recommendedTrack;
-  const provider = response.provider;
-  if ((track !== "construction_expertise" && track !== "apartment_acceptance" && track !== "not_defined") ||
-    (provider !== "yandex" && provider !== "fallback") || typeof response.isAI !== "boolean") {
-    throw new Error(DIAGNOSTIC_ERROR);
-  }
   return {
-    result: text(response.result),
-    structuredResult: {
-      summary: text(result.summary), currentArea: text(result.currentArea),
-      currentRole: text(result.currentRole), education: text(result.education),
-      targetTasks: text(result.targetTasks), recommendation: text(result.recommendation),
-      recommendedTrack: track,
-      importantNote: result.importantNote === null ? null : text(result.importantNote),
-    },
-    isAI: response.isAI,
-    provider,
-    sourceVersion: text(response.sourceVersion),
-    fallbackReason: response.fallbackReason === null ? null : text(response.fallbackReason),
+    structuredResult: { recommendation: text(result.recommendation) },
   };
 }
 

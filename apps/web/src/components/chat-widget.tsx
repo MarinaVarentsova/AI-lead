@@ -175,6 +175,13 @@ export function ChatWidget() {
   const createConversation = useCreateConversation();
   const currentQIndex = step >= 2 && step <= 5 ? step - 2 : 0;
 
+  const loadDiagnosticSchema = async () => {
+    setSchemaLoading(true);
+    try { setDiagnosticSchema(await getDiagnosticSchema()); }
+    catch { setSessionError(true); }
+    finally { setSchemaLoading(false); }
+  };
+
   useEffect(() => {
     if (questionFocusGate.current.afterOptionsRender(
       currentQIndex,
@@ -187,7 +194,7 @@ export function ChatWidget() {
 
   // Create session on mount
   useEffect(() => {
-    getDiagnosticSchema().then(setDiagnosticSchema).catch(() => setSessionError(true)).finally(() => setSchemaLoading(false));
+    void loadDiagnosticSchema();
     createSession.mutate(undefined, {
       onSuccess: (data) => setSessionId(data.sessionId),
       onError: () => setSessionError(true),
@@ -622,6 +629,7 @@ export function ChatWidget() {
                   className="w-full rounded-lg text-sm border-border"
                   onClick={() => {
                     setSessionError(false);
+                    void loadDiagnosticSchema();
                     createSession.mutate(undefined, {
                       onSuccess: (d) => setSessionId(d.sessionId),
                       onError: () => setSessionError(true),

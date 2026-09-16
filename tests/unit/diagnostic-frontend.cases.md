@@ -13,8 +13,8 @@ The following are UI verification cases, not automated browser tests:
 | Four questions | Start card → intro → Q1–Q4 | Existing logo/style and questions; progress 25%, 50%, 75%, 100%; chosen answer appears once as user bubble. |
 | Q4 ordering | Select final answer; delay save response | POST /api/diagnostic-answers first; /api/diagnose only after successful save, body contains conversationId only. No /api/qualify. |
 | Loading | Delay either request; double-click Q4 | «Формируем результат диагностики...»; chips hidden; synchronous refs prevent duplicate submit. |
-| Structured result | Return valid structuredResult | «Диагностика завершена», summary, Опыт, Стаж, Образование, Цель, Рекомендация; no duplicate result string. |
-| Important note | Test null and nonempty importantNote | Separate «Важно» block only for non-null note. |
+| Structured result | Return valid structuredResult | Show only the recommendation text; no separate experience, seniority, education or goal blocks. |
+| Education condition | Return a conditional recommendation | The condition is part of the recommendation text; no separate profile block is rendered. |
 | Fallback | isAI=false, provider=fallback | Same normal result card; no provider/sourceVersion/fallbackReason/technical labels shown. |
 | Save error | Reject answer save | Neutral error and «Повторить»; no diagnose call. |
 | Diagnose error | Return 500, invalid JSON, missing structuredResult or empty required field | Neutral error and retry, no generic manager promise or blank screen. |

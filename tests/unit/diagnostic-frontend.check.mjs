@@ -19,16 +19,53 @@ const compiled = ts.transpileModule(source, { compilerOptions: {
 const { completeDiagnostic, parseDiagnoseResponse } = await import(
   "data:text/javascript;base64," + Buffer.from(compiled).toString("base64")
 );
+const schemaSource = readFileSync(new URL("apps/web/src/lib/diagnostic-schema.ts", root), "utf8")
+  .replace('"./api"', JSON.stringify(apiModule));
+const schemaCompiled = ts.transpileModule(schemaSource, { compilerOptions: {
+  module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022,
+} }).outputText;
+const { getDiagnosticSchema, parseDiagnosticSchema } = await import(
+  "data:text/javascript;base64," + Buffer.from(schemaCompiled).toString("base64")
+);
 const fixture = JSON.parse(readFileSync(new URL("diagnose-route.fixtures.json", import.meta.url), "utf8"));
-const payload = { conversationId: fixture.conversationId, ...fixture.row };
+const payload = { conversationId: fixture.conversationId, current_area: fixture.row.currentArea,
+  current_role: fixture.row.currentRole, education_status: fixture.row.educationStatus,
+  target_tasks: fixture.row.targetTasks };
 const response = {
   result: "Readable result", structuredResult: fixture.validResult,
   isAI: false, provider: "fallback", sourceVersion: fixture.expectedSourceVersion,
   fallbackReason: "AI_CONFIGURATION_ERROR",
 };
+const visibleResponse = { structuredResult: { recommendation: fixture.validResult.recommendation } };
+const schema = [
+  { questionNumber: 1, field: "current_area", questionText: "Сфера?", options: [
+    { code: "construction_repair", label: "Строительство", allowsFreeText: false },
+    { code: "other", label: "Другая сфера", allowsFreeText: true },
+  ] },
+  { questionNumber: 2, field: "current_role", questionText: "Роль?", options: [
+    { code: "manager_owner", label: "Руководитель", allowsFreeText: false },
+  ] },
+  { questionNumber: 3, field: "education_status", questionText: "Образование?", options: [
+    { code: "higher", label: "Высшее", allowsFreeText: false },
+  ] },
+  { questionNumber: 4, field: "target_tasks", questionText: "Задачи?", options: [
+    { code: "defects_quality", label: "Дефекты", allowsFreeText: false },
+  ] },
+];
 const originalFetch = globalThis.fetch;
 let calls = [];
 try {
+  globalThis.fetch = async (url) => { assert.equal(url, "/api/diagnostic/schema"); return Response.json(schema); };
+  const loadedSchema = await getDiagnosticSchema();
+  assert.deepEqual(loadedSchema, schema);
+  assert.deepEqual(loadedSchema.map(question => question.field),
+    ["current_area", "current_role", "education_status", "target_tasks"]);
+  assert.deepEqual(loadedSchema[0].options.map(option => option.label), ["Строительство", "Другая сфера"]);
+  assert.throws(() => parseDiagnosticSchema([schema[1], schema[0], schema[2], schema[3]]));
+  assert.throws(() => parseDiagnosticSchema(schema.map((question, index) => index === 0 ? {
+    ...question, options: question.options.map(option => ({ ...option, allowsFreeText: false })),
+  } : question)));
+
   globalThis.fetch = async (url, options) => {
     calls.push(url);
     assert.equal(url, "/api/diagnose");
@@ -44,7 +81,7 @@ try {
   });
   assert.deepEqual(calls, ["/api/diagnostic-answers"]);
   releaseSave();
-  assert.deepEqual(await pending, response);
+  assert.deepEqual(await pending, visibleResponse);
   assert.deepEqual(calls, ["/api/diagnostic-answers", "/api/diagnose"]);
 
   calls = [];
@@ -56,15 +93,27 @@ try {
   await assert.rejects(completeDiagnostic(payload, async () => {}));
   globalThis.fetch = async () => new Response("not JSON");
   await assert.rejects(completeDiagnostic(payload, async () => {}));
-  assert.equal(parseDiagnoseResponse(response).structuredResult.importantNote, null);
-  assert.equal(parseDiagnoseResponse({ ...response, structuredResult: {
-    ...fixture.validResult, importantNote: "Требуется СПО или ВО",
-  } }).structuredResult.importantNote, "Требуется СПО или ВО");
-  assert.throws(() => parseDiagnoseResponse({ ...response, structuredResult: { ...fixture.validResult, summary: " " } }));
-  assert.deepEqual(parseDiagnoseResponse({ ...response, isAI: true, provider: "yandex", fallbackReason: null }).structuredResult, fixture.validResult);
+  assert.deepEqual(parseDiagnoseResponse(response), visibleResponse);
+  assert.throws(() => parseDiagnoseResponse({ ...response, structuredResult: { ...fixture.validResult, recommendation: " " } }));
   globalThis.fetch = async () => Response.json(response);
-  assert.deepEqual(await completeDiagnostic(payload, async () => {}), response);
-  console.log("PASS: 10 frontend helper cases; sequential save/generate, errors, retry, structured AI/fallback; zero real network calls.");
+  assert.deepEqual(await completeDiagnostic(payload, async () => {}), visibleResponse);
+
+  const widget = readFileSync(new URL("apps/web/src/components/chat-widget.tsx", root), "utf8");
+  assert.ok(widget.includes("getDiagnosticSchema()"));
+  assert.ok(widget.includes("const dictItems = q.options"));
+  assert.ok(widget.includes("opt.allowsFreeText"));
+  assert.ok(widget.includes('submitAnswer(qIndex, "other", customInput.trim())'));
+  assert.ok(widget.includes("disabled={!customInput.trim()}"));
+  assert.match(widget, /current_area:\s*allAnswers\[0\]\.code/);
+  assert.match(widget, /allAnswers\[0\]\.code === "other"[\s\S]*current_area_other_text:\s*allAnswers\[0\]\.raw/);
+  assert.match(widget, /current_role:\s*allAnswers\[1\]\.code/);
+  assert.match(widget, /education_status:\s*allAnswers\[2\]\.code/);
+  assert.match(widget, /target_tasks:\s*allAnswers\[3\]\.code/);
+  assert.ok(widget.includes("<p>{result.recommendation}</p>"));
+  for (const legacyBlock of ["result.currentArea", "result.currentRole", "result.education", "result.targetTasks"]) {
+    assert.ok(!widget.includes(legacyBlock));
+  }
+  console.log("PASS: API schema order/options, required other text, v3 payload, recommendation-only result, save/generate and error paths.");
 } finally {
   globalThis.fetch = originalFetch;
 }
