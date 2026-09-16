@@ -27,6 +27,14 @@ const schemaCompiled = ts.transpileModule(schemaSource, { compilerOptions: {
 const { getDiagnosticSchema, parseDiagnosticSchema } = await import(
   "data:text/javascript;base64," + Buffer.from(schemaCompiled).toString("base64")
 );
+const dialogueSource = readFileSync(new URL("apps/web/src/lib/diagnostic-dialogue.ts", root), "utf8")
+  .replace('"./api"', JSON.stringify(apiModule));
+const dialogueCompiled = ts.transpileModule(dialogueSource, { compilerOptions: {
+  module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022,
+} }).outputText;
+const { recordDiagnosticQuestion, recordDiagnosticAnswer } = await import(
+  "data:text/javascript;base64," + Buffer.from(dialogueCompiled).toString("base64")
+);
 const fixture = JSON.parse(readFileSync(new URL("diagnose-route.fixtures.json", import.meta.url), "utf8"));
 const payload = { conversationId: fixture.conversationId, current_area: fixture.row.currentArea,
   current_role: fixture.row.currentRole, education_status: fixture.row.educationStatus,
@@ -55,7 +63,9 @@ const schema = [
 const originalFetch = globalThis.fetch;
 let calls = [];
 try {
-  globalThis.fetch = async (url) => { assert.equal(url, "/api/diagnostic/schema"); return Response.json(schema); };
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "/api/diagnostic/schema"); assert.equal(options.cache, "no-store"); return Response.json(schema);
+  };
   const loadedSchema = await getDiagnosticSchema();
   assert.deepEqual(loadedSchema, schema);
   assert.deepEqual(loadedSchema.map(question => question.field),
@@ -65,6 +75,17 @@ try {
   assert.throws(() => parseDiagnosticSchema(schema.map((question, index) => index === 0 ? {
     ...question, options: question.options.map(option => ({ ...option, allowsFreeText: false })),
   } : question)));
+
+  const turnBodies = [];
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "/api/diagnostic/turns"); turnBodies.push(JSON.parse(options.body)); return Response.json({ saved: true });
+  };
+  await recordDiagnosticQuestion(fixture.conversationId, 1);
+  await recordDiagnosticAnswer(fixture.conversationId, 1, "other", "Банковская сфера");
+  assert.deepEqual(turnBodies, [
+    { conversationId: fixture.conversationId, questionNumber: 1, kind: "question" },
+    { conversationId: fixture.conversationId, questionNumber: 1, kind: "answer", answerCode: "other", otherText: "Банковская сфера" },
+  ]);
 
   globalThis.fetch = async (url, options) => {
     calls.push(url);
@@ -112,6 +133,9 @@ try {
   assert.ok(widget.includes("<p>{result.recommendation}</p>"));
   for (const legacyBlock of ["result.currentArea", "result.currentRole", "result.education", "result.targetTasks"]) {
     assert.ok(!widget.includes(legacyBlock));
+  }
+  for (const legacyQuestion of ["С какой сферой связан ваш опыт?", "Какой у вас стаж?", "Какая цель вам ближе?"]) {
+    assert.ok(!widget.includes(legacyQuestion));
   }
   console.log("PASS: API schema order/options, required other text, v3 payload, recommendation-only result, save/generate and error paths.");
 } finally {

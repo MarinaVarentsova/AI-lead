@@ -83,7 +83,7 @@ for (const [answered, next, options] of [[0, 1, 5], [1, 2, 6], [2, 3, 6]]) {
   assert.equal(gate.afterOptionsRender(next, false, options), true, "rendered next options trigger focus");
   assert.equal(gate.afterOptionsRender(next, false, options), false, "focus is consumed once");
 }
-assert.ok(widget.indexOf("questionFocusGate.current.afterAnswer") < widget.indexOf("addBotMessage(diagnosticSchema[qIndex + 1]?.questionText"));
+assert.ok(widget.indexOf("questionFocusGate.current.afterAnswer") < widget.indexOf("addBotMessage(next.questionText)"));
 assert.ok(widget.includes("questionFocusGate.current.afterOptionsRender"));
 for (const [width, height] of [[375,667],[390,844],[430,932],[768,1024],[820,1180],[1366,768],[1440,900],[1920,1080]]) {
   const margin = width < 640 ? 0 : 32;

@@ -60,9 +60,11 @@ try {
 
   const { default: router } = await import(new URL("apps/api/src/routes/diagnostic-schema.ts", root));
   const handler = router.stack.find(layer => layer.route?.path === "/diagnostic/schema").route.stack[0].handle;
-  const response = { statusCode: 0, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
+  const response = { statusCode: 0, headers: {}, set(name, value) { this.headers[name] = value; return this; },
+    status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } };
   handler({}, response);
   assert.equal(response.statusCode, 200);
+  assert.equal(response.headers["Cache-Control"], "no-store");
   assert.deepEqual(response.body, DIAGNOSTIC_SCHEMA);
   console.log("PASS: v3 schema endpoint, exact order/codes/free-text flags, no legacy fields, and v3 validation.");
 } finally {

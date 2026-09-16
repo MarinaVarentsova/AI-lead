@@ -93,17 +93,53 @@ function diagnosticMessages(answers: DiagnosticAnswers): NewDialogueMessage[] {
   });
 }
 
+const sameDialogueMessage = (row: DialogueRow, message: NewDialogueMessage) =>
+  row.speaker === message.speaker && row.stage === message.stage &&
+  row.messageType === message.messageType && row.text === message.text;
+
+export async function saveDiagnosticTurn(sessionId: string, questionNumber: number,
+  answer?: { code: string; otherText?: string }) {
+  const question = DIAGNOSTIC_SCHEMA[questionNumber - 1];
+  if (!question) throw new Error("DIAGNOSTIC_TURN_INVALID");
+  const questionMessage: NewDialogueMessage = { speaker: "artem", stage: "diagnostic",
+    messageType: "diagnostic_question", text: question.questionText };
+  let message = questionMessage;
+  let index = (questionNumber - 1) * 2;
+  if (answer) {
+    const option = question.options.find(item => item.code === answer.code);
+    if (!option) throw new Error("DIAGNOSTIC_TURN_INVALID");
+    const otherText = answer.otherText?.trim();
+    if (option.allowsFreeText && (!otherText || otherText.length > 500)) throw new Error("DIAGNOSTIC_TURN_INVALID");
+    if (!option.allowsFreeText && otherText) throw new Error("DIAGNOSTIC_TURN_INVALID");
+    message = { speaker: "user", stage: "diagnostic", messageType: "diagnostic_answer",
+      text: option.allowsFreeText ? `Другая сфера: ${otherText}` : option.label };
+    index++;
+  }
+  return withDialogueLock(sessionId, async tx => {
+    const existing = (await readDialogue(tx, sessionId)).filter(row => row.stage === "diagnostic");
+    if (answer && (!existing[index - 1] || !sameDialogueMessage(existing[index - 1], questionMessage))) {
+      throw new Error("DIAGNOSTIC_DIALOGUE_CONFLICT");
+    }
+    if (existing[index]) {
+      if (!sameDialogueMessage(existing[index], message)) throw new Error("DIAGNOSTIC_DIALOGUE_CONFLICT");
+      return { row: existing[index], created: false };
+    }
+    if (existing.length !== index) throw new Error("DIAGNOSTIC_DIALOGUE_CONFLICT");
+    const [row] = await appendDialogueLocked(tx, sessionId, [message]);
+    if (!row) throw new Error("DIALOGUE_INSERT_FAILED");
+    return { row, created: true };
+  });
+}
+
 export async function saveDiagnosticDialogue(sessionId: string, answers: DiagnosticAnswers) {
   const expected = diagnosticMessages(answers);
   return withDialogueLock(sessionId, async tx => {
     const existing = (await readDialogue(tx, sessionId)).filter(row => row.stage === "diagnostic");
-    if (existing.length) {
-      const matches = existing.length === expected.length && existing.every((row, index) =>
-        row.speaker === expected[index]!.speaker && row.messageType === expected[index]!.messageType && row.text === expected[index]!.text);
-      if (!matches) throw new Error("DIAGNOSTIC_DIALOGUE_CONFLICT");
-      return existing;
-    }
-    return appendDialogueLocked(tx, sessionId, expected);
+    const matches = existing.length <= expected.length && existing.every((row, index) =>
+      sameDialogueMessage(row, expected[index]!));
+    if (!matches) throw new Error("DIAGNOSTIC_DIALOGUE_CONFLICT");
+    if (existing.length === expected.length) return existing;
+    return [...existing, ...await appendDialogueLocked(tx, sessionId, expected.slice(existing.length))];
   });
 }
 

@@ -29,7 +29,7 @@ export function parseDiagnosticSchema(value: unknown): DiagnosticSchemaQuestion[
 }
 
 export async function getDiagnosticSchema(): Promise<DiagnosticSchemaQuestion[]> {
-  const response = await apiFetch("/api/diagnostic/schema");
+  const response = await apiFetch("/api/diagnostic/schema", { cache: "no-store" });
   if (!response.ok) throw new Error("DIAGNOSTIC_SCHEMA_UNAVAILABLE");
   return parseDiagnosticSchema(await response.json());
 }

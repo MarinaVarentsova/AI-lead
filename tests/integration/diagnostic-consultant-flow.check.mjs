@@ -65,10 +65,11 @@ try {
     );
   `);
 
-  const [{ default: sessions }, { default: conversations }, { default: diagnosticAnswers },
+  const [{ default: sessions }, { default: conversations }, { default: diagnosticTurns }, { default: diagnosticAnswers },
     { default: diagnose }, { default: consultant }, repository, { YandexAIProvider }] = await Promise.all([
     import(new URL("apps/api/src/routes/sessions.ts", root)),
     import(new URL("apps/api/src/routes/conversations.ts", root)),
+    import(new URL("apps/api/src/routes/diagnostic-turns.ts", root)),
     import(new URL("apps/api/src/routes/diagnostic-answers.ts", root)),
     import(new URL("apps/api/src/routes/diagnose.ts", root)),
     import(new URL("apps/api/src/routes/consultant-chat.ts", root)),
@@ -94,6 +95,27 @@ try {
   // C/D/E: canonical question/answer pairs, human labels, strict order and idempotent replay.
   const answers = { conversationId: sessionId, current_area: "other", current_area_other_text: "Банковская сфера",
     current_role: "foreman_master_site_specialist", education_status: "secondary_vocational", target_tasks: "defects_quality" };
+  const turns = [
+    { answerCode: "other", otherText: "Банковская сфера" },
+    { answerCode: "foreman_master_site_specialist" },
+    { answerCode: "secondary_vocational" },
+    { answerCode: "defects_quality" },
+  ];
+  for (const [index, answer] of turns.entries()) {
+    const questionNumber = index + 1;
+    assert.equal((await invoke(diagnosticTurns, "/diagnostic/turns",
+      { conversationId: sessionId, questionNumber, kind: "question" })).statusCode, 201);
+    if (questionNumber === 1) {
+      const shown = (await pg.query("SELECT * FROM ai_dialogue WHERE session_id=$1 ORDER BY message_order", [sessionId])).rows;
+      assert.equal(shown.length, 1); assert.equal(shown[0].message_type, "diagnostic_question");
+    }
+    assert.equal((await invoke(diagnosticTurns, "/diagnostic/turns",
+      { conversationId: sessionId, questionNumber, kind: "answer", ...answer })).statusCode, 201);
+    if (questionNumber === 1) {
+      const answered = (await pg.query("SELECT * FROM ai_dialogue WHERE session_id=$1 ORDER BY message_order", [sessionId])).rows;
+      assert.deepEqual(answered.map(row => row.message_type), ["diagnostic_question", "diagnostic_answer"]);
+    }
+  }
   assert.equal((await invoke(diagnosticAnswers, "/diagnostic-answers", answers)).statusCode, 201);
   assert.equal((await invoke(diagnosticAnswers, "/diagnostic-answers", answers)).statusCode, 201);
   const diagnosticRows = (await pg.query("SELECT * FROM ai_dialogue WHERE session_id=$1 ORDER BY message_order", [sessionId])).rows;

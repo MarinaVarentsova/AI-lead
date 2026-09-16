@@ -17,6 +17,7 @@ import {
   type DiagnosticPayload, type DiagnoseResponse, type StructuredDiagnosticResult,
 } from "@/lib/diagnostic-result";
 import { getDiagnosticSchema, type DiagnosticSchemaQuestion } from "@/lib/diagnostic-schema";
+import { recordDiagnosticAnswer, recordDiagnosticQuestion } from "@/lib/diagnostic-dialogue";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -245,19 +246,21 @@ export function ChatWidget() {
     createConversation.mutate(
       { data: { sessionId } },
       {
-        onSuccess: (data) => {
+        onSuccess: (data) => { void (async () => {
           const convId = data.conversationId;
-          setConversationId(convId);
-          setMessages((prev) => [
-            ...prev,
-            { id: uid(), role: "user", content: "Начать" },
-          ]);
-          setIsTyping(false);
-          // Показываем Q1 напрямую — без вызова OpenAI
-          addBotMessage(diagnosticSchema[0]?.questionText ?? "");
-          setStep(2);
-          showNextStep("question", false);
-        },
+          try {
+            await recordDiagnosticQuestion(convId, 1);
+            setConversationId(convId);
+            setMessages((prev) => [...prev, { id: uid(), role: "user", content: "Начать" }]);
+            setIsTyping(false);
+            addBotMessage(diagnosticSchema[0]?.questionText ?? "");
+            setStep(2);
+            showNextStep("question", false);
+          } catch {
+            setIsTyping(false);
+            addBotMessage("Не удалось начать диагностику. Проверьте соединение и попробуйте снова.");
+          }
+        })(); },
         onError: () => {
           setIsTyping(false);
           addBotMessage("Не удалось начать диагностику. Проверьте соединение и попробуйте снова.");
@@ -275,13 +278,13 @@ export function ChatWidget() {
       setCustomInput("");
       return;
     }
-    submitAnswer(qIndex, code, displayName);
+    void submitAnswer(qIndex, code, displayName);
   };
 
   const submitCustomAnswer = (qIndex: number) => {
     if (!customInput.trim()) return;
     setActiveCustomQ(null);
-    submitAnswer(qIndex, "other", customInput.trim());
+    void submitAnswer(qIndex, "other", customInput.trim());
   };
 
   const generateResult = async (payload: DiagnosticPayload) => {
@@ -303,30 +306,35 @@ export function ChatWidget() {
     }
   };
 
-  const submitAnswer = (qIndex: number, code: string, raw: string) => {
+  const submitAnswer = async (qIndex: number, code: string, raw: string) => {
     // Synchronous guards also cover repeated clicks before React re-renders.
     if (!conversationId || diagnosticBusy.current || qIndex !== answeredCount.current) return;
     answeredCount.current++;
     const q = diagnosticSchema[qIndex];
     if (!q) return;
-    const newAnswer: DiagnosticAnswer = { questionNumber: q.questionNumber, questionKey: q.field, code, raw };
-    const allAnswers = [...answers, newAnswer];
-    setAnswers(allAnswers);
-    setMessages((prev) => [...prev, { id: uid(), role: "user", content: raw }]);
-    setStep(qIndex + 3);
-
-    if (qIndex < diagnosticSchema.length - 1) {
-      questionFocusGate.current.afterAnswer(qIndex + 1);
-      addBotMessage(diagnosticSchema[qIndex + 1]?.questionText ?? "");
-    } else {
-      void generateResult({
-        conversationId,
-        current_area: allAnswers[0].code,
-        ...(allAnswers[0].code === "other" ? { current_area_other_text: allAnswers[0].raw } : {}),
-        current_role: allAnswers[1].code,
-        education_status: allAnswers[2].code,
-        target_tasks: allAnswers[3].code,
-      });
+    setIsTyping(true);
+    try {
+      await recordDiagnosticAnswer(conversationId, q.questionNumber, code, code === "other" ? raw : undefined);
+      const next = diagnosticSchema[qIndex + 1];
+      if (next) await recordDiagnosticQuestion(conversationId, next.questionNumber);
+      const newAnswer: DiagnosticAnswer = { questionNumber: q.questionNumber, questionKey: q.field, code, raw };
+      const allAnswers = [...answers, newAnswer];
+      setAnswers(allAnswers);
+      setMessages((prev) => [...prev, { id: uid(), role: "user", content: raw }]);
+      setStep(qIndex + 3);
+      if (next) {
+        questionFocusGate.current.afterAnswer(qIndex + 1);
+        addBotMessage(next.questionText);
+      } else {
+        void generateResult({ conversationId, current_area: allAnswers[0].code,
+          ...(allAnswers[0].code === "other" ? { current_area_other_text: allAnswers[0].raw } : {}),
+          current_role: allAnswers[1].code, education_status: allAnswers[2].code,
+          target_tasks: allAnswers[3].code });
+      }
+    } catch {
+      answeredCount.current--;
+    } finally {
+      setIsTyping(false);
     }
   };
 
