@@ -17,9 +17,9 @@ export const BENEFITS: Record<ArtemProgram, string> = {
   acceptance_choice: "«Приёмка квартир» — более простой первый этап, а «Приёмка ИЖС» посвящена более сложной проверке частного дома.",
 };
 export function diagnosticProgram(facts: DiagnosticFactsPacket): ArtemProgram {
-  if (facts.answerCodes.educationStatus === "no_higher_or_secondary_vocational") return "apartment_acceptance";
-  if (facts.answerCodes.targetTasks === "apartment_house_acceptance") return "acceptance_choice";
-  return "construction_expertise";
+  if (facts.recommendedTrackHint === "construction_expertise") return "construction_expertise";
+  if (facts.recommendedTrackHint === "apartment_acceptance") return "apartment_acceptance";
+  return "acceptance_choice";
 }
 export function currentProgram(initial: ArtemProgram, question: string, history: ConsultantExchange[]): ArtemProgram {
   let selected = initial;

@@ -12,14 +12,16 @@ export function generateDiagnosticFallback(facts: DiagnosticFactsPacket): Diagno
   const title = PROGRAM_NAMES[program];
   const conclusion = school ? "Если сейчас у вас только школьное образование, можно рассмотреть «Приёмку квартир»: для «Стройэксперта» нужно СПО или высшее образование." :
     program === "acceptance_choice" ? "Вам можно рассмотреть два направления — «Приёмка квартир» и «Приёмка ИЖС»." :
-    conditional ? "По вашей задаче можно рассмотреть «Стройэксперт» и начать обучение уже сейчас; выпускные документы выдаются после предъявления оконченного диплома СПО или высшего образования." :
     `Под вашу задачу можно рассмотреть «${title}».`;
+  const educationCondition = conditional
+    ? "Начать обучение можно уже сейчас; выпускные документы выдаются после предъявления оконченного диплома СПО или высшего образования."
+    : "";
   const next = program === "acceptance_choice" ? "После заключения можно уточнить, хотите ли вы начать с квартир или сразу работать с частными домами." :
     "Для уточнения программы и условий нажмите «Связаться с менеджером».";
   return {
     summary: "Ваше персональное заключение после четырёх ответов.",
     currentArea: facts.currentArea, currentRole: facts.currentRole, education: facts.education, targetTasks: facts.targetTasks,
-    recommendation: [conclusion, facts.education, facts.targetTasks, BENEFITS[program], school ? "Приёмка квартир не заменяет переподготовку строительного эксперта." : "", next].filter(Boolean).join(" "),
+    recommendation: [conclusion, educationCondition, facts.education, facts.targetTasks, BENEFITS[program], school ? "Приёмка квартир не заменяет переподготовку строительного эксперта." : "", next].filter(Boolean).join(" "),
     recommendedTrack: facts.recommendedTrackHint ?? "not_defined",
     importantNote: school ? "Для «Стройэксперта» требуется СПО или высшее образование." : conditional
       ? "Выпускные документы выдаются после предъявления оконченного диплома СПО или высшего образования." : null,

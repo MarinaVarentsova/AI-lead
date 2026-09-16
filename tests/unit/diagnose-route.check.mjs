@@ -150,8 +150,9 @@ try {
       assert.equal(res.body.sourceVersion, fixture.expectedSourceVersion);
       for (const key of ["summary", "currentArea", "currentRole", "education", "targetTasks", "recommendation"]) {
         assert.ok(res.body.structuredResult[key].trim());
-        assert.ok(res.body.result.includes(res.body.structuredResult[key]));
       }
+      assert.equal(res.body.result, res.body.structuredResult.recommendation);
+      assert.doesNotMatch(res.body.result, /Ваш опыт|Стаж|Образование:|Ваша цель|Текущая сфера:|Роль:/i);
       assert.ok(!res.body.result.includes("recommendedTrack"));
       const middle = res.body.isAI ? ["DIAGNOSTIC_AI_CALL_SUCCESS"] : ["DIAGNOSTIC_AI_CALL_FAILED", "DIAGNOSTIC_FALLBACK_USED"];
       assert.deepEqual(events, ["DIAGNOSTIC_RESULT_START", "DIAGNOSTIC_ANSWERS_LOADED",

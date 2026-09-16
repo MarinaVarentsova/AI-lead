@@ -62,8 +62,10 @@ export function validateDiagnosticResult(value: unknown, facts: DiagnosticFactsP
   if (confirmed.length < 2 || !publicText.includes(normalize(PROGRAM_NAMES[diagnosticProgram(facts)])) ||
     !/дефект|документац|исследова|заключени|осмотр|проверк|стройк|подрядчик/i.test(recommendation) ||
     !/Связаться с менеджером|уточни/i.test(recommendation)) return invalid();
-  if (facts.recommendedTrackHint === null && !hasSchoolGuard(facts) && diagnosticProgram(facts) === "construction_expertise" &&
-    !/если|условн|уточни/i.test(recommendation)) return invalid();
+  if (facts.answerCodes.educationStatus === "currently_studying" &&
+    !/начать обучение.*сейчас|сейчас.*начать обучение/i.test(recommendation)) return invalid();
+  if (facts.answerCodes.educationStatus === "currently_studying" &&
+    !/выпускн[а-я]* документ[а-я]*.*после.*диплом/i.test(recommendation)) return invalid();
   if (["summary", "currentArea", "currentRole", "education", "targetTasks", "recommendation"].some(key =>
     /Пользователь имеет|Рекомендация должна|recommendedTrack|education_status|target_tasks/i.test(readText(key)))) return invalid();
   if (/Пользователь имеет|Рекомендация должна учитывать/iu.test(recommendation) ||
