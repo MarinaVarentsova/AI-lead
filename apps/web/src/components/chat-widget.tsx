@@ -53,25 +53,16 @@ const CONTACT_CHANNELS = [
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ProgressBar({ current, total }: { current: number; total: number }) {
-  const pct = Math.round((current / total) * 100);
   return (
-    <div className="px-5 py-3 shrink-0 bg-white border-b border-border/70">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold text-primary">Диагностика · вопрос {current} из {total}</span>
-        <span className="text-xs text-muted-foreground">{pct}%</span>
-      </div>
-      <div className="flex items-center" aria-label={`Шаг ${current} из ${total}`}>
+    <div className="diagnostic-question__progress" aria-label={`Шаг ${current} из ${total}`}>
+      <strong>{String(current).padStart(2, "0")} / {String(total).padStart(2, "0")}</strong>
+      <div>
         {Array.from({ length: total }, (_, index) => {
           const number = index + 1;
-          const active = number === current;
-          const complete = number < current;
           return (
-            <div key={number} className="flex items-center flex-1 last:flex-none">
-              <span className={`grid h-7 w-7 place-items-center rounded-full text-xs font-bold transition-colors ${
-                active ? "bg-[#c79d3e] text-[#073d33]" : complete ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-              }`}>{number}</span>
-              {number < total && <span className={`mx-2 h-px flex-1 ${complete ? "bg-primary" : "bg-border"}`} />}
-            </div>
+            <span key={number} className={number < current ? "is-complete" : number === current ? "is-current" : undefined}>
+              {number < current ? <CheckCircle2 aria-hidden="true" /> : null}
+            </span>
           );
         })}
       </div>
@@ -122,7 +113,10 @@ function ResultCard({
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ChatWidget({ onDiagnosticStarted }: { onDiagnosticStarted?: () => void }) {
+export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted }: {
+  onDiagnosticStarted?: () => void;
+  onDiagnosticCompleted?: () => void;
+}) {
   const [step, setStep] = useState(0);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -131,6 +125,8 @@ export function ChatWidget({ onDiagnosticStarted }: { onDiagnosticStarted?: () =
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [customInput, setCustomInput] = useState("");
   const [activeCustomQ, setActiveCustomQ] = useState<string | null>(null);
+  const [pendingAnswer, setPendingAnswer] = useState<{ code: string; raw: string } | null>(null);
+  const [reviewQuestionIndex, setReviewQuestionIndex] = useState<number | null>(null);
   const [sessionError, setSessionError] = useState(false);
   const [diagnosticSchema, setDiagnosticSchema] = useState<DiagnosticSchemaQuestion[]>([]);
   const [schemaLoading, setSchemaLoading] = useState(true);
@@ -274,19 +270,31 @@ export function ChatWidget({ onDiagnosticStarted }: { onDiagnosticStarted?: () =
   // ─── Chip selection ─────────────────────────────────────────────────────────
 
   const handleOptionSelect = (qIndex: number, code: string, displayName: string, isCustom: boolean) => {
+    if (reviewQuestionIndex !== null) return;
+    setPendingAnswer({ code, raw: displayName });
     if (isCustom) {
-      showNextStep();
       setActiveCustomQ(`q${qIndex + 1}`);
       setCustomInput("");
       return;
     }
-    void submitAnswer(qIndex, code, displayName);
+    setActiveCustomQ(null);
+    setCustomInput("");
   };
 
-  const submitCustomAnswer = (qIndex: number) => {
-    if (!customInput.trim()) return;
-    setActiveCustomQ(null);
-    void submitAnswer(qIndex, "other", customInput.trim());
+  const handleDiagnosticNext = (qIndex: number) => {
+    if (reviewQuestionIndex !== null) {
+      const next = reviewQuestionIndex + 1;
+      setReviewQuestionIndex(next >= currentQIndex ? null : next);
+      return;
+    }
+    if (!pendingAnswer || (pendingAnswer.code === "other" && !customInput.trim())) return;
+    void submitAnswer(qIndex, pendingAnswer.code,
+      pendingAnswer.code === "other" ? customInput.trim() : pendingAnswer.raw);
+  };
+
+  const handleDiagnosticBack = (qIndex: number) => {
+    if (qIndex <= 0) return;
+    setReviewQuestionIndex(qIndex - 1);
   };
 
   const generateResult = async (payload: DiagnosticPayload) => {
@@ -325,9 +333,13 @@ export function ChatWidget({ onDiagnosticStarted }: { onDiagnosticStarted?: () =
       setMessages((prev) => [...prev, { id: uid(), role: "user", content: raw }]);
       setStep(qIndex + 3);
       if (next) {
+        setPendingAnswer(null);
+        setActiveCustomQ(null);
+        setCustomInput("");
         questionFocusGate.current.afterAnswer(qIndex + 1);
         addBotMessage(next.questionText);
       } else {
+        onDiagnosticCompleted?.();
         void generateResult({ conversationId, current_area: allAnswers[0].code,
           ...(allAnswers[0].code === "other" ? { current_area_other_text: allAnswers[0].raw } : {}),
           current_role: allAnswers[1].code, education_status: allAnswers[2].code,
@@ -419,10 +431,9 @@ export function ChatWidget({ onDiagnosticStarted }: { onDiagnosticStarted?: () =
 
   // ─── Chips renderer ─────────────────────────────────────────────────────────
 
-  const renderChips = (qIndex: number) => {
+  const renderChips = (qIndex: number, reviewing = false) => {
     const q = diagnosticSchema[qIndex];
     if (!q) return null;
-    if (step !== qIndex + 2) return null;
     if (isTyping) return null;
 
     if (schemaLoading) {
@@ -439,12 +450,13 @@ export function ChatWidget({ onDiagnosticStarted }: { onDiagnosticStarted?: () =
     }
 
     const dictItems = q.options;
+    const selectedCode = reviewing ? answers[qIndex]?.code : pendingAnswer?.code;
 
     return (
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-wrap gap-2 mt-4 px-4"
+        className="diagnostic-question__options"
       >
         {dictItems.map((opt) => {
           const label = opt.label;
@@ -454,39 +466,31 @@ export function ChatWidget({ onDiagnosticStarted }: { onDiagnosticStarted?: () =
               data-testid={`chip-q${q.questionNumber}-${opt.code}`}
               onClick={() => handleOptionSelect(qIndex, opt.code, label, opt.allowsFreeText)}
               aria-label={label}
-              className="min-h-[44px] px-4 py-2 text-sm font-medium rounded-xl border-2 border-primary text-primary bg-white transition-all duration-150 hover:bg-secondary hover:text-primary active:bg-primary active:text-primary-foreground"
+              aria-pressed={selectedCode === opt.code}
+              disabled={reviewing}
+              className={selectedCode === opt.code ? "is-selected" : undefined}
             >
               {label}
             </button>
           );
         })}
 
-        {activeCustomQ === `q${q.questionNumber}` && (
+        {!reviewing && activeCustomQ === `q${q.questionNumber}` && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
-            className="w-full mt-2"
+            className="diagnostic-question__custom"
           >
-            <div className="relative">
-              <Textarea
+            <div>
+              <Input
                 data-testid={`input-q${q.questionNumber}-custom`}
                 value={customInput}
                 onChange={(e) => setCustomInput(e.target.value)}
                 placeholder="Напишите ваш вариант..."
                 aria-label="Введите свой вариант ответа"
-                className="min-h-[80px] text-sm resize-none pr-12 bg-white border-border rounded-xl"
+                className="diagnostic-question__input"
                 autoFocus
               />
-              <Button
-                data-testid="button-submit-custom"
-                size="icon"
-                onClick={() => submitCustomAnswer(qIndex)}
-                aria-label="Отправить ответ"
-                className="absolute bottom-2 right-2 h-8 w-8 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground"
-                disabled={!customInput.trim()}
-              >
-                <Send className="w-4 h-4" />
-              </Button>
             </div>
           </motion.div>
         )}
@@ -701,6 +705,52 @@ export function ChatWidget({ onDiagnosticStarted }: { onDiagnosticStarted?: () =
 
   const isDiagnosticStep = step >= 2 && step <= 5;
   const questionNumber = isDiagnosticStep ? step - 1 : 0;
+
+  if (isDiagnosticStep) {
+    const displayedQIndex = reviewQuestionIndex ?? currentQIndex;
+    const displayedQuestion = diagnosticSchema[displayedQIndex];
+    const reviewing = reviewQuestionIndex !== null;
+    const canContinue = reviewing || Boolean(pendingAnswer &&
+      (pendingAnswer.code !== "other" || customInput.trim()));
+
+    return (
+      <div className="chat-widget diagnostic-question flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
+        <header className="diagnostic-launch__header consultation-chat-header px-7 flex items-center text-white shrink-0">
+          <div className="diagnostic-launch__logo" aria-label="ИНОБР">
+            <span aria-hidden="true" />
+            <strong>ИНОБР</strong>
+          </div>
+          <div className="diagnostic-launch__brand-copy">
+            <h2 id="consultation-title">Подбор направления обучения</h2>
+            <p>Стройэксперт</p>
+          </div>
+        </header>
+
+        <main className="diagnostic-question__body">
+          <ProgressBar current={displayedQIndex + 1} total={4} />
+          {displayedQuestion && (
+            <div ref={currentQuestionRef} className="diagnostic-question__content">
+              <h1>{displayedQuestion.questionText}</h1>
+              {renderChips(displayedQIndex, reviewing)}
+            </div>
+          )}
+          {isTyping && <div className="diagnostic-question__loading" role="status">
+            <Loader2 aria-hidden="true" /> Сохраняем ответ...
+          </div>}
+          <nav className="diagnostic-question__navigation" aria-label="Навигация по диагностике">
+            <Button variant="ghost" onClick={() => handleDiagnosticBack(displayedQIndex)}
+              disabled={displayedQIndex === 0 || isTyping} className="diagnostic-question__back">
+              <ChevronRight aria-hidden="true" /> Назад
+            </Button>
+            <Button onClick={() => handleDiagnosticNext(displayedQIndex)} disabled={!canContinue || isTyping}
+              className="diagnostic-question__next">
+              Далее <ArrowUpRight aria-hidden="true" />
+            </Button>
+          </nav>
+        </main>
+      </div>
+    );
+  }
 
   // ─── Chat screen ──────────────────────────────────────────────────────────────
 

@@ -253,7 +253,8 @@
     radial-gradient(circle at 100% 0, rgba(197,157,63,.12), transparent 18rem),
     linear-gradient(#ffffff, #f6f8f5);
 }
-.consultation-modal--launch {
+.consultation-modal--launch,
+.consultation-modal--diagnostic {
   width: min(1150px, calc(100vw - 40px));
   height: min(600px, calc(var(--chat-viewport-height, 100dvh) - 32px));
   grid-template-columns: minmax(0, 67fr) minmax(340px, 33fr);
@@ -335,6 +336,68 @@
 }
 .consultation-modal--launch .consultation-modal__close:hover { background: rgba(255,255,255,.15); }
 .consultation-modal--launch .consultation-modal__close svg { width: 17px; height: 17px; }
+.diagnostic-question__body {
+  min-height: 0; flex: 1; display: flex; flex-direction: column; padding: 26px 44px 24px; overflow-y: auto;
+  background: linear-gradient(145deg, #fff 70%, #f7faf8);
+}
+.diagnostic-question__progress { display: flex; align-items: center; gap: 26px; width: min(500px, 100%); }
+.diagnostic-question__progress strong {
+  flex: 0 0 auto; padding: 7px 11px; border-radius: 6px; color: #345c52; background: #edf4ef;
+  font-size: 14px; line-height: 1; letter-spacing: .03em;
+}
+.diagnostic-question__progress > div {
+  position: relative; width: 330px; display: flex; align-items: center; justify-content: space-between;
+}
+.diagnostic-question__progress > div::before {
+  content: ""; position: absolute; z-index: 0; left: 7px; right: 7px; top: 50%; height: 2px;
+  background: #d7e0dc; transform: translateY(-50%);
+}
+.diagnostic-question__progress span {
+  position: relative; z-index: 1; width: 14px; height: 14px; display: grid; place-items: center;
+  border: 2px solid #cbd6d1; border-radius: 999px; background: white;
+}
+.diagnostic-question__progress span.is-current { width: 18px; height: 18px; border-color: #e2a11d; background: #f2b631; }
+.diagnostic-question__progress span.is-complete { width: 18px; height: 18px; border-color: #0d584a; color: white; background: #0d584a; }
+.diagnostic-question__progress span svg { width: 13px; height: 13px; stroke-width: 3; }
+.diagnostic-question__content { margin-top: 35px; }
+.diagnostic-question__content h1 {
+  max-width: 680px; color: #112f28; font-size: 38px; font-weight: 780; line-height: 1.12; letter-spacing: -.035em;
+}
+.diagnostic-question__options {
+  margin-top: 24px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;
+}
+.diagnostic-question__options > button {
+  min-height: 66px; padding: 13px 18px; border: 2px solid #8dafaa; border-radius: 10px;
+  color: #244b42; background: #fff; font-size: 16px; font-weight: 650; line-height: 1.25;
+  text-align: left; transition: border-color .15s, background .15s, color .15s, transform .15s;
+}
+.diagnostic-question__options > button:hover:not(:disabled) { border-color: #176553; background: #f2f7f4; }
+.diagnostic-question__options > button.is-selected {
+  border-color: #dea019; color: #15372f; background: #f2b631; box-shadow: 0 8px 18px rgba(180,126,16,.14);
+}
+.diagnostic-question__options > button:disabled { cursor: default; opacity: 1; }
+.diagnostic-question__custom { grid-column: 1 / -1; }
+.diagnostic-question__input {
+  height: 58px; border: 2px solid #8dafaa !important; border-radius: 10px !important;
+  color: #173c34; background: white; font-size: 16px !important;
+}
+.diagnostic-question__loading { margin-top: 16px; display: flex; align-items: center; gap: 8px; color: #61736d; font-size: 14px; }
+.diagnostic-question__loading svg { width: 18px; height: 18px; animation: spin 1s linear infinite; }
+.diagnostic-question__navigation {
+  margin-top: auto; padding-top: 22px; display: flex; align-items: center; justify-content: space-between;
+  border-top: 1px solid #e2e9e5;
+}
+.diagnostic-question__back { padding: 0 4px !important; color: #31584e !important; font-size: 16px !important; }
+.diagnostic-question__back svg { width: 20px; height: 20px; transform: rotate(180deg); }
+.diagnostic-question__back:disabled { visibility: hidden; }
+.diagnostic-question__next {
+  width: 220px; min-height: 62px !important; padding: 0 24px !important; justify-content: space-between;
+  border: 1px solid #d19319 !important; border-radius: 11px !important; color: #17362f !important;
+  background: linear-gradient(135deg, #f5bd34, #e9a921) !important; font-size: 18px !important; font-weight: 760 !important;
+  box-shadow: 0 9px 18px rgba(167,119,19,.15);
+}
+.diagnostic-question__next:disabled { border-color: #d9dfdc !important; background: #e8ecea !important; box-shadow: none; opacity: .7; }
+.diagnostic-question__next svg { width: 22px; height: 22px; }
 .consultation-modal .chat-dialogue { background: #f2f6f3; }
 .consultation-modal .chat-widget { color: #152b25; }
 .consultation-modal .chat-widget .bg-white { box-shadow: 0 8px 24px rgba(7,61,51,.055); }
@@ -369,9 +432,11 @@
   .consultation-info__person-copy { margin: 0; }
   .consultation-info__person-copy strong { font-size: 15px; }
   .consultation-info__person-copy p { display: none; }
-  .consultation-modal--launch { display: block; overflow-y: auto; }
-  .consultation-modal--launch .consultation-modal__workspace { height: auto; overflow: visible; }
-  .consultation-modal--launch .diagnostic-launch { min-height: 570px; }
+  .consultation-modal--launch, .consultation-modal--diagnostic { display: block; overflow-y: auto; }
+  .consultation-modal--launch .consultation-modal__workspace,
+  .consultation-modal--diagnostic .consultation-modal__workspace { height: auto; overflow: visible; }
+  .consultation-modal--launch .diagnostic-launch,
+  .consultation-modal--diagnostic .diagnostic-question { min-height: 570px; }
   .diagnostic-launch-person { display: block; }
   .diagnostic-launch-person__motto { min-height: 70px; padding-left: 24px; }
   .diagnostic-launch-person__card { padding: 22px; }
@@ -380,6 +445,9 @@
   .diagnostic-launch__copy p { font-size: 17px; }
   .diagnostic-launch__action { width: min(340px, 100%); }
   .diagnostic-launch__button { min-height: 62px !important; font-size: 17px !important; }
+  .diagnostic-question__body { padding: 26px 28px 24px; }
+  .diagnostic-question__content h1 { font-size: 34px; }
+  .diagnostic-question__options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 639px) {
   .consultation-stage { padding: 0; }
@@ -408,6 +476,14 @@
   .diagnostic-launch__benefits { gap: 12px; }
   .diagnostic-launch__benefits div { display: grid; gap: 7px; }
   .diagnostic-launch__benefits div + div { padding-left: 10px; }
+  .diagnostic-question__body { padding: 24px 18px 20px; }
+  .diagnostic-question__progress { gap: 15px; }
+  .diagnostic-question__progress > div { width: min(235px, 100%); }
+  .diagnostic-question__content { margin-top: 28px; }
+  .diagnostic-question__content h1 { font-size: 29px; }
+  .diagnostic-question__options { grid-template-columns: 1fr; gap: 10px; }
+  .diagnostic-question__options > button { min-height: 58px; font-size: 15px; }
+  .diagnostic-question__next { width: 175px; min-height: 56px !important; }
 }
 @media (max-height: 680px) and (max-width: 899px) {
   .consultation-info__person { display: none; }

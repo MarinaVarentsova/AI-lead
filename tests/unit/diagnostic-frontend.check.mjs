@@ -145,8 +145,9 @@ try {
   assert.ok(widget.includes("getDiagnosticSchema()"));
   assert.ok(widget.includes("const dictItems = q.options"));
   assert.ok(widget.includes("opt.allowsFreeText"));
-  assert.ok(widget.includes('submitAnswer(qIndex, "other", customInput.trim())'));
-  assert.ok(widget.includes("disabled={!customInput.trim()}"));
+  assert.match(widget, /pendingAnswer\.code === "other" \? customInput\.trim\(\) : pendingAnswer\.raw/);
+  assert.ok(widget.includes('activeCustomQ === `q${q.questionNumber}`'));
+  assert.ok(widget.includes("disabled={!canContinue || isTyping}"));
   assert.match(widget, /current_area:\s*allAnswers\[0\]\.code/);
   assert.match(widget, /allAnswers\[0\]\.code === "other"[\s\S]*current_area_other_text:\s*allAnswers\[0\]\.raw/);
   assert.match(widget, /current_role:\s*allAnswers\[1\]\.code/);
