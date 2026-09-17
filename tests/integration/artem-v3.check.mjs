@@ -97,6 +97,22 @@ try {
     assert.deepEqual(result.diagnosticResult.result, direct[index].diagnostic, cases[index].label);
     assert.deepEqual(result.transcript.slice(1), direct[index].history, cases[index].label);
   });
+  const invalidStructuredProvider = new YandexAIProvider({});
+  invalidStructuredProvider.generateDiagnosticResult = async () => ({ recommendation: "wrong legacy shape" });
+  invalidStructuredProvider.generateStructured = provider.generateStructured;
+  const fallbackRuntime = createArtemRuntime(canonical, invalidStructuredProvider);
+  const fallbackCases = [cases[0], cases[5], cases[6], cases[4]];
+  const fallbackSaved = [];
+  const fallbackSummary = await runTester(fallbackCases.length, fallbackRuntime, {
+    async saveCase(value) { fallbackSaved.push(value); }, async progress() {}, async finish() {},
+  }, fallbackCases, { sleep: async () => {} });
+  assert.equal(fallbackSummary.TECH_ERROR, 0);
+  for (const result of fallbackSaved) {
+    assert.equal(result.diagnosticResult.source, "fallback");
+    assert.equal(result.diagnosticResult.failureReason, "AI_INVALID_RESULT");
+    assert.ok(result.diagnosticResult.result.recommendation.trim());
+    assert.notEqual(result.verdict, "TECH_ERROR");
+  }
   assert.match(direct[4].diagnostic.recommendation, /Приёмка квартир.*Приёмка ИЖС/);
   assert.match(direct[5].diagnostic.recommendation, /выпускные документы/i);
   assert.match(direct[6].diagnostic.recommendation, /Приёмка квартир/);

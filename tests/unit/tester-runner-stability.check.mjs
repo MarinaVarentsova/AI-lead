@@ -102,6 +102,19 @@ try {
     assert.deepEqual(delays, [1_000, 2_000]);
   }
 
+  // A prod-validated v3 fallback is a valid diagnostic result, not a tester parser failure.
+  {
+    const saved = [];
+    const { runtime, counters } = runtimeFor({ diagnostic: () =>
+      ({ result: diagnosticResult, source: "fallback", failureReason: "AI_INVALID_RESULT" }) });
+    const summary = await runTester(1, runtime, { async saveCase(result) { saved.push(result); },
+      async progress() {}, async finish() {} }, personas.slice(0, 1), { sleep: async () => {} });
+    assert.equal(counters.diagnostic, 1);
+    assert.equal(saved[0].diagnosticResult.failureReason, "AI_INVALID_RESULT");
+    assert.notEqual(saved[0].verdict, "TECH_ERROR");
+    assert.equal(summary.TECH_ERROR, 0);
+  }
+
   // Evaluator retry never regenerates Artem's diagnostic or answer.
   {
     const delays = [];

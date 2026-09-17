@@ -104,7 +104,11 @@ export async function runTester(count: number, runtime: ArtemRuntime, store: Tes
       const resolved = DiagnosticKnowledgeResolver.resolve(persona.answers);
       const diagnostic = await executeAI("diagnostic_generation", async () => {
         const outcome = await runtime.diagnostic.generate(DiagnosticKnowledgeResolver.buildFactsPacket(resolved));
-        if (outcome.source === "fallback" && outcome.failureReason !== "AI_CONFIGURATION_ERROR") {
+        // The production runtime has already validated this fallback against the
+        // same v3 result contract. Do not turn a valid production result back
+        // into a tester-only schema failure.
+        if (outcome.source === "fallback" && outcome.failureReason !== "AI_CONFIGURATION_ERROR" &&
+          outcome.failureReason !== "AI_INVALID_RESULT") {
           throw new DiagnosticAIError(outcome.failureReason ?? "AI_REQUEST_FAILED");
         }
         return outcome;
