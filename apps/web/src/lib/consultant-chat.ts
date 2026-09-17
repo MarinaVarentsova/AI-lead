@@ -1,6 +1,7 @@
 import { apiFetch } from "./api";
 
 export const CONSULTANT_ERROR = "Не удалось получить ответ. Попробуйте ещё раз.";
+export const CONSULTANT_LENGTH_ERROR = "Вопрос получился слишком длинным. Сократите его до 1000 знаков.";
 
 export class ConsultantLimitError extends Error {}
 
@@ -14,9 +15,12 @@ export function createConsultantRequestId(): string {
 }
 
 export async function sendConsultantTurn(conversationId: string, message: string, requestId?: string): Promise<{ message: string; limitReached: boolean }> {
+  const normalized = message.trim();
+  if (!normalized) throw new Error(CONSULTANT_ERROR);
+  if (normalized.length > 1000) throw new Error(CONSULTANT_LENGTH_ERROR);
   const options = {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ conversationId, message: message.trim(), ...(requestId ? { requestId } : {}) }),
+    body: JSON.stringify({ conversationId, message: normalized, ...(requestId ? { requestId } : {}) }),
   };
   let response: Response | undefined;
   for (let attempt = 0; attempt < 2; attempt++) {

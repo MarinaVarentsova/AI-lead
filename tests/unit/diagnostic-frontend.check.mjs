@@ -180,7 +180,8 @@ try {
   assert.ok(widget.includes('Вопрос {questionNumber} из 3'));
   assert.ok(widget.includes('className="diagnostic-consultation__history"'));
   assert.ok(widget.includes('setConsultantMessages((previous) => [...previous, { id: uid(), role: "bot", content: reply.message }])'));
-  assert.match(widget, /canAskQuestion \? \([\s\S]*diagnostic-consultation__composer[\s\S]*\) : \([\s\S]*diagnostic-consultation__complete/);
+  assert.match(widget, /canAskQuestion && \([\s\S]*diagnostic-consultation__composer/);
+  assert.match(widget, /contactPhase !== "submitted"[\s\S]*diagnostic-consultation__complete/);
   assert.match(widget, /diagnostic-consultation__manager[\s\S]*handleManagerContactClick/);
   for (const legacyBlock of ["result.currentArea", "result.currentRole", "result.education", "result.targetTasks"]) {
     assert.ok(!widget.includes(legacyBlock));

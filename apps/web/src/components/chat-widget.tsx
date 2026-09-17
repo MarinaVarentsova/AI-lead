@@ -368,7 +368,7 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
 
   const handleConsultantSubmit = async () => {
     const question = questionDraft.trim();
-    if (consultantLimitReached || consultantBusy.current || !conversationId || !question || question.length > 4000) return;
+    if (consultantLimitReached || consultantBusy.current || !conversationId || !question || question.length > 1000) return;
     showNextStep("user");
     consultantBusy.current = true;
     setConsultantLoading(true);
@@ -499,6 +499,7 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
               <Input
                 data-testid={`input-q${q.questionNumber}-custom`}
                 value={customInput}
+                maxLength={200}
                 onChange={(e) => setCustomInput(e.target.value)}
                 placeholder="Напишите ваш вариант..."
                 aria-label="Введите свой вариант ответа"
@@ -828,10 +829,10 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
             </div>}
           </div>
 
-          {canAskQuestion ? (
+          {canAskQuestion && (
             <div className="diagnostic-consultation__composer">
               <Textarea ref={postDiagnosticInputRef} value={questionDraft} disabled={consultantLoading}
-                maxLength={4000} onChange={(event) => setQuestionDraft(event.target.value)}
+                maxLength={1000} onChange={(event) => setQuestionDraft(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                     event.preventDefault(); void handleConsultantSubmit();
@@ -846,7 +847,8 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
                 {!consultantLoading && <ArrowUpRight aria-hidden="true" />}
               </Button>
             </div>
-          ) : (
+          )}
+          {contactPhase !== "submitted" && (
             <div className="diagnostic-consultation__complete" ref={limitCtaRef}>
               <Button className="diagnostic-consultation__manager" onClick={() => {
                 setConsultationViewActive(false); onPostDiagnosticViewChange?.("default");
@@ -984,7 +986,7 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
                 ref={postDiagnosticInputRef}
                 value={questionDraft}
                 disabled={consultantLoading}
-                maxLength={4000}
+                maxLength={1000}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                     event.preventDefault();

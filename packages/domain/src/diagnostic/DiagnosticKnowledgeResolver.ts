@@ -25,7 +25,7 @@ export class DiagnosticKnowledgeResolver {
     let otherText: string | null = null;
     if (currentArea === "other") {
       if (typeof raw !== "string" || !raw.trim()) issues.push({ field: "current_area_other_text", code: "required" });
-      else if (raw.trim().length > 500) issues.push({ field: "current_area_other_text", code: "invalid_raw" });
+      else if (raw.trim().length > 200) issues.push({ field: "current_area_other_text", code: "invalid_raw" });
       else otherText = raw.trim();
     } else if (raw !== undefined && raw !== null && raw !== "") issues.push({ field: "current_area_other_text", code: "unexpected" });
     if (!currentArea || !currentRole || !educationStatus || !targetTasks || issues.length) throw new DiagnosticValidationError(issues);

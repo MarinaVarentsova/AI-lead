@@ -15,10 +15,12 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
   req.log.info({ requestId: traceRequestId, stage: phase, provider }, "CONSULTANT_CHAT_START");
   try {
     const { conversationId, message: value, requestId: suppliedId } = req.body ?? {};
-    if (!uuid(conversationId) || typeof value !== "string" || !value.trim() || value.trim().length > 4000 ||
+    if (!uuid(conversationId) || typeof value !== "string" || !value.trim() || value.trim().length > 1000 ||
       (suppliedId !== undefined && !uuid(suppliedId))) {
       errorCode = "CONSULTANT_REQUEST_INVALID";
-      res.status(400).json({ error: "Invalid conversationId, requestId or message (1–4000 characters required).", code: errorCode }); return;
+      res.status(400).json({ error: typeof value === "string" && value.trim().length > 1000
+        ? "Вопрос получился слишком длинным. Сократите его до 1000 знаков."
+        : "Вопрос должен содержать от 1 до 1000 знаков.", code: errorCode }); return;
     }
     const message = value.trim();
     const requestId = suppliedId ?? randomUUID();

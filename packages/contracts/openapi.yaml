@@ -169,6 +169,7 @@ components:
           enum: [construction_repair, design_estimates, construction_control, real_estate_valuation_law, other]
         current_area_other_text:
           type: string
+          maxLength: 200
         current_role:
           type: string
           enum: [engineer_designer_estimator, foreman_master_site_specialist, manager_owner, valuer_lawyer_expert, not_in_construction]

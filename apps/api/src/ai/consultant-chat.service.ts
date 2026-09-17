@@ -1,4 +1,4 @@
-import { ConsultantKnowledgeResolver, UNKNOWN_KNOWLEDGE, type ConsultantDiagnosticContext } from "@workspace/domain/consultant";
+import { ConsultantKnowledgeResolver, classifyConsultantIntent, type ConsultantDiagnosticContext } from "@workspace/domain/consultant";
 import type { ArtemProgram } from "@workspace/domain/diagnostic";
 import { DiagnosticAIError } from "./diagnostic-result.types";
 import { redactConsultantQuestion, selectConsultantInput } from "./consultant-chat.prompt";
@@ -11,6 +11,17 @@ export function consultantFallback(input: ConsultantProviderInput, markdown: str
   return fallbackReply(markdown, program ?? (/targetTasks=apartment_house_acceptance|no_professional_education/.test(input.diagnosticContext) ? "apartment_acceptance" : "construction_expertise"),
     input.question, input.history ?? [], input.diagnosticContext);
 }
+const SMALL_TALK_REPLY = "Спасибо, всё хорошо. Продолжим по обучению — что хотите уточнить?";
+const OFF_TOPIC_REPLY = "Похоже, мы ушли от темы обучения. Я здесь, чтобы помочь выбрать подходящую программу. Сформулируйте вопрос в этом контексте — буду рад проконсультировать.";
+const ABUSIVE_REPLY = "Давайте вернёмся к теме обучения. Я помогу выбрать подходящую программу и разобраться в условиях.";
+function unknownProgramFactReply(question: string): string {
+  const q = question.toLowerCase();
+  const parameter = /лиценз/.test(q) ? "номер и реквизиты лицензии" : /договор/.test(q) ? "условия договора" :
+    /возврат/.test(q) ? "условия возврата" : /доступ/.test(q) ? "срок доступа к материалам" :
+      /иностран|признан.*диплом/.test(q) ? "признание конкретного диплома" :
+        /суд/.test(q) ? "требования конкретного суда" : /работодател/.test(q) ? "требования конкретного работодателя" : "запрошенный параметр программы";
+  return `Подтверждённых данных про ${parameter} сейчас нет. Этот конкретный параметр нужно уточнить у менеджера.`;
+}
 export class ConsultantChatService {
   constructor(private readonly resolver: ConsultantKnowledgeResolver, private readonly provider: ConsultantAIProvider, private readonly markdown?: string) {}
   prepare(question: string, diagnosticContext: ConsultantDiagnosticContext): ConsultantProviderInput {
@@ -22,8 +33,16 @@ export class ConsultantChatService {
     const facts = selectConsultantInput(input);
     const markdown = this.markdown ?? await loadArtemKnowledge();
     const unknown = facts.matchedSections.every(section => ["faq", "manager"].includes(section.id));
+    const intent = classifyConsultantIntent(facts.question, !unknown);
+    if (intent === "small_talk") return { message: SMALL_TALK_REPLY, isAI: false, provider: "fallback",
+      matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null };
+    if (intent === "off_topic" || intent === "abusive_or_trolling") return {
+      message: intent === "abusive_or_trolling" ? ABUSIVE_REPLY : OFF_TOPIC_REPLY,
+      isAI: false, provider: "fallback", matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null,
+    };
+    const genuineUnknown = intent === "genuine_unknown_program_fact" || (unknown && intent === "relevant_training_question");
     try {
-      if (unknown) throw new Error("INSUFFICIENT_KNOWLEDGE");
+      if (unknown || genuineUnknown) throw new Error("INSUFFICIENT_KNOWLEDGE");
       const message = await this.provider.generateConsultantReply(selectConsultantInput(facts));
       if (typeof message !== "string" || !message.trim() || message.length > 6000 ||
         /в базе знаний|Пользователь имеет|рекомендация должна|no_professional_education|recommendedTrack|diagnosticContext/i.test(message)) throw new DiagnosticAIError("AI_INVALID_RESULT");
@@ -32,9 +51,9 @@ export class ConsultantChatService {
       return { message: message.trim(), isAI: true, provider: "yandex",
         matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null };
     } catch (error) {
-      return { message: unknown ? UNKNOWN_KNOWLEDGE : consultantFallback(facts, markdown), isAI: false, provider: "fallback",
+      return { message: genuineUnknown ? unknownProgramFactReply(facts.question) : consultantFallback(facts, markdown), isAI: false, provider: "fallback",
         matchedSectionIds: facts.matchedSections.map(section => section.id),
-        fallbackReason: unknown ? "INSUFFICIENT_KNOWLEDGE" : error instanceof DiagnosticAIError ? error.code : "AI_REQUEST_FAILED" };
+        fallbackReason: genuineUnknown ? "INSUFFICIENT_KNOWLEDGE" : error instanceof DiagnosticAIError ? error.code : "AI_REQUEST_FAILED" };
     }
   }
 }

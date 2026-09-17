@@ -54,6 +54,9 @@ try {
     education_status: "higher", target_tasks: "defects_quality" };
   assert.equal(DiagnosticKnowledgeResolver.resolve(valid).answers.currentArea.code, "construction_repair");
   assert.equal(DiagnosticKnowledgeResolver.resolve({ ...valid, current_area: "other", current_area_other_text: "Промышленная безопасность" }).answers.currentArea.otherText, "Промышленная безопасность");
+  assert.doesNotThrow(() => DiagnosticKnowledgeResolver.resolve({ ...valid, current_area: "other", current_area_other_text: "я".repeat(200) }));
+  assert.throws(() => DiagnosticKnowledgeResolver.resolve({ ...valid, current_area: "other", current_area_other_text: "я".repeat(201) }), error =>
+    error instanceof DiagnosticValidationError && error.issues.some(issue => issue.field === "current_area_other_text" && issue.code === "invalid_raw"));
   assert.throws(() => DiagnosticKnowledgeResolver.resolve({ ...valid, current_area: "other" }), error =>
     error instanceof DiagnosticValidationError && error.issues.some(issue => issue.field === "current_area_other_text" && issue.code === "required"));
   assert.doesNotThrow(() => DiagnosticKnowledgeResolver.resolve(valid));

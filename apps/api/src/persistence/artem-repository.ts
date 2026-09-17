@@ -109,7 +109,7 @@ export async function saveDiagnosticTurn(sessionId: string, questionNumber: numb
     const option = question.options.find(item => item.code === answer.code);
     if (!option) throw new Error("DIAGNOSTIC_TURN_INVALID");
     const otherText = answer.otherText?.trim();
-    if (option.allowsFreeText && (!otherText || otherText.length > 500)) throw new Error("DIAGNOSTIC_TURN_INVALID");
+    if (option.allowsFreeText && (!otherText || otherText.length > 200)) throw new Error("DIAGNOSTIC_TURN_INVALID");
     if (!option.allowsFreeText && otherText) throw new Error("DIAGNOSTIC_TURN_INVALID");
     message = { speaker: "user", stage: "diagnostic", messageType: "diagnostic_answer",
       text: option.allowsFreeText ? `Другая сфера: ${otherText}` : option.label };

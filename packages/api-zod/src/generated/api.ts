@@ -30,7 +30,7 @@ export const CreateConversationBody = zod.object({
 export const SaveDiagnosticAnswersBody = zod.object({
   "conversationId": zod.string().uuid(),
   "current_area": zod.enum(['construction_repair', 'design_estimates', 'construction_control', 'real_estate_valuation_law', 'other']),
-  "current_area_other_text": zod.string().optional(),
+  "current_area_other_text": zod.string().max(200).optional(),
   "current_role": zod.enum(['engineer_designer_estimator', 'foreman_master_site_specialist', 'manager_owner', 'valuer_lawyer_expert', 'not_in_construction']),
   "education_status": zod.enum(['higher', 'secondary_vocational', 'currently_studying', 'no_higher_or_secondary_vocational']),
   "target_tasks": zod.enum(['defects_quality', 'damage_loss', 'apartment_house_acceptance', 'judicial_construction_expertise', 'explore'])
@@ -55,5 +55,4 @@ export const GetDiagnosticSchemaResponseItem = zod.object({
 }))
 })
 export const GetDiagnosticSchemaResponse = zod.array(GetDiagnosticSchemaResponseItem).min(4).max(4)
-
 

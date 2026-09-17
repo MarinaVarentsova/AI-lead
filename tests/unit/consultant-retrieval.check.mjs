@@ -25,7 +25,7 @@ const hooks = registerHooks({
 });
 try {
   const { ConsultantKnowledgeResolver, createConsultantSections } = await import(new URL("packages/domain/src/consultant/index.ts", root));
-  const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_2.md", root), "utf8");
+  const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_0.md", root), "utf8");
   const resolver = new ConsultantKnowledgeResolver(markdown);
   const fixtures = JSON.parse(readFileSync(new URL("consultant-retrieval.fixtures.json", import.meta.url), "utf8"));
   for (const fixture of fixtures) {
@@ -80,6 +80,11 @@ try {
   assert.throws(() => resolver.resolve({ question: " " }), { code: "CONSULTANT_VALIDATION_ERROR" });
   assert.throws(() => resolver.resolve({ question: "Привет", diagnosticContext: { educationStatus: "PRIVATE_VALUE" } }), { code: "CONSULTANT_VALIDATION_ERROR" });
   assert.deepEqual(resolver.resolve({ question: "Погода на Марсе?" }).matchedSections.map(s => s.id), ["faq", "manager"]);
+  assert.equal(resolver.resolve({ question: "как дела?" }).intent, "small_talk");
+  assert.equal(resolver.resolve({ question: "расскажи анекдот" }).intent, "off_topic");
+  assert.equal(resolver.resolve({ question: "ты дебил" }).intent, "abusive_or_trolling");
+  assert.equal(resolver.resolve({ question: "Да это хрень, сколько стоит Стройэксперт?" }).intent, "relevant_training_question");
+  assert.equal(resolver.resolve({ question: "Какой номер лицензии?" }).intent, "genuine_unknown_program_fact");
   const catalog = createConsultantSections(markdown);
   assert.equal(catalog.length, 23);
   assert.ok(!catalog.some(s => s.sources.includes("6.3") || s.sources.includes("8.2") || s.sources.includes("16.5")));
