@@ -16,6 +16,39 @@ export const BENEFITS: Record<ArtemProgram, string> = {
   house_unspecified: "Разовые проверки готовых домов и сопровождение стройки по этапам — разные задачи и программы.",
   acceptance_choice: "«Приёмка квартир» — более простой первый этап, а «Приёмка ИЖС» посвящена более сложной проверке частного дома.",
 };
+
+/** Turns confirmed diagnostic facts into role-specific value without inferring unconfirmed skills. */
+export function personalizedBenefit(facts: DiagnosticFactsPacket, program: ArtemProgram): string {
+  const { currentArea, currentRole } = facts.answerCodes;
+  if (program === "construction_expertise" &&
+    (currentArea === "design_estimates" || currentRole === "engineer_designer_estimator")) {
+    return "С учётом вашей работы в проектировании и сметах программа помогает расширить работу с проектной и технической документацией: исследовать дефекты и готовить экспертные заключения.";
+  }
+  if (program === "construction_expertise" && currentArea === "construction_control") {
+    return "С учётом вашей работы в строительном контроле программа помогает перейти от фиксации качества к исследованию причин дефектов и подготовке экспертных выводов и заключений.";
+  }
+  return `${facts.currentArea} ${facts.currentRole} ${BENEFITS[program]}`;
+}
+
+function professionalBenefit(program: ArtemProgram, context: string): string | null {
+  if (program !== "construction_expertise") return null;
+  if (/currentArea=design_estimates|currentRole=engineer_designer_estimator/.test(context)) {
+    return "Для проектировщика программа расширяет работу с проектной и технической документацией: помогает исследовать дефекты и готовить экспертные заключения.";
+  }
+  if (/currentArea=construction_control/.test(context)) {
+    return "Для специалиста строительного контроля программа расширяет задачи от фиксации качества до исследования причин дефектов и подготовки экспертных выводов и заключений.";
+  }
+  if (/currentRole=manager_owner/.test(context)) {
+    return "Для руководителя программа помогает разбирать причины дефектов и использовать экспертные выводы при контроле качества работ, не предполагая наличие у компании неподтверждённой клиентской базы.";
+  }
+  if (/currentRole=valuer_lawyer_expert/.test(context)) {
+    return "Для оценщика или эксперта программа помогает связать исследование дефектов и технической документации с подготовкой экспертных заключений.";
+  }
+  if (/currentRole=foreman_master_site_specialist/.test(context)) {
+    return "Для прораба или специалиста на объекте программа помогает перейти от фиксации дефектов к исследованию их причин и подготовке экспертных выводов.";
+  }
+  return null;
+}
 export function diagnosticProgram(facts: DiagnosticFactsPacket): ArtemProgram {
   if (facts.recommendedTrackHint === "construction_expertise") return "construction_expertise";
   if (facts.recommendedTrackHint === "apartment_acceptance") return "apartment_acceptance";
@@ -65,7 +98,7 @@ export function commercialText(markdown: string, program: ArtemProgram, question
 }
 
 export function fallbackReply(markdown: string, program: ArtemProgram, question: string,
-  history: ConsultantExchange[], education: string): string {
+  history: ConsultantExchange[], diagnosticContext: string): string {
   const q = question.toLowerCase().replace(/ё/g, "е");
   const name = PROGRAM_NAMES[program];
   const userHistory = history.filter(row => row.role === "user").map(row => row.message).join(" ");
@@ -74,7 +107,10 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
   if (/телефон.*не хочу|не хочу.*телефон|не звоните|просто отвечайте/.test(q) && !/цен|стоит|документ/.test(q)) return "Хорошо, продолжим здесь.";
   if (/скидк|акци/.test(q)) return "Размер и наличие скидки нужно подтвердить. Действующие предложения может проверить менеджер.";
   if (/гарант.*(?:работ|доход|заказ|трудоустр)/.test(q) || /заказ|клиент|трудоустр/.test(q)) {
-    return "Институт не гарантирует трудоустройство, доход или заказы. Первые обращения можно искать через профессиональные контакты, юристов и экспертные организации. Для старта полезно выбрать ограниченный круг задач и развивать практику на основе заданий и обратной связи.";
+    const managerCondition = /currentRole=manager_owner/.test(diagnosticContext)
+      ? " Если у компании уже есть заказчики, подрядчики или партнёры, можно начать с предложения им ограниченного круга экспертных задач."
+      : "";
+    return "Институт не гарантирует трудоустройство, доход или заказы. Первые обращения можно искать через профессиональные контакты, юристов и экспертные организации. Для старта полезно выбрать ограниченный круг задач и развивать практику на основе заданий и обратной связи." + managerCondition;
   }
   if (/подумаю|не сейчас/.test(q) && !/дорого/.test(q)) {
     if (/дорого|бюджет|цен/.test(userHistory)) return BENEFITS[program] + " " + commercialText(markdown, program, tariffContext);
@@ -88,10 +124,10 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
     return (/дорого/.test(q) ? BENEFITS[program] + " " : "") + commercialText(markdown, program, tariffContext);
   }
   if (/образован|поступ|аттестат|диплома.*нет|диплом не|экономическ.*диплом/.test(q)) {
-    if (/иностран|зарубеж/.test(q + education)) return "По иностранному диплому нужна индивидуальная проверка. Признание документа заранее обещать нельзя; менеджер организует проверку.";
-    if (/учусь|студент|получаю.*образован/.test(q + education)) return "Если вы сейчас учитесь в колледже или вузе, вариант с переподготовкой можно проверить отдельно. Менеджер уточнит порядок зачисления и выдачи диплома.";
-    if (/no_higher_or_secondary_vocational|только (?:школ|аттестат)/.test(education + q)) return "Для «Стройэксперта» нужно СПО или высшее образование. Если сейчас у вас только школа, можно рассмотреть «Приёмку квартир» — осмотр и фиксацию дефектов; это не переподготовка строительного эксперта.";
-    if (/currently_studying/.test(education) || /диплома.*нет|диплом не/.test(q)) {
+    if (/иностран|зарубеж/.test(q + diagnosticContext)) return "По иностранному диплому нужна индивидуальная проверка. Признание документа заранее обещать нельзя; менеджер организует проверку.";
+    if (/учусь|студент|получаю.*образован/.test(q + diagnosticContext)) return "Если вы сейчас учитесь в колледже или вузе, обучение можно начать; выпускные документы выдаются после предъявления оконченного диплома СПО или высшего образования.";
+    if (/no_higher_or_secondary_vocational|только (?:школ|аттестат)/.test(diagnosticContext + q)) return "Для «Стройэксперта» нужно СПО или высшее образование. Если сейчас у вас только школа, можно рассмотреть «Приёмку квартир» — осмотр и фиксацию дефектов; это не переподготовка строительного эксперта.";
+    if (/currently_studying/.test(diagnosticContext) || /диплома.*нет|диплом не/.test(q)) {
       if (!/окончил|получил|есть.*(?:спо|высшее)/.test(q + userHistory)) return "Вы окончили колледж или вуз, просто диплома сейчас нет под рукой, или такого образования нет?";
     }
     if (program === "construction_expertise") return "Для поступления на «Стройэксперт» достаточно СПО или высшего образования любого профиля. Строительный опыт не обязателен. Если образование получено, а документа нет под рукой, порядок подтверждения уточнит менеджер.";
@@ -102,9 +138,11 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
     return "Базовый «Стройэксперт» — 260 академических часов, Средний — 520. Академические часы не равны календарным дням. " + commercial;
   }
   if (/диплом|документ|сертификат|удостоверен|фрдо/.test(q)) return program === "construction_expertise" ?
-    "После успешного завершения «Стройэксперта» выдаётся диплом о профессиональной переподготовке; сведения о нём вносятся в ФИС ФРДО. Дополнительные документы зависят от тарифа; они не заменяют диплом и не дают отдельной квалификации." :
+    "После успешного завершения «Стройэксперта» выдаётся диплом о профессиональной переподготовке; сведения о нём вносятся в ФИС ФРДО. Сертификаты и удостоверения зависят от тарифа; они не заменяют диплом и не дают самостоятельной новой квалификации." :
     `Точный выдаваемый документ по программе «${name}» нужно уточнить. Документы «Стройэксперта» на неё автоматически не распространяются.`;
   if (/нет опыта|без опыта|нович/.test(q)) return "Строительный опыт для поступления на «Стройэксперт» не обязателен, достаточно СПО или высшего образования. Осваивать новое направление помогают материалы, задания и итоговая работа с проверкой; самостоятельная работа требует практики.";
+  const roleBenefit = professionalBenefit(program, diagnosticContext);
+  if (roleBenefit && /что даст|как (?:расширить|применить)|польз|зачем|для (?:проектиров|руководител|оценщик|прораб|строительн.*контрол)/.test(q)) return roleBenefit;
   if (/ижс/.test(q) && program === "house_unspecified") return "Вам интереснее разовые проверки готовых домов или сопровождение стройки по этапам?";
   if (explicitProgram(question) || isConsultantChoiceQuestion(question) || /выбрать|подойдет|подходит|рекоменд|зачем|польз/.test(q)) return `Можно рассмотреть «${name}». ${BENEFITS[program]}`;
   if (/начал|формат|дистанц|срок|нет времени/.test(q) && program === "construction_expertise") return "«Стройэксперт» проходит дистанционно, в индивидуальном графике. Есть задания, контроль знаний и итоговая работа. Точную продолжительность и нагрузку по тарифу нужно уточнить.";

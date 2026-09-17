@@ -1,7 +1,7 @@
 import type { ConsultantSection } from "./consultant-types";
 export const UNKNOWN_KNOWLEDGE = "Этот конкретный параметр требует проверки. Индивидуальные условия можно уточнить у менеджера.";
 export function createConsultantSections(markdown: string): readonly ConsultantSection[] {
-  if (!markdown.includes("Версия 3.1 · 17 сентября 2026 года.")) throw new Error("Artem v3.1 source required");
+  if (!markdown.includes("Версия 3.2 · 17 сентября 2026 года.")) throw new Error("Artem v3.2 source required");
   const blocks = new Map<string, string>();
   for (const block of markdown.replace(/\r\n/g, "\n").split(/(?=^## \d+\.)/m)) {
     const id = /^## (\d+)\./.exec(block)?.[1];
@@ -16,6 +16,7 @@ export function createConsultantSections(markdown: string): readonly ConsultantS
     s("admission", "Образование и поступление", ["поступ", "образован", "спо", "высш", "аттестат"], ["6"]),
     s("non_profile", "Непрофильное образование", ["непрофиль", "экономическ", "экономист", "педагог", "гуманитар", "медицин"], ["6"]),
     s("experience", "Опыт", ["опыт", "стаж", "нович", "с нуля"], ["13"]),
+    s("role_benefit", "Профессиональная польза", ["что даст", "как расширить", "проектировщик", "руководитель", "оценщик", "прораб", "контроль качества", "профессиональная польза"], ["7", "13"]),
     s("construction_expertise", "Строительная экспертиза", ["строительн экспертиз", "эксперт", "дефект"], ["7"]),
     s("judicial", "Судебная экспертиза", ["судебн", "суд", "заключен"], ["8"]),
     s("legal_limits", "Границы квалификации", ["юридическ", "право", "сро", "нострой", "ноприз", "нок", "минстрой"], ["8", "9"]),

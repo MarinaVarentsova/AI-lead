@@ -212,6 +212,23 @@ try {
   const expensive = await run({ message: "Дорого. Что я получу за эти деньги?" });
   assert.match(expensive.message, /дефект|документац|заключени/i);
   assert.match(expensive.message, /14 880/);
+  const designerBenefit = await run({ row: { ...fixture.row, currentArea: "design_estimates", currentRole: "engineer_designer_estimator", educationStatus: "secondary_vocational", targetTasks: "judicial_construction_expertise" },
+    message: "Что даст программа проектировщику?" });
+  assert.match(designerBenefit.message, /проектн.*техническ.*документац/i);
+  assert.match(designerBenefit.message, /исследова.*дефект/i);
+  assert.match(designerBenefit.message, /экспертн.*заключен/i);
+  assert.doesNotMatch(designerBenefit.message, /требует проверки|уточн.*менеджер/i);
+  const controlBenefit = await run({ row: { ...fixture.row, currentArea: "construction_control", currentRole: "manager_owner", educationStatus: "higher", targetTasks: "defects_quality" },
+    message: "Как расширить задачи в контроле качества?" });
+  assert.match(controlBenefit.message, /фиксац.*качеств/i);
+  assert.match(controlBenefit.message, /причин.*дефект/i);
+  assert.match(controlBenefit.message, /экспертн.*(?:вывод|заключен)/i);
+  assert.doesNotMatch(controlBenefit.message, /требует проверки|уточн.*менеджер/i);
+  const managerClients = await run({ row: { ...fixture.row, currentArea: "construction_control", currentRole: "manager_owner" }, message: "Как искать первых клиентов?" });
+  assert.match(managerClients.message, /Если у компании уже есть заказчики, подрядчики или партнёры/i);
+  assert.doesNotMatch(managerClients.message, /у вашей компании уже есть/i);
+  const judicialDocument = await run({ message: "Сертификат даёт самостоятельную квалификацию?" });
+  assert.match(judicialDocument.message, /сертификаты и удостоверения.*не заменяют диплом.*не дают самостоятельной новой квалификации/i);
   const thinking = await run({ message: "Я пока подумаю" });
   assert.match(thinking.message, /Что пока осталось неясным/i);
   assert.ok(examples[0].answer.includes("14 880"), "known price must be answered before any CTA");
@@ -289,11 +306,11 @@ try {
   try {
     const knowledgeDir = path.join(packaged, "knowledge");
     mkdirSync(knowledgeDir);
-    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_1.md", root), "utf8");
-    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v3_1.md"), markdown);
+    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_2.md", root), "utf8");
+    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v3_2.md"), markdown);
     assert.equal(await loadArtemKnowledge(pathToFileURL(path.join(packaged, "index.mjs")).href), markdown);
     assert.ok(readFileSync(new URL("apps/api/build.mjs", root), "utf8")
-      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v3_1.md")'));
+      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v3_2.md")'));
   } finally {
     rmSync(packaged, { recursive: true, force: true });
   }
@@ -328,7 +345,7 @@ try {
     if (evaluatorAttempts === 1 || evaluatorAttempts === 3 || evaluatorAttempts === 4 || evaluatorAttempts === 5) throw new Error("Evaluator unavailable");
     return good;
   };
-  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_1.md", root), "utf8"), fakeProvider);
+  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_2.md", root), "utf8"), fakeProvider);
   const productionBefore = persisted.length;
   const savedCases = [], progress = [];
   const summary = await runTester(2, runtime, { async saveCase(c) { savedCases.push(c); }, async progress(n) { progress.push(n); }, async finish() {} }, personas.slice(0, 2), { sleep: async () => {} });

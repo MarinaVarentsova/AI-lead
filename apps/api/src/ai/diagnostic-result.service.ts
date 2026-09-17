@@ -1,7 +1,7 @@
 import { DiagnosticKnowledgeResolver, type DiagnosticAnswers } from "@workspace/domain/diagnostic";
 import type { AIProvider } from "./provider";
 import { selectDiagnosticFacts } from "./diagnostic-result.prompt";
-import { diagnosticProgram, PROGRAM_NAMES, BENEFITS } from "./artem-policy";
+import { diagnosticProgram, PROGRAM_NAMES, personalizedBenefit } from "./artem-policy";
 import { DiagnosticAIError, hasSchoolGuard, validateDiagnosticResult,
   type DiagnosticAIErrorCode, type DiagnosticAIResult, type DiagnosticFactsPacket } from "./diagnostic-result.types";
 
@@ -21,7 +21,7 @@ export function generateDiagnosticFallback(facts: DiagnosticFactsPacket): Diagno
   return {
     summary: "Ваше персональное заключение после четырёх ответов.",
     currentArea: facts.currentArea, currentRole: facts.currentRole, education: facts.education, targetTasks: facts.targetTasks,
-    recommendation: [conclusion, educationCondition, facts.education, facts.targetTasks, BENEFITS[program], school ? "Приёмка квартир не заменяет переподготовку строительного эксперта." : "", next].filter(Boolean).join(" "),
+    recommendation: [conclusion, educationCondition, facts.education, facts.targetTasks, personalizedBenefit(facts, program), school ? "Приёмка квартир не заменяет переподготовку строительного эксперта." : "", next].filter(Boolean).join(" "),
     recommendedTrack: facts.recommendedTrackHint ?? "not_defined",
     importantNote: school ? "Для «Стройэксперта» требуется СПО или высшее образование." : conditional
       ? "Выпускные документы выдаются после предъявления оконченного диплома СПО или высшего образования." : null,

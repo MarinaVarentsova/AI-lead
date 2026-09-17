@@ -51,7 +51,7 @@ export class ConsultantKnowledgeResolver {
     // Stable content fingerprint, not a security hash. Changes invalidate the source version.
     let hash = 2166136261;
     for (const char of markdown.replace(/\r\n/g, "\n")) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-    this.sourceVersion = `inobr-artem-v3.1-${(hash >>> 0).toString(16)}`;
+    this.sourceVersion = `inobr-artem-v3.2-${(hash >>> 0).toString(16)}`;
   }
 
   resolve(input: ConsultantInput): ConsultantRetrievalPacket {
@@ -90,6 +90,9 @@ export class ConsultantKnowledgeResolver {
     }
     if (matches(question, "судебн") || matches(question, "суд")) { required.add("judicial"); required.add("legal_limits"); }
     if (matches(question, "заказ") || matches(question, "клиент")) { required.add("orders"); required.add("guarantees"); }
+    const professionalBenefit = ["что даст", "как расширить", "профессиональн польз", "для проектиров", "для руководител", "для оценщик", "для прораб", "контрол качества"]
+      .some(term => matches(question, term));
+    if (professionalBenefit) { required.add("role_benefit"); required.add("construction_expertise"); }
     if (matches(question, "квартир") && matches(question, "стройэксперт")) {
       required.add("apartment_acceptance");
       if (!school) required.add("stroyexpert");
