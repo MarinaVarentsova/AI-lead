@@ -7,7 +7,7 @@ export type DiagnosticAnswers = {
   education_status: string;
   target_tasks: string;
 };
-export const SOURCE_VERSION = "inobr-artem-v3.0" as const;
+export const SOURCE_VERSION = "inobr-artem-v3.1" as const;
 export type ResolvedAnswer<Code extends string> = { code: Code };
 export type DiagnosticGuard = { code: "no_professional_education" | "completion_document_pending";
   severity: "hard" | "conditional"; rule: string };

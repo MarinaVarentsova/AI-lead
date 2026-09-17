@@ -198,6 +198,23 @@ try {
   assert.ok(examples[1].answer.includes("образования любого профиля"));
   assert.ok(examples[2].answer.includes("Автоматического назначения"));
   assert.ok(examples[3].answer.includes("Институт не гарантирует"));
+  assert.match(examples[3].answer, /профессиональные контакты|ограниченный круг задач/i);
+  const apartmentPrice = await run({ row: { ...fixture.row, targetTasks: "apartment_house_acceptance" },
+    message: "Сколько стоит Приёмка квартир и есть ли рассрочка?" });
+  for (const amount of ["28 000", "44 000", "72 000"]) assert.ok(apartmentPrice.message.includes(amount));
+  assert.match(apartmentPrice.message, /рассрочки.*уточнить/i);
+  const stroyDocument = await run({ message: "Какой документ выдаётся на Стройэксперте?" });
+  assert.match(stroyDocument.message, /диплом.*профессиональной переподготовке/i);
+  assert.match(stroyDocument.message, /ФИС ФРДО/i);
+  const incomeGuarantee = await run({ message: "Вы гарантируете доход и заказы после обучения?" });
+  assert.match(incomeGuarantee.message, /не гарантирует/i);
+  assert.match(incomeGuarantee.message, /профессиональные контакты|ограниченный круг задач/i);
+  const expensive = await run({ message: "Дорого. Что я получу за эти деньги?" });
+  assert.match(expensive.message, /дефект|документац|заключени/i);
+  assert.match(expensive.message, /14 880/);
+  const thinking = await run({ message: "Я пока подумаю" });
+  assert.match(thinking.message, /Что пока осталось неясным/i);
+  assert.ok(examples[0].answer.includes("14 880"), "known price must be answered before any CTA");
   const school = await run({ row: { ...fixture.row, educationStatus: "no_higher_or_secondary_vocational" } });
   assert.ok(school.message.includes("Приёмка квартир"));
   for (const message of ["", " ", null, "a".repeat(4001)]) await run({ message, status: 400 });
@@ -272,11 +289,11 @@ try {
   try {
     const knowledgeDir = path.join(packaged, "knowledge");
     mkdirSync(knowledgeDir);
-    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3.md", root), "utf8");
-    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v3.md"), markdown);
+    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_1.md", root), "utf8");
+    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v3_1.md"), markdown);
     assert.equal(await loadArtemKnowledge(pathToFileURL(path.join(packaged, "index.mjs")).href), markdown);
     assert.ok(readFileSync(new URL("apps/api/build.mjs", root), "utf8")
-      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v3.md")'));
+      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v3_1.md")'));
   } finally {
     rmSync(packaged, { recursive: true, force: true });
   }
@@ -311,7 +328,7 @@ try {
     if (evaluatorAttempts === 1 || evaluatorAttempts === 3 || evaluatorAttempts === 4 || evaluatorAttempts === 5) throw new Error("Evaluator unavailable");
     return good;
   };
-  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3.md", root), "utf8"), fakeProvider);
+  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_1.md", root), "utf8"), fakeProvider);
   const productionBefore = persisted.length;
   const savedCases = [], progress = [];
   const summary = await runTester(2, runtime, { async saveCase(c) { savedCases.push(c); }, async progress(n) { progress.push(n); }, async finish() {} }, personas.slice(0, 2), { sleep: async () => {} });

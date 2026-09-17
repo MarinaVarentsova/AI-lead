@@ -1,4 +1,4 @@
-// v3 A–O: production and tester use the same runtime and canonical knowledge.
+// v3.1 A–O: production and tester use the same runtime and canonical knowledge.
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire, registerHooks } from "node:module";
@@ -33,8 +33,10 @@ try {
   const { generatePersonas } = await import(new URL("apps/api/src/tester/personas.ts", root));
   const { CRITERIA, EVALUATOR_PROMPT } = await import(new URL("apps/api/src/tester/evaluator.ts", root));
   const { DIAGNOSTIC_SCHEMA } = await import(new URL("packages/domain/src/diagnostic/diagnostic-schema.ts", root));
-  const canonical = read("knowledge/inobr/artem_unified_knowledge_base_v3.md");
+  const canonical = read("knowledge/inobr/artem_unified_knowledge_base_v3_1.md");
   assert.equal((await loadArtemKnowledge()).replace(/\r\n/g, "\n").trim(), canonical.replace(/\r\n/g, "\n").trim());
+  assert.equal(existsSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3.md", root)), false);
+  assert.match(canonical, /Версия 3\.1/);
   assert.throws(() => createArtemRuntime("# Устаревшая база"));
 
   const base = { current_area: "construction_repair", current_role: "foreman_master_site_specialist",
@@ -113,6 +115,19 @@ try {
     assert.ok(result.diagnosticResult.result.recommendation.trim());
     assert.notEqual(result.verdict, "TECH_ERROR");
   }
+  const syntheticCases = generatePersonas(10, () => 0.42);
+  const syntheticSaved = [];
+  const syntheticSummary = await runTester(10, runtime, {
+    async saveCase(value) { syntheticSaved.push(value); }, async progress() {}, async finish() {},
+  }, syntheticCases, { sleep: async () => {} });
+  assert.equal(syntheticSaved.length, 10);
+  assert.ok(syntheticSaved.every(result => result.diagnosticResult?.result?.recommendation?.trim()));
+  assert.ok(syntheticSaved.every(result => result.transcript.length >= 3));
+  assert.ok(syntheticSaved.every(result => result.evaluatorResult));
+  assert.deepEqual({ PASS: syntheticSummary.PASS, REVIEW: syntheticSummary.REVIEW,
+    FAIL: syntheticSummary.FAIL, TECH_ERROR: syntheticSummary.TECH_ERROR },
+  { PASS: 10, REVIEW: 0, FAIL: 0, TECH_ERROR: 0 });
+  assert.ok(syntheticSummary.runEvaluation);
   assert.match(direct[4].diagnostic.recommendation, /Приёмка квартир.*Приёмка ИЖС/);
   assert.match(direct[5].diagnostic.recommendation, /выпускные документы/i);
   assert.match(direct[6].diagnostic.recommendation, /Приёмка квартир/);
@@ -129,13 +144,13 @@ try {
   }
   await assert.rejects(runtime.reply(runtime.prepare(base, "Четвёртый вопрос", limitHistory), limitHistory), /FOLLOW_UP_LIMIT/);
   for (const turn of direct[13].history.filter(turn => turn.role === "assistant")) assert.doesNotMatch(turn.message, /оставьте (?:контакт|телефон)|нажмите «Связаться|свяжитесь с менеджером/i);
-  assert.match(EVALUATOR_PROMPT, /KB v3\.0/);
+  assert.match(EVALUATOR_PROMPT, /KB v3\.1/);
   for (const rule of [/ровно четыре стартовых поля/, /стаж не спрашивается/, /минимум два подтверждённых факта/,
     /apartment_house_acceptance/, /currently_studying/, /no_higher_or_secondary_vocational/,
     /current_area и current_role сами по себе не переключают/, /технадзор ИЖС/, /важнее landing priority/]) {
     assert.match(EVALUATOR_PROMPT, rule);
   }
-  console.log("PASS: v3 A–O, canonical source, prod/tester runtime parity, education guards, acceptance choice, refusal and evaluator contract.");
+  console.log("PASS: v3.1 A–O, canonical source, prod/tester runtime parity, education guards, acceptance choice, refusal and evaluator contract.");
 } finally {
   hooks.deregister();
 }

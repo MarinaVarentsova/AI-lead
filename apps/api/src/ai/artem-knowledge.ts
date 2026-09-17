@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-export const ARTEM_SOURCE = "artem_unified_knowledge_base_v3.md";
+export const ARTEM_SOURCE = "artem_unified_knowledge_base_v3_1.md";
 export async function loadArtemKnowledge(moduleUrl = import.meta.url): Promise<string> {
   const cwd = process.cwd();
   const root = cwd.endsWith(path.join("apps", "api")) ? path.resolve(cwd, "../..") : cwd;
@@ -9,7 +9,7 @@ export async function loadArtemKnowledge(moduleUrl = import.meta.url): Promise<s
     new URL(`../../../../knowledge/inobr/${ARTEM_SOURCE}`, moduleUrl), path.join(root, "knowledge/inobr", ARTEM_SOURCE)]) {
     try {
       const text = await readFile(candidate, "utf8");
-      if (!text.includes("Версия 3.0 · 16 сентября 2026 года.")) throw new Error("ARTEM_KNOWLEDGE_VERSION_INVALID");
+      if (!text.includes("Версия 3.1 · 17 сентября 2026 года.")) throw new Error("ARTEM_KNOWLEDGE_VERSION_INVALID");
       return text;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;

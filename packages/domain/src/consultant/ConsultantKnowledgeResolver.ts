@@ -51,7 +51,7 @@ export class ConsultantKnowledgeResolver {
     // Stable content fingerprint, not a security hash. Changes invalidate the source version.
     let hash = 2166136261;
     for (const char of markdown.replace(/\r\n/g, "\n")) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-    this.sourceVersion = `inobr-artem-v3.0-${(hash >>> 0).toString(16)}`;
+    this.sourceVersion = `inobr-artem-v3.1-${(hash >>> 0).toString(16)}`;
   }
 
   resolve(input: ConsultantInput): ConsultantRetrievalPacket {
