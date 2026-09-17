@@ -267,14 +267,8 @@
   gap: 22px;
   border-bottom: 1px solid rgba(255,255,255,.12);
 }
-.diagnostic-launch__logo { display: flex; align-items: center; gap: 10px; color: white; }
-.diagnostic-launch__logo strong { font-size: 23px; font-weight: 750; line-height: 1; letter-spacing: .035em; }
-.diagnostic-launch__logo span { position: relative; width: 37px; height: 22px; flex: 0 0 auto; }
-.diagnostic-launch__logo span::before,
-.diagnostic-launch__logo span::after {
-  content: ""; position: absolute; inset: 2px 0; border: 3px solid white; transform: skewY(-26deg);
-}
-.diagnostic-launch__logo span::after { inset: 2px 10px; border-width: 0 3px; transform: skewY(26deg); }
+.diagnostic-launch__logo { width: 154px; height: 50px; flex: 0 0 auto; overflow: hidden; border-radius: 5px; }
+.diagnostic-launch__logo img { display: block; width: 100%; height: 100%; object-fit: cover; }
 .diagnostic-launch__brand-copy { padding-left: 16px; border-left: 1px solid rgba(255,255,255,.28); }
 .diagnostic-launch__brand-copy h2 { color: white; font-size: 14px; font-weight: 650; line-height: 1.25; }
 .diagnostic-launch__brand-copy p { margin-top: 3px; color: rgba(255,255,255,.64); font-size: 11px; }

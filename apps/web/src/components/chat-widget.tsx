@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Send, Loader2, CheckCircle2, ChevronRight, ArrowUpRight, BookOpen, Target, UserRound,
   FileText, Users, ChartNoAxesColumnIncreasing } from "lucide-react";
-import inobrLogo from "@assets/image_1782127452755.png";
 import {
   useCreateSession,
   useCreateConversation,
@@ -47,6 +46,7 @@ const CONTACT_CHANNELS = [
   { code: "max", label: "MAX", placeholder: "Номер телефона", type: "tel" },
   { code: "email", label: "E-mail", placeholder: "Ваш e-mail", type: "email" },
 ];
+const INOBR_LOGO_SRC = "/inobr-logo.jpg";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
@@ -633,10 +633,7 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
         <header
           className="diagnostic-launch__header consultation-chat-header px-7 flex items-center text-white shrink-0"
         >
-          <div className="diagnostic-launch__logo" aria-label="ИНОБР">
-            <span aria-hidden="true" />
-            <strong>ИНОБР</strong>
-          </div>
+          <div className="diagnostic-launch__logo"><img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" /></div>
           <div className="diagnostic-launch__brand-copy">
             <h2 id="consultation-title">Подбор направления обучения</h2>
             <p>Стройэксперт</p>
@@ -730,10 +727,7 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
     return (
       <div className="chat-widget diagnostic-question flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
         <header className="diagnostic-launch__header consultation-chat-header px-7 flex items-center text-white shrink-0">
-          <div className="diagnostic-launch__logo" aria-label="ИНОБР">
-            <span aria-hidden="true" />
-            <strong>ИНОБР</strong>
-          </div>
+          <div className="diagnostic-launch__logo"><img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" /></div>
           <div className="diagnostic-launch__brand-copy">
             <h2 id="consultation-title">Подбор направления обучения</h2>
             <p>Стройэксперт</p>
@@ -771,7 +765,7 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
     return (
       <div className="chat-widget diagnostic-recommendation flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
         <header className="diagnostic-launch__header consultation-chat-header px-7 flex items-center text-white shrink-0">
-          <div className="diagnostic-launch__logo" aria-label="ИНОБР"><span aria-hidden="true" /><strong>ИНОБР</strong></div>
+          <div className="diagnostic-launch__logo"><img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" /></div>
           <div className="diagnostic-launch__brand-copy">
             <h2 id="consultation-title">Подбор направления обучения</h2><p>Стройэксперт</p>
           </div>
@@ -811,7 +805,7 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
     return (
       <div className="chat-widget diagnostic-consultation flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
         <header className="diagnostic-launch__header consultation-chat-header px-7 flex items-center text-white shrink-0">
-          <div className="diagnostic-launch__logo" aria-label="ИНОБР"><span aria-hidden="true" /><strong>ИНОБР</strong></div>
+          <div className="diagnostic-launch__logo"><img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" /></div>
           <div className="diagnostic-launch__brand-copy">
             <h2 id="consultation-title">Подбор направления обучения</h2><p>Стройэксперт</p>
           </div>
@@ -875,7 +869,7 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
         style={{ minHeight: "72px" }}
       >
         <div className="h-8 w-[70px] overflow-hidden shrink-0 rounded">
-          <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
+          <img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" className="h-full w-auto max-w-none" />
         </div>
         <div>
           <h2 id="consultation-title" className="font-semibold text-[15px] text-white leading-tight">Подбор направления обучения</h2>
@@ -909,7 +903,7 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
                   >
                     {msg.role === "bot" && (
                       <div className="w-7 h-7 overflow-hidden rounded shrink-0 mt-1">
-                        <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
+                        <img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" className="h-full w-auto max-w-none" />
                       </div>
                     )}
                     <div
@@ -936,7 +930,7 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
                 className="flex gap-2.5 max-w-[80%] mr-auto items-center"
               >
                 <div className="w-7 h-7 overflow-hidden rounded shrink-0">
-                  <img src={inobrLogo} alt="ИНОБР" className="h-full w-auto max-w-none" />
+                  <img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" className="h-full w-auto max-w-none" />
                 </div>
                 <div className="bg-white border border-border shadow-sm rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:-0.3s]" />
