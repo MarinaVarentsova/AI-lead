@@ -469,10 +469,10 @@
 .diagnostic-consultation__manager svg { width: 22px; height: 22px; }
 .diagnostic-consultation__submit:disabled { border-color: #d9dfdc !important; background: #e8ecea !important; box-shadow: none; opacity: .7; }
 .diagnostic-consultation__complete {
-  margin-top: 16px; padding-top: 16px; display: flex; align-items: center; justify-content: flex-end;
+  margin-top: 16px; padding-top: 16px; display: flex; align-items: center;
   border-top: 1px solid #e2e9e5;
 }
-.diagnostic-consultation__manager { width: 280px; flex: 0 0 auto; }
+.diagnostic-consultation__manager { width: 100%; flex: 1 1 auto; }
 .consultation-modal .chat-dialogue { background: #f2f6f3; }
 .consultation-modal .chat-widget { color: #152b25; }
 .consultation-modal .chat-widget .bg-white { box-shadow: 0 8px 24px rgba(7,61,51,.055); }

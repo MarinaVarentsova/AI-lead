@@ -183,6 +183,8 @@ try {
   assert.match(widget, /canAskQuestion && \([\s\S]*diagnostic-consultation__composer/);
   assert.match(widget, /contactPhase !== "submitted"[\s\S]*diagnostic-consultation__complete/);
   assert.match(widget, /diagnostic-consultation__manager[\s\S]*handleManagerContactClick/);
+  const styles = readFileSync(new URL("apps/web/src/index.css", root), "utf8");
+  assert.match(styles, /\.diagnostic-consultation__manager\s*\{\s*width:\s*100%;\s*flex:\s*1 1 auto;/);
   for (const legacyBlock of ["result.currentArea", "result.currentRole", "result.education", "result.targetTasks"]) {
     assert.ok(!widget.includes(legacyBlock));
   }
