@@ -51,7 +51,6 @@ export default function Home() {
               ? " consultation-modal--recommendation" : consultationActive
                 ? " consultation-modal--consultation" : ""}`} role="dialog" aria-modal="true" aria-labelledby="consultation-title">
             <button className="consultation-modal__close" onClick={closeConsultation} aria-label="Закрыть консультацию">
-              {!diagnosticStarted && <span>Закрыть</span>}
               <X aria-hidden="true" />
             </button>
 

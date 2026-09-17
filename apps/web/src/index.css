@@ -328,13 +328,6 @@
   position: relative; margin-top: 17px; padding-left: 25px; color: #536b64; font-size: 15px; line-height: 1.45;
 }
 .diagnostic-launch-person__card p::before { content: "“"; position: absolute; left: 0; top: -7px; color: #c39a3c; font-size: 29px; font-weight: 750; }
-.consultation-modal--launch .consultation-modal__close {
-  top: 19px; right: 20px; width: auto; height: 40px; padding: 0 12px 0 15px; gap: 8px;
-  border: 1px solid rgba(255,255,255,.92); color: white; background: rgba(255,255,255,.08); box-shadow: none;
-  font-size: 12px; font-weight: 650;
-}
-.consultation-modal--launch .consultation-modal__close:hover { background: rgba(255,255,255,.15); }
-.consultation-modal--launch .consultation-modal__close svg { width: 17px; height: 17px; }
 .diagnostic-question__body {
   min-height: 0; flex: 1; display: flex; flex-direction: column; padding: 26px 44px 24px; overflow-y: auto;
   background: linear-gradient(145deg, #fff 70%, #f7faf8);
