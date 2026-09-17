@@ -267,8 +267,11 @@
   gap: 22px;
   border-bottom: 1px solid rgba(255,255,255,.12);
 }
-.diagnostic-launch__logo { width: 154px; height: 50px; flex: 0 0 auto; overflow: hidden; border-radius: 5px; }
-.diagnostic-launch__logo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.diagnostic-launch__logo {
+  width: 154px; height: 50px; margin-top: -3px; padding: 2px 2px 4px; flex: 0 0 auto; overflow: hidden;
+  border-radius: 5px; background: white;
+}
+.diagnostic-launch__logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .diagnostic-launch__brand-copy { padding-left: 16px; border-left: 1px solid rgba(255,255,255,.28); }
 .diagnostic-launch__brand-copy h2 { color: white; font-size: 14px; font-weight: 650; line-height: 1.25; }
 .diagnostic-launch__brand-copy p { margin-top: 3px; color: rgba(255,255,255,.64); font-size: 11px; }
@@ -327,7 +330,7 @@
 .diagnostic-launch-person__card p::before { content: "“"; position: absolute; left: 0; top: -7px; color: #c39a3c; font-size: 29px; font-weight: 750; }
 .consultation-modal--launch .consultation-modal__close {
   top: 19px; right: 20px; width: auto; height: 40px; padding: 0 12px 0 15px; gap: 8px;
-  border-color: rgba(255,255,255,.28); color: white; background: rgba(255,255,255,.08); box-shadow: none;
+  border: 1px solid rgba(255,255,255,.92); color: white; background: rgba(255,255,255,.08); box-shadow: none;
   font-size: 12px; font-weight: 650;
 }
 .consultation-modal--launch .consultation-modal__close:hover { background: rgba(255,255,255,.15); }
@@ -363,9 +366,10 @@
   margin-top: 24px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px;
 }
 .diagnostic-question__options > button {
-  min-height: 66px; padding: 13px 18px; border: 2px solid #8dafaa; border-radius: 10px;
+  min-height: 66px; padding: 13px 18px; display: flex; align-items: center; justify-content: center;
+  border: 2px solid #8dafaa; border-radius: 10px;
   color: #244b42; background: #fff; font-size: 16px; font-weight: 650; line-height: 1.25;
-  text-align: left; transition: border-color .15s, background .15s, color .15s, transform .15s;
+  text-align: center; transition: border-color .15s, background .15s, color .15s, transform .15s;
 }
 .diagnostic-question__options > button:hover:not(:disabled) { border-color: #176553; background: #f2f7f4; }
 .diagnostic-question__options > button.is-selected {

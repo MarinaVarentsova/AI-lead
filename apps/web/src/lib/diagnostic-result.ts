@@ -61,3 +61,14 @@ export async function completeDiagnostic(
   if (!response.ok) throw new Error(DIAGNOSTIC_ERROR);
   return parseDiagnoseResponse(await response.json());
 }
+
+/** Generate only after the turn endpoint has confirmed all four answers. */
+export async function completePersistedDiagnostic(conversationId: string): Promise<DiagnoseResponse> {
+  const response = await apiFetch("/api/diagnose", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ conversationId }),
+  });
+  if (!response.ok) throw new Error(DIAGNOSTIC_ERROR);
+  return parseDiagnoseResponse(await response.json());
+}

@@ -16,7 +16,7 @@ const source = readFileSync(new URL("apps/web/src/lib/diagnostic-result.ts", roo
 const compiled = ts.transpileModule(source, { compilerOptions: {
   module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022,
 } }).outputText;
-const { completeDiagnostic, parseDiagnoseResponse } = await import(
+const { completeDiagnostic, completePersistedDiagnostic, parseDiagnoseResponse } = await import(
   "data:text/javascript;base64," + Buffer.from(compiled).toString("base64")
 );
 const schemaSource = readFileSync(new URL("apps/web/src/lib/diagnostic-schema.ts", root), "utf8")
@@ -142,6 +142,16 @@ try {
   globalThis.fetch = async () => Response.json(response);
   assert.deepEqual(await completeDiagnostic(payload, async () => {}), visibleResponse);
 
+  calls = [];
+  globalThis.fetch = async (url, options) => {
+    calls.push(url);
+    assert.equal(url, "/api/diagnose");
+    assert.deepEqual(JSON.parse(options.body), { conversationId: fixture.conversationId });
+    return Response.json(response);
+  };
+  assert.deepEqual(await completePersistedDiagnostic(fixture.conversationId), visibleResponse);
+  assert.deepEqual(calls, ["/api/diagnose"], "confirmed turn persistence must not be repeated before recommendation");
+
   const widget = readFileSync(new URL("apps/web/src/components/chat-widget.tsx", root), "utf8");
   assert.ok(widget.includes("getDiagnosticSchema()"));
   assert.ok(widget.includes("const dictItems = q.options"));
@@ -154,6 +164,7 @@ try {
   assert.match(widget, /current_role:\s*allAnswers\[1\]\.code/);
   assert.match(widget, /education_status:\s*allAnswers\[2\]\.code/);
   assert.match(widget, /target_tasks:\s*allAnswers\[3\]\.code/);
+  assert.ok(widget.includes("completePersistedDiagnostic(payload.conversationId)"));
   assert.ok(widget.includes('className="diagnostic-recommendation__text">{result.recommendation}</p>'));
   assert.ok(widget.includes("260–520 академических часов"));
   assert.ok(widget.includes("Связаться с менеджером"));

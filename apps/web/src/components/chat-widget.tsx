@@ -13,7 +13,7 @@ import { createChatScroll, createQuestionFocusGate } from "@/lib/chat-scroll";
 import { sendConsultantTurn, createConsultantRequestId, ConsultantLimitError, CONSULTANT_ERROR } from "@/lib/consultant-chat";
 import { submitContact, CONTACT_ERROR, type ContactPayload } from "@/lib/contact";
 import {
-  completeDiagnostic, DIAGNOSTIC_ERROR,
+  completePersistedDiagnostic, DIAGNOSTIC_ERROR,
   type DiagnosticPayload, type DiagnoseResponse, type StructuredDiagnosticResult,
 } from "@/lib/diagnostic-result";
 import { getDiagnosticSchema, type DiagnosticSchemaQuestion } from "@/lib/diagnostic-schema";
@@ -317,7 +317,7 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
     showNextStep("result");
     setDiagnosticStatus("loading");
     try {
-      const response = await completeDiagnostic(payload);
+      const response = await completePersistedDiagnostic(payload.conversationId);
       setDiagnosticResult(response);
       setDiagnosticStatus("success");
       showNextStep("result", false);
