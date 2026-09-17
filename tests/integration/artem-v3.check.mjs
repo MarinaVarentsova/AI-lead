@@ -30,7 +30,9 @@ try {
   const { createArtemRuntime, loadArtemKnowledge } = await import(new URL("apps/api/src/ai/artem-runtime.ts", root));
   const { YandexAIProvider } = await import(new URL("apps/api/src/ai/yandex-provider.ts", root));
   const { runTester } = await import(new URL("apps/api/src/tester/runner.ts", root));
+  const { generatePersonas } = await import(new URL("apps/api/src/tester/personas.ts", root));
   const { CRITERIA, EVALUATOR_PROMPT } = await import(new URL("apps/api/src/tester/evaluator.ts", root));
+  const { DIAGNOSTIC_SCHEMA } = await import(new URL("packages/domain/src/diagnostic/diagnostic-schema.ts", root));
   const canonical = read("knowledge/inobr/artem_unified_knowledge_base_v3.md");
   assert.equal((await loadArtemKnowledge()).replace(/\r\n/g, "\n").trim(), canonical.replace(/\r\n/g, "\n").trim());
   assert.throws(() => createArtemRuntime("# Устаревшая база"));
@@ -40,7 +42,7 @@ try {
   const cases = [
     ["A дефекты", base, ["Что мне выбрать?"]],
     ["B ущерб", { ...base, target_tasks: "damage_loss" }, ["Чем поможет обучение?"]],
-    ["C судебная", { ...base, target_tasks: "judicial_construction_expertise" }, ["Можно работать судебным экспертом?"]],
+    ["C судебная", { ...base, education_status: "secondary_vocational", target_tasks: "judicial_construction_expertise" }, ["Можно работать судебным экспертом?"]],
     ["D изучает", { ...base, target_tasks: "explore" }, ["Что выбрать?"]],
     ["E приёмка", { ...base, target_tasks: "apartment_house_acceptance" }, ["Что выбрать?"]],
     ["F студент", { ...base, education_status: "currently_studying" }, ["Можно начать сейчас?"]],
@@ -62,6 +64,16 @@ try {
       recommendedFixes: [], funnelAssessment: "Корректно", groundingAssessment: "Только v3" };
   };
   const runtime = createArtemRuntime(canonical, provider);
+  const schemaCodes = Object.fromEntries(DIAGNOSTIC_SCHEMA.map(question =>
+    [question.field, new Set(question.options.map(option => option.code))]));
+  for (const persona of generatePersonas(10, () => 0.42)) {
+    for (const field of DIAGNOSTIC_SCHEMA.map(question => question.field)) {
+      assert.ok(schemaCodes[field].has(persona.answers[field]), `${field} must come from shared schema`);
+    }
+    for (const legacy of ["experience_area", "experience_years", "education_type", "goal"]) {
+      assert.equal(legacy in persona.answers, false);
+    }
+  }
   const direct = [];
   for (const persona of cases) {
     const diagnostic = await runtime.diagnostic.generateDiagnosticResult(persona.answers);
@@ -88,8 +100,25 @@ try {
   assert.match(direct[4].diagnostic.recommendation, /Приёмка квартир.*Приёмка ИЖС/);
   assert.match(direct[5].diagnostic.recommendation, /выпускные документы/i);
   assert.match(direct[6].diagnostic.recommendation, /Приёмка квартир/);
+  assert.match(direct[9].diagnostic.recommendation, /Стройэксперт/);
+  assert.doesNotMatch(direct[9].diagnostic.recommendation, /Строительный контроль ИЖС/);
+  const supervisionHistory = [];
+  const supervisionQuestion = "Хочу сопровождать стройку ИЖС по этапам и вести технадзор";
+  const supervision = await runtime.reply(runtime.prepare(base, supervisionQuestion, supervisionHistory), supervisionHistory);
+  assert.match(supervision.message, /Строительный контроль ИЖС/);
+  const limitHistory = [];
+  for (const question of ["Что входит?", "Какой документ?", "Сколько стоит?"]) {
+    const reply = await runtime.reply(runtime.prepare(base, question, limitHistory), limitHistory);
+    limitHistory.push({ role: "user", message: question }, { role: "assistant", message: reply.message });
+  }
+  await assert.rejects(runtime.reply(runtime.prepare(base, "Четвёртый вопрос", limitHistory), limitHistory), /FOLLOW_UP_LIMIT/);
   for (const turn of direct[13].history.filter(turn => turn.role === "assistant")) assert.doesNotMatch(turn.message, /оставьте (?:контакт|телефон)|нажмите «Связаться|свяжитесь с менеджером/i);
   assert.match(EVALUATOR_PROMPT, /KB v3\.0/);
+  for (const rule of [/ровно четыре стартовых поля/, /стаж не спрашивается/, /минимум два подтверждённых факта/,
+    /apartment_house_acceptance/, /currently_studying/, /no_higher_or_secondary_vocational/,
+    /current_area и current_role сами по себе не переключают/, /технадзор ИЖС/, /важнее landing priority/]) {
+    assert.match(EVALUATOR_PROMPT, rule);
+  }
   console.log("PASS: v3 A–O, canonical source, prod/tester runtime parity, education guards, acceptance choice, refusal and evaluator contract.");
 } finally {
   hooks.deregister();
