@@ -65,6 +65,14 @@ assert.ok(css.includes('@media (max-width: 899px)'));
 assert.ok(css.includes('@media (max-width: 639px)'));
 assert.ok(css.includes('height: var(--chat-viewport-height, 100dvh)'));
 assert.ok(css.includes('overflow-wrap: anywhere'));
+assert.match(css, /\.diagnostic-consultation__manager\s*\{[\s\S]*?justify-content:\s*center;/);
+assert.match(css, /\.diagnostic-consultation__manager-label\s*\{[^}]*text-align:\s*center;/);
+assert.match(css, /\.diagnostic-consultation__manager svg\s*\{[^}]*position:\s*absolute;[^}]*right:\s*22px;[^}]*transform:\s*translateY\(-50%\)/);
+assert.match(css, /\.diagnostic-consultation__composer textarea\s*\{[^}]*resize:\s*none;/);
+assert.match(css, /\.diagnostic-consultation__history\s*\{[^}]*overflow-y:\s*auto;/);
+assert.match(css, /\.consultation-modal--consultation \.consultation-modal__workspace\s*\{[^}]*height:\s*100%;[^}]*min-height:\s*0;[^}]*overflow:\s*hidden;/);
+assert.match(css, /\.consultation-modal--consultation\s*\{\s*display:\s*grid;[^}]*grid-template-rows:\s*minmax\(0, 1fr\) 86px;/);
+assert.ok(!/\.consultation-modal[^\{]*\{[^}]*resize\s*:/s.test(css), "modal has no manual resize");
 assert.ok(home.includes('window.visualViewport'));
 assert.ok(statSync(new URL("apps/web/public/artem-consultant-full.jpg", root)).size > 100_000);
 const card = widget.slice(widget.indexOf('function ResultCard'), widget.indexOf('// ─── Main component'));
@@ -85,11 +93,14 @@ for (const [answered, next, options] of [[0, 1, 5], [1, 2, 6], [2, 3, 6]]) {
 }
 assert.ok(widget.indexOf("questionFocusGate.current.afterAnswer") < widget.indexOf("addBotMessage(next.questionText)"));
 assert.ok(widget.includes("questionFocusGate.current.afterOptionsRender"));
-for (const [width, height] of [[375,667],[390,844],[430,932],[768,1024],[820,1180],[1366,768],[1440,900],[1920,1080]]) {
-  const margin = width < 640 ? 0 : 32;
-  const modalHeight = width < 640 ? height : Math.min(840, height - margin);
-  const modalWidth = width < 640 ? width : Math.min(1080, width - margin);
-  assert.ok(modalHeight > 0 && modalHeight + margin <= height);
-  assert.ok(modalWidth + margin <= width);
+for (const [width, height] of [[360,800],[390,844],[430,932],[768,1024],[1024,768],[1280,800],[1440,900],[1920,1080]]) {
+  const marginX = width < 640 ? 0 : 40;
+  const marginY = width < 640 ? 0 : 32;
+  const modalHeight = width < 640 ? height : Math.min(600, height - marginY);
+  const modalWidth = width < 640 ? width : Math.min(1150, width - marginX);
+  assert.ok(modalHeight > 0);
+  assert.ok(modalWidth + marginX <= width);
+  assert.ok(modalHeight + marginY <= height);
+  if (width <= 899) assert.ok(css.includes('grid-template-rows: minmax(0, 1fr) 86px'));
 }
-console.log("PASS: semantic chat focus, modal composition, Artem portrait, and responsive desktop/tablet/mobile constraints across 8 viewports (not browser rendering).");
+console.log("PASS: semantic chat focus, centered manager CTA, internal history scroll, no resize, and responsive consultation constraints across 8 required viewports (not browser rendering).");

@@ -184,7 +184,8 @@ try {
   assert.match(widget, /contactPhase !== "submitted"[\s\S]*diagnostic-consultation__complete/);
   assert.match(widget, /diagnostic-consultation__manager[\s\S]*handleManagerContactClick/);
   const styles = readFileSync(new URL("apps/web/src/index.css", root), "utf8");
-  assert.match(styles, /\.diagnostic-consultation__manager\s*\{\s*width:\s*100%;\s*flex:\s*1 1 auto;/);
+  assert.match(styles, /\.diagnostic-consultation__manager\s*\{[\s\S]*?width:\s*100%;[\s\S]*?flex:\s*1 1 auto;[\s\S]*?justify-content:\s*center;/);
+  assert.match(widget, /diagnostic-consultation__manager-label">Связаться с менеджером<\/span>[\s\S]*?<ArrowUpRight/);
   for (const legacyBlock of ["result.currentArea", "result.currentRole", "result.education", "result.targetTasks"]) {
     assert.ok(!widget.includes(legacyBlock));
   }

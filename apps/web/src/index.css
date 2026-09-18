@@ -453,7 +453,7 @@
   align-items: end; gap: 12px; border-top: 1px solid #e2e9e5;
 }
 .diagnostic-consultation__composer textarea {
-  min-height: 74px; max-height: 112px; padding: 13px 15px; resize: vertical; border: 2px solid #8dafaa;
+  min-height: 74px; max-height: 112px; padding: 13px 15px; resize: none; border: 2px solid #8dafaa;
   border-radius: 10px; color: #173c34; background: white; font-size: 15px;
 }
 .diagnostic-consultation__composer textarea:focus { border-color: #176553; box-shadow: none; }
@@ -472,7 +472,14 @@
   margin-top: 16px; padding-top: 16px; display: flex; align-items: center;
   border-top: 1px solid #e2e9e5;
 }
-.diagnostic-consultation__manager { width: 100%; flex: 1 1 auto; }
+.diagnostic-consultation__manager {
+  position: relative; width: 100%; flex: 1 1 auto; justify-content: center;
+  padding-right: 52px !important; padding-left: 52px !important; text-align: center;
+}
+.diagnostic-consultation__manager-label { display: block; width: 100%; text-align: center; }
+.diagnostic-consultation__manager svg {
+  position: absolute; top: 50%; right: 22px; flex: 0 0 auto; transform: translateY(-50%);
+}
 .consultation-modal .chat-dialogue { background: #f2f6f3; }
 .consultation-modal .chat-widget { color: #152b25; }
 .consultation-modal .chat-widget .bg-white { box-shadow: 0 8px 24px rgba(7,61,51,.055); }
@@ -530,6 +537,29 @@
   .diagnostic-question__options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .diagnostic-recommendation__body { padding: 24px 28px; }
   .diagnostic-consultation__body { min-height: 492px; padding: 24px 28px; }
+  .consultation-modal--consultation {
+    display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) 86px;
+    overflow: hidden;
+  }
+  .consultation-modal--consultation .consultation-modal__workspace {
+    grid-row: 1; height: 100%; min-height: 0; overflow: hidden;
+  }
+  .consultation-modal--consultation .diagnostic-consultation { height: 100%; min-height: 0; }
+  .consultation-modal--consultation .diagnostic-launch-person {
+    grid-row: 2; min-height: 0; display: block; border-top: 1px solid #dce7df;
+  }
+  .consultation-modal--consultation .diagnostic-launch-person__motto { display: none; }
+  .consultation-modal--consultation .diagnostic-launch-person__card {
+    height: 86px; padding: 10px 64px 10px 18px; display: grid;
+    grid-template-columns: 64px minmax(0, 1fr); grid-template-rows: auto auto; column-gap: 12px;
+    align-content: center; overflow: hidden;
+  }
+  .consultation-modal--consultation .diagnostic-launch-person__card img {
+    grid-row: 1 / 3; width: 64px; height: 64px; border-radius: 13px;
+  }
+  .consultation-modal--consultation .diagnostic-launch-person__card h2 { margin: 0; align-self: end; font-size: 17px; }
+  .consultation-modal--consultation .diagnostic-launch-person__card span { margin-top: 2px; align-self: start; font-size: 12px; }
+  .consultation-modal--consultation .diagnostic-launch-person__card p { display: none; }
 }
 @media (max-width: 639px) {
   .consultation-stage { padding: 0; }
@@ -551,7 +581,11 @@
   .consultation-info__portrait { width: 52px; height: 52px; border-radius: 11px; }
   .consultation-info__person-copy span { font-size: 11px; }
   .chat-dialogue { scrollbar-gutter: auto; }
-  .diagnostic-launch__header { min-height: 78px; padding-left: 18px; }
+  .diagnostic-launch__header { min-height: 70px; gap: 10px; padding: 0 54px 0 12px; }
+  .diagnostic-launch__logo { width: 112px; height: 40px; margin-top: 0; }
+  .diagnostic-launch__brand-copy { min-width: 0; padding-left: 10px; }
+  .diagnostic-launch__brand-copy h2 { font-size: 12px; }
+  .diagnostic-launch__brand-copy p { font-size: 10px; }
   .diagnostic-launch__body { padding: 30px 20px 24px; }
   .diagnostic-launch__copy { margin-top: 26px; }
   .diagnostic-launch__copy h1 { font-size: 32px; }
@@ -576,7 +610,16 @@
   .diagnostic-consultation__submit { width: 100%; }
   .diagnostic-consultation__complete { align-items: stretch; flex-direction: column; }
   .diagnostic-consultation__manager { width: 100%; }
+  .consultation-modal--consultation { grid-template-rows: minmax(0, 1fr) 74px; }
+  .consultation-modal--consultation .diagnostic-launch-person__card {
+    height: 74px; padding: 8px 54px 8px 14px; grid-template-columns: 52px minmax(0, 1fr); column-gap: 10px;
+  }
+  .consultation-modal--consultation .diagnostic-launch-person__card img { width: 52px; height: 52px; border-radius: 11px; }
+  .consultation-modal--consultation .diagnostic-launch-person__card h2 { font-size: 15px; }
+  .consultation-modal--consultation .diagnostic-launch-person__card span { font-size: 11px; }
 }
 @media (max-height: 680px) and (max-width: 899px) {
   .consultation-info__person { display: none; }
+  .consultation-modal--consultation { grid-template-rows: minmax(0, 1fr); }
+  .consultation-modal--consultation .diagnostic-launch-person { display: none; }
 }

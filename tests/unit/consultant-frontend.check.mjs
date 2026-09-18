@@ -66,5 +66,6 @@ try {
   assert.ok(widget.includes('maxLength={1000}'));
   assert.ok(widget.includes('maxLength={200}'));
   assert.match(widget, /contactPhase !== "submitted"[\s\S]*diagnostic-consultation__manager/);
+  assert.match(widget, /diagnostic-consultation__history[\s\S]*diagnostic-consultation__composer[\s\S]*diagnostic-consultation__manager/);
   console.log("PASS: limit response, retry request ID, input/CTA wiring; 8 consultant frontend helper cases: 3 sequential questions, 4 errors, retry; mocked network only.");
 } finally { globalThis.fetch = originalFetch; }

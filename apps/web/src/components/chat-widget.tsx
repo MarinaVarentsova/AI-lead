@@ -853,7 +853,9 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
               <Button className="diagnostic-consultation__manager" onClick={() => {
                 setConsultationViewActive(false); onPostDiagnosticViewChange?.("default");
                 void handleManagerContactClick();
-              }}>Связаться с менеджером <ArrowUpRight aria-hidden="true" /></Button>
+              }}><span className="diagnostic-consultation__manager-label">Связаться с менеджером</span>
+                <ArrowUpRight aria-hidden="true" />
+              </Button>
             </div>
           )}
         </main>
