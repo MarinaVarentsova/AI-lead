@@ -4,7 +4,8 @@ import { verdictLabel, runStatusLabel, errorLabel, areaLabel, severityLabel, sco
 import { TESTER_MODES, TESTER_MODE_DESCRIPTIONS, type TesterMode } from "@/lib/tester-modes";
 type Evaluation = { score: number; verdict: string; criteria: Record<string, number>; strengths: string[]; problems: string[]; recommendedFixes: string[]; funnelAssessment: string; groundingAssessment: string };
 type TestCase = { id: string; caseNumber: number; persona: { label: string; mode?: TesterMode; intent?: string; scenarioSeed?: string }; diagnosticAnswers: unknown; diagnosticResult: unknown;
-  transcript: { role: string; message: string }[] | null; evaluatorResult: Evaluation | null; score: number | null; verdict: string; errorMessage: string | null };
+  transcript: { role: string; message: string }[] | null; evaluatorResult: Evaluation | null; score: number | null; verdict: string; errorMessage: string | null;
+  stage?: string | null; errorCode?: string | null; errorDetail?: string | null; attempts?: number | null };
 type Summary = { totalCases: number; PASS: number; REVIEW: number; FAIL: number; averageScore: number | null;
   averageQualificationScore: number | null; averageGroundingScore: number | null; averageSalesFunnelScore: number | null;
   evaluatedCases: number; errorCases: number; error?: string; summaryError?: string;
@@ -207,7 +208,12 @@ function TesterPanel() {
         <details><summary>Ответы диагностики — технические коды</summary><pre className="whitespace-pre-wrap text-xs">{JSON.stringify(item.diagnosticAnswers, null, 2)}</pre></details>
         <details><summary>Рекомендация Артёма — технические данные</summary><pre className="whitespace-pre-wrap text-sm">{JSON.stringify(item.diagnosticResult, null, 2)}</pre></details>
         <h3>Диалог и рекомендация</h3>{item.transcript?.map((line,i) => <p key={i} className="whitespace-pre-wrap"><strong>{line.role === "user" ? "Кандидат" : "Артём"}: </strong>{line.message}</p>)}
-        {item.errorMessage && <p role="alert">{errorLabel(item.errorMessage)}</p>}
+        {item.errorMessage && <div role="alert" className="rounded border border-destructive/40 p-3 space-y-1">
+          <p>{errorLabel(item.errorMessage)}</p>
+          <p className="text-sm">Этап: {item.stage ?? "не определён"} · Код: {item.errorCode ?? item.errorMessage} · Попыток: {item.attempts ?? "—"}</p>
+          {item.errorDetail && <p className="text-sm break-words">Причина: {item.errorDetail}</p>}
+          <p className="text-sm">Ответ Артёма сохранён: {item.transcript?.some(turn => turn.role === "assistant") ? "да" : "нет"}</p>
+        </div>}
         {item.evaluatorResult && <>
           <p>{item.evaluatorResult.funnelAssessment}</p><p>{item.evaluatorResult.groundingAssessment}</p>
           {([ ["Сильные стороны", item.evaluatorResult.strengths], ["Проблемы режима и общие", item.evaluatorResult.problems], ["Рекомендуемые исправления", item.evaluatorResult.recommendedFixes] ] as const)

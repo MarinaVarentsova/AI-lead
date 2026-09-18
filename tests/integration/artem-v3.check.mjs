@@ -138,7 +138,7 @@ try {
   assert.ok(syntheticSummary.runEvaluation);
   const modeSmoke = {};
   for (const mode of TESTER_MODES) {
-    const count = mode === "Быдло" ? 10 : 5;
+    const count = mode === "Быдло" || mode === "Ботан" ? 10 : 5;
     const smokeCases = fallbackStressPersonas(count, mode, () => 0.42);
     const smokeSaved = [];
     const smokeSummary = await runTester(count, runtime, { async saveCase(value) { smokeSaved.push(value); },
@@ -176,8 +176,8 @@ try {
   assert.match(EVALUATOR_PROMPT, /KB v3\.6/);
   for (const evaluatorGuard of [/не требуй цену.*если пользователь.*не спрашивал/i, /проверь transcript по смыслу/i,
     /Базовый — для основ/, /портфолио из примеров заключений/, /соцсети/, /retrieval\/behavior failure/i,
-    /Не придумывай названия модулей/i, /не являются подтверждением реального опыта/i,
-    /CTA не обязан присутствовать в каждом ответе/i, /не требуй выяснять, дело в цене или пользе/i]) {
+    /Не придумывай названия модулей/i, /Различай подтверждённую учебную работу и overclaim/i,
+    /После полного профессионального\/справочного ответа textual CTA не обязателен/i, /не требуй выяснять, дело в цене или пользе/i]) {
     assert.match(EVALUATOR_PROMPT, evaluatorGuard);
   }
   for (const rule of [/ровно четыре стартовых поля/, /стаж не спрашивается/, /2–3 подтверждённых факта/,
@@ -185,7 +185,7 @@ try {
     /current_area и current_role сами по себе не переключают/, /технадзор ИЖС/, /важнее landing priority/]) {
     assert.match(EVALUATOR_PROMPT, rule);
   }
-  console.log("PASS: v3.6 A–O, 10-case Быдло and 5-case other-mode smoke; prod/tester runtime parity, education guards, refusal and evaluator contract.");
+  console.log("PASS: v3.6 A–O, 10-case Быдло/Ботан and 5-case other-mode smoke; prod/tester runtime parity, education guards, refusal and evaluator contract.");
 } finally {
   hooks.deregister();
 }

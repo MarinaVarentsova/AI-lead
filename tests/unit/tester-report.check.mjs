@@ -41,6 +41,8 @@ try {
   assert.ok(page.includes("Чему доучить Артёма"));
   assert.ok(page.includes("Всего сценариев:"));
   assert.ok(page.includes("Технические ошибки не считаются"));
+  assert.ok(page.includes("Ответ Артёма сохранён:"));
+  assert.ok(page.includes("item.errorDetail"));
   assert.ok(page.includes("Продолжить на тех же сценариях"));
   assert.ok(page.includes("Достигнут предел 5 серий"));
   assert.ok(!page.includes("CASE_EXECUTION_OR_EVALUATION_FAILED"));

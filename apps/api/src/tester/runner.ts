@@ -11,7 +11,7 @@ export interface CaseResult {
   caseNumber: number; persona: Persona; diagnosticAnswers: Persona["answers"]; diagnosticResult: unknown;
   transcript: ConsultantExchange[]; evaluatorResult: Evaluation | null; score: number | null;
   verdict: "PASS" | "REVIEW" | "FAIL" | "TECH_ERROR"; errorMessage: string | null;
-  stage: TesterStage | null; errorCode: string | null; attempts: number | null;
+  stage: TesterStage | null; errorCode: string | null; errorDetail: string | null; attempts: number | null;
 }
 export interface TestStore { saveCase(result: CaseResult): Promise<void>; progress(count: number): Promise<void>; finish(summary: unknown): Promise<void> }
 export type TesterStage = "diagnostic_generation" | "consultant_generation" | "evaluator" | "run_summary";
@@ -29,9 +29,14 @@ const defaultOptions: TesterExecutionOptions = {
   retryDelaysMs: TESTER_RETRY_DELAYS_MS,
 };
 class TesterStageError extends Error {
-  constructor(readonly stage: TesterStage, readonly errorCode: string, readonly attempts: number) {
+  constructor(readonly stage: TesterStage, readonly errorCode: string, readonly attempts: number, readonly detail: string) {
     super(errorCode);
   }
+}
+function safeErrorDetail(error: unknown): string {
+  const value = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  return value.replace(/(?:https?:\/\/)?[^\s:@]+:[^\s@]+@/g, "[credentials]@")
+    .replace(/[\w.+-]+@[\w.-]+\.[a-z]{2,}/gi, "[email]").slice(0, 300);
 }
 function technicalErrorCode(error: unknown): string | null {
   if (error instanceof DiagnosticAIError && ["AI_REQUEST_TIMEOUT", "AI_REQUEST_FAILED", "AI_INVALID_RESULT"].includes(error.code)) return error.code;
@@ -48,7 +53,7 @@ async function executeAI<T>(stage: TesterStage, operation: () => Promise<T>, opt
         (stage === "evaluator" || stage === "run_summary" ? "AI_REQUEST_FAILED" : null);
       const delay = options.retryDelaysMs[attempt - 1];
       if (!errorCode || delay === undefined) {
-        throw new TesterStageError(stage, errorCode ?? (error instanceof Error ? error.message : "CASE_EXECUTION_OR_EVALUATION_FAILED"), attempt);
+        throw new TesterStageError(stage, errorCode ?? (error instanceof Error ? error.message : "CASE_EXECUTION_OR_EVALUATION_FAILED"), attempt, safeErrorDetail(error));
       }
       await options.sleep(delay);
     }
@@ -56,10 +61,12 @@ async function executeAI<T>(stage: TesterStage, operation: () => Promise<T>, opt
 }
 function storedTechnicalError(value: string | null) {
   try {
-    const parsed = JSON.parse(value ?? "") as { stage?: unknown; errorCode?: unknown; attempts?: unknown };
-    if (typeof parsed.stage === "string" && typeof parsed.errorCode === "string" && typeof parsed.attempts === "number") return parsed;
+    const parsed = JSON.parse(value ?? "") as { stage?: unknown; errorCode?: unknown; errorDetail?: unknown; attempts?: unknown };
+    if (typeof parsed.stage === "string" && typeof parsed.errorCode === "string" && typeof parsed.attempts === "number") return {
+      ...parsed, errorDetail: typeof parsed.errorDetail === "string" ? parsed.errorDetail : null,
+    };
   } catch { /* legacy plain errorMessage */ }
-  return { stage: null, errorCode: value, attempts: value ? 1 : null };
+  return { stage: null, errorCode: value, errorDetail: null, attempts: value ? 1 : null };
 }
 export function normalizeStoredCase<T extends { evaluatorResult: unknown; errorMessage: string | null; verdict: string | null; score: number | null }>(row: T) {
   let evaluatorResult: Evaluation | null = null;
@@ -69,7 +76,7 @@ export function normalizeStoredCase<T extends { evaluatorResult: unknown; errorM
     verdict: evaluatorResult?.verdict ?? "TECH_ERROR" as const,
     errorMessage: evaluatorResult ? null : technical.errorCode ?? "CASE_EXECUTION_OR_EVALUATION_FAILED",
     stage: evaluatorResult ? null : technical.stage, errorCode: evaluatorResult ? null : technical.errorCode,
-    attempts: evaluatorResult ? null : technical.attempts };
+    errorDetail: evaluatorResult ? null : technical.errorDetail, attempts: evaluatorResult ? null : technical.attempts };
 }
 export function aggregate(results: Pick<CaseResult, "verdict" | "errorMessage" | "evaluatorResult">[]) {
   const quality = results.filter(r => r.verdict !== "TECH_ERROR" && !r.errorMessage && r.evaluatorResult);
@@ -99,7 +106,7 @@ export async function runTester(count: number, runtime: ArtemRuntime, store: Tes
   for (const [index, persona] of personas.entries()) {
     const result: CaseResult = { caseNumber: index + 1, persona, diagnosticAnswers: persona.answers,
       diagnosticResult: null, transcript: [], evaluatorResult: null, score: null, verdict: "TECH_ERROR", errorMessage: null,
-      stage: null, errorCode: null, attempts: null };
+      stage: null, errorCode: null, errorDetail: null, attempts: null };
     let currentStage: TesterStage = "diagnostic_generation";
     try {
       const resolved = DiagnosticKnowledgeResolver.resolve(persona.answers);
@@ -146,8 +153,10 @@ export async function runTester(count: number, runtime: ArtemRuntime, store: Tes
       })), options);
       result.score = result.evaluatorResult.score; result.verdict = result.evaluatorResult.verdict;
     } catch (error) {
-      const failure = error instanceof TesterStageError ? error : new TesterStageError(currentStage, technicalErrorCode(error) ?? "CASE_EXECUTION_OR_EVALUATION_FAILED", 1);
-      result.errorMessage = failure.errorCode; result.stage = failure.stage; result.errorCode = failure.errorCode; result.attempts = failure.attempts;
+      const failure = error instanceof TesterStageError ? error : new TesterStageError(currentStage,
+        technicalErrorCode(error) ?? "CASE_EXECUTION_OR_EVALUATION_FAILED", 1, safeErrorDetail(error));
+      result.errorMessage = failure.errorCode; result.stage = failure.stage; result.errorCode = failure.errorCode;
+      result.errorDetail = failure.detail; result.attempts = failure.attempts;
     }
     results.push(result);
     await store.saveCase(result);

@@ -61,9 +61,9 @@ router.post("/tester/runs", async (req, res) => {
       }
       return runTester(count, runtime, {
         async saveCase(value) {
-          const { stage, errorCode, attempts, ...stored } = value;
+          const { stage, errorCode, errorDetail, attempts, ...stored } = value;
           const errorMessage = value.verdict === "TECH_ERROR" && errorCode
-            ? JSON.stringify({ stage, errorCode, attempts }) : stored.errorMessage;
+            ? JSON.stringify({ stage, errorCode, errorDetail, attempts, artemResponseSaved: value.transcript.some(turn => turn.role === "assistant") }) : stored.errorMessage;
           await db.insert(aiTestCases).values({ ...stored, errorMessage, runId: run.id, completedAt: new Date() });
         },
         async progress(completedCases) { await db.update(aiTestRuns).set({ completedCases }).where(eq(aiTestRuns.id, run.id)); },

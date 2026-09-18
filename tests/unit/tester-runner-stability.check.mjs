@@ -142,14 +142,30 @@ try {
     assert.equal(saved[1].stage, "consultant_generation");
     assert.equal(saved[1].errorCode, "AI_REQUEST_FAILED");
     assert.equal(saved[1].attempts, 3);
+    assert.match(saved[1].errorDetail, /AI_REQUEST_FAILED/);
     assert.equal(summary.TECH_ERROR, 1);
     assert.equal(summary.evaluatedCases, 1);
     assert.equal(summary.averageScore, 90);
     const restored = normalizeStoredCase({ evaluatorResult: null, verdict: "TECH_ERROR", score: null,
-      errorMessage: JSON.stringify({ stage: saved[1].stage, errorCode: saved[1].errorCode, attempts: saved[1].attempts }) });
+      errorMessage: JSON.stringify({ stage: saved[1].stage, errorCode: saved[1].errorCode,
+        errorDetail: saved[1].errorDetail, attempts: saved[1].attempts }) });
     assert.equal(restored.stage, "consultant_generation");
     assert.equal(restored.errorCode, "AI_REQUEST_FAILED");
     assert.equal(restored.attempts, 3);
+    assert.equal(restored.errorDetail, saved[1].errorDetail);
+  }
+
+  // Evaluator exhaustion preserves Artem's completed transcript and exact safe failure detail.
+  {
+    const saved = [];
+    const { runtime, counters } = runtimeFor({ evaluator: () => { throw new Error("INVALID_EVALUATION"); } });
+    const summary = await runTester(1, runtime, { async saveCase(result) { saved.push(result); },
+      async progress() {}, async finish() {} }, personas.slice(0, 1), { sleep: async () => {} }, "Ботан");
+    assert.equal(counters.diagnostic, 1); assert.equal(counters.reply, 1); assert.equal(counters.evaluator, 3);
+    assert.equal(saved[0].stage, "evaluator"); assert.equal(saved[0].errorCode, "INVALID_EVALUATION");
+    assert.equal(saved[0].attempts, 3); assert.match(saved[0].errorDetail, /INVALID_EVALUATION/);
+    assert.ok(saved[0].transcript.some(turn => turn.role === "assistant"));
+    assert.equal(summary.TECH_ERROR, 1);
   }
 
   console.log("PASS: tester concurrency=1, inter-case delay, generation/evaluator retry isolation, 45s timeout, TECH_ERROR metadata and average exclusion.");

@@ -24,7 +24,7 @@ const hooks = registerHooks({
 });
 try {
   const modes = await import(new URL("apps/api/src/tester/stress-modes.ts", root));
-  const { evaluatorPromptForMode } = await import(new URL("apps/api/src/tester/evaluator.ts", root));
+  const { evaluatorPromptForMode, validateEvaluation, CRITERIA } = await import(new URL("apps/api/src/tester/evaluator.ts", root));
   assert.deepEqual(modes.TESTER_MODES, ["Разводило", "Ботан", "Адекват", "Быдло", "Психологиня"]);
   for (const mode of modes.TESTER_MODES) {
     assert.ok(modes.TESTER_MODE_DESCRIPTIONS[mode].length > 20);
@@ -38,7 +38,10 @@ try {
     assert.match(evaluatorPromptForMode(mode), new RegExp(`${mode}:`));
   }
   assert.match(evaluatorPromptForMode("Разводило"), /выдуманных скидок.*гарантий.*возврата/s);
-  assert.match(evaluatorPromptForMode("Ботан"), /профессиональные границы.*overclaim/s);
+  const botanyPrompt = evaluatorPromptForMode("Ботан");
+  for (const rule of [/professional.*precision|factual precision/i, /textual CTA.*не требуй|Не требуй textual CTA/i,
+    /3–4 месяца/, /6–8 месяцев/, /учебные задания.*реценз/i, /чисто справочном follow-up/i,
+    /сферы услуг/i, /unknown document/i]) assert.match(botanyPrompt, rule);
   assert.match(evaluatorPromptForMode("Адекват"), /ясность.*персонализацию.*routing/s);
   assert.match(evaluatorPromptForMode("Быдло"), /Не штрафуй.*мат.*штрафуй ответное оскорбление/s);
   assert.match(evaluatorPromptForMode("Психологиня"), /Полный off-topic.*смешанном сообщении.*учебную часть/s);
@@ -55,6 +58,9 @@ try {
     { label: "b", intent: "b", answers: ai.personas[0].answers, questions: ["Одинаково?"] },
   ] }; } }, () => 0.42);
   assert.equal(duplicate.source, "fallback");
+  const minimalValid = validateEvaluation({ criteria: Object.fromEntries(CRITERIA.map(key => [key, 90])) });
+  assert.equal(minimalValid.verdict, "PASS");
+  assert.deepEqual(minimalValid.problems, []);
   const page = readFileSync(new URL("apps/web/src/pages/tester.tsx", root), "utf8");
   const modeUi = readFileSync(new URL("apps/web/src/lib/tester-modes.ts", root), "utf8");
   for (const mode of modes.TESTER_MODES) assert.ok(modeUi.includes(mode));
@@ -66,6 +72,7 @@ try {
   assert.match(route, /parent\.summary[\s\S]*?mode/);
   assert.match(route, /previousCases\.map\(row => row\.persona as Persona\)/);
   assert.match(route, /summary: \{ mode, modeDescription:[\s\S]*?generatorSource/);
+  assert.match(route, /errorDetail, attempts, artemResponseSaved/);
   assert.ok(!route.includes("aiSessions") && !route.includes("aiDialogue") && !route.includes("aiEvents"));
   console.log("PASS: 5 stress modes, distinct prompts/fallbacks, evaluator calibration, UI request/display and JSONB continuation metadata.");
 } finally { hooks.deregister(); }
