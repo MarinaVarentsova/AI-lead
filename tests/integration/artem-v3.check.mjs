@@ -1,4 +1,4 @@
-// v4.0 A–O: production and tester use the same runtime and canonical knowledge.
+// v3.4 A–O: production and tester use the same runtime and canonical knowledge.
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire, registerHooks } from "node:module";
@@ -33,12 +33,13 @@ try {
   const { generatePersonas } = await import(new URL("apps/api/src/tester/personas.ts", root));
   const { CRITERIA, EVALUATOR_PROMPT } = await import(new URL("apps/api/src/tester/evaluator.ts", root));
   const { DIAGNOSTIC_SCHEMA } = await import(new URL("packages/domain/src/diagnostic/diagnostic-schema.ts", root));
-  const canonical = read("knowledge/inobr/artem_unified_knowledge_base_v4_0.md");
+  const canonical = read("knowledge/inobr/artem_unified_knowledge_base_v3_4.md");
   assert.equal((await loadArtemKnowledge()).replace(/\r\n/g, "\n").trim(), canonical.replace(/\r\n/g, "\n").trim());
   assert.equal(existsSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3.md", root)), false);
   assert.equal(existsSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_1.md", root)), false);
   assert.equal(existsSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_2.md", root)), false);
-  assert.match(canonical, /Версия 4\.0/);
+  assert.equal(existsSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_0.md", root)), false);
+  assert.match(canonical, /Версия 3\.4/);
   assert.throws(() => createArtemRuntime("# Устаревшая база"));
 
   const base = { current_area: "construction_repair", current_role: "foreman_master_site_specialist",
@@ -64,8 +65,8 @@ try {
   const provider = new YandexAIProvider({});
   provider.generateStructured = async prompt => {
     if (prompt.includes("systemicProblems")) throw new Error("summary unavailable");
-    return { criteria: Object.fromEntries(CRITERIA.map(key => [key, 90])), strengths: ["v4"], problems: [],
-      recommendedFixes: [], funnelAssessment: "Корректно", groundingAssessment: "Только v4" };
+    return { criteria: Object.fromEntries(CRITERIA.map(key => [key, 90])), strengths: ["v3.4"], problems: [],
+      recommendedFixes: [], funnelAssessment: "Корректно", groundingAssessment: "Только v3.4" };
   };
   const runtime = createArtemRuntime(canonical, provider);
   const schemaCodes = Object.fromEntries(DIAGNOSTIC_SCHEMA.map(question =>
@@ -129,10 +130,14 @@ try {
   assert.deepEqual({ PASS: syntheticSummary.PASS, REVIEW: syntheticSummary.REVIEW,
     FAIL: syntheticSummary.FAIL, TECH_ERROR: syntheticSummary.TECH_ERROR },
   { PASS: 10, REVIEW: 0, FAIL: 0, TECH_ERROR: 0 });
+  const acceptanceCase = syntheticSaved.find(result => result.persona.label === "Приёмка объектов");
+  assert.ok(acceptanceCase, "synthetic run must include Приёмка объектов");
+  assert.notEqual(acceptanceCase.verdict, "TECH_ERROR");
+  assert.ok(acceptanceCase.diagnosticResult?.result?.recommendation?.trim());
   assert.ok(syntheticSummary.runEvaluation);
   assert.match(direct[4].diagnostic.recommendation, /Приёмка квартир.*Приёмка ИЖС/);
   assert.match(direct[5].diagnostic.recommendation, /выпускные документы/i);
-  assert.match(direct[6].diagnostic.recommendation, /Приёмка квартир/);
+  assert.match(direct[6].diagnostic.recommendation, /При.мк[ау] квартир/);
   assert.match(direct[9].diagnostic.recommendation, /Стройэксперт/);
   assert.doesNotMatch(direct[9].diagnostic.recommendation, /Строительный контроль ИЖС/);
   assert.match(direct[8].history[1].message, /проектн.*техническ.*документац/i);
@@ -155,17 +160,19 @@ try {
   }
   await assert.rejects(runtime.reply(runtime.prepare(base, "Четвёртый вопрос", limitHistory), limitHistory), /FOLLOW_UP_LIMIT/);
   for (const turn of direct[13].history.filter(turn => turn.role === "assistant")) assert.doesNotMatch(turn.message, /оставьте (?:контакт|телефон)|нажмите «Связаться|свяжитесь с менеджером/i);
-  assert.match(EVALUATOR_PROMPT, /KB v4\.0/);
+  assert.match(EVALUATOR_PROMPT, /KB v3\.4/);
   for (const evaluatorGuard of [/не требуй цену.*если пользователь.*не спрашивал/i, /проверь transcript по смыслу/i,
-    /Базовый — для основ/, /портфолио из примеров заключений/, /соцсети/, /retrieval\/behavior failure/i]) {
+    /Базовый — для основ/, /портфолио из примеров заключений/, /соцсети/, /retrieval\/behavior failure/i,
+    /Не придумывай названия модулей/i, /не являются подтверждением реального опыта/i,
+    /CTA не обязан присутствовать в каждом ответе/i, /не требуй выяснять, дело в цене или пользе/i]) {
     assert.match(EVALUATOR_PROMPT, evaluatorGuard);
   }
-  for (const rule of [/ровно четыре стартовых поля/, /стаж не спрашивается/, /минимум два подтверждённых факта/,
+  for (const rule of [/ровно четыре стартовых поля/, /стаж не спрашивается/, /2–3 подтверждённых факта/,
     /apartment_house_acceptance/, /currently_studying/, /no_higher_or_secondary_vocational/,
     /current_area и current_role сами по себе не переключают/, /технадзор ИЖС/, /важнее landing priority/]) {
     assert.match(EVALUATOR_PROMPT, rule);
   }
-  console.log("PASS: v4.0 A–O, canonical source, prod/tester runtime parity, education guards, acceptance choice, refusal and evaluator contract.");
+  console.log("PASS: v3.4 A–O, canonical source, prod/tester runtime parity, education guards, acceptance choice, refusal and evaluator contract.");
 } finally {
   hooks.deregister();
 }

@@ -22,12 +22,12 @@ export function personalizedBenefit(facts: DiagnosticFactsPacket, program: Artem
   const { currentArea, currentRole } = facts.answerCodes;
   if (program === "construction_expertise" &&
     (currentArea === "design_estimates" || currentRole === "engineer_designer_estimator")) {
-    return "С учётом вашей работы в проектировании и сметах программа помогает расширить работу с проектной и технической документацией: исследовать дефекты и готовить экспертные заключения.";
+    return `С учётом ответа «${facts.currentArea}» программа помогает расширить работу с проектной и технической документацией: исследовать дефекты и готовить экспертные заключения.`;
   }
   if (program === "construction_expertise" && currentArea === "construction_control") {
-    return "С учётом вашей работы в строительном контроле программа помогает перейти от фиксации качества к исследованию причин дефектов и подготовке экспертных выводов и заключений.";
+    return `С учётом ответа «${facts.currentArea}» программа помогает перейти от фиксации качества к исследованию причин дефектов и подготовке экспертных выводов и заключений.`;
   }
-  return `${facts.currentArea} ${facts.currentRole} ${BENEFITS[program]}`;
+  return `Для вашей роли «${facts.currentRole}» это даёт конкретное применение: ${BENEFITS[program].charAt(0).toLowerCase()}${BENEFITS[program].slice(1)}`;
 }
 
 function professionalBenefit(program: ArtemProgram, context: string): string | null {
@@ -94,7 +94,9 @@ export function commercialText(markdown: string, program: ArtemProgram, question
     return `${row[0]} — полная стоимость ${row[1]}${payment}`;
   }).join("; ") + "." +
     (program === "apartment_acceptance" ? " Условия рассрочки нужно уточнить." : "") +
-    (/9\s*330/.test(question) ? " 9 330 ₽ — один из шести платежей, а не цена всего курса." : "");
+    (/9\s*330/.test(question) && program === "construction_expertise"
+      ? " Прежний платёж 9 330 ₽ больше не является актуальным; график оплаты тарифа «Премиум» нужно подтвердить."
+      : "");
 }
 
 export function fallbackReply(markdown: string, program: ArtemProgram, question: string,
@@ -112,12 +114,11 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
       : "";
     return "Институт не гарантирует трудоустройство, доход или заказы. Первые обращения можно искать через профессиональные контакты, юристов и экспертные организации. Для старта полезно выбрать ограниченный круг задач и развивать практику на основе заданий и обратной связи." + managerCondition;
   }
-  if (/подумаю|не сейчас/.test(q) && !/дорого/.test(q)) {
+  if (/подумаю|не сейчас|пока не готов|вернусь позже/.test(q) && !/дорого/.test(q)) {
     if (/дорого|бюджет|цен/.test(userHistory)) return BENEFITS[program] + " " + commercialText(markdown, program, tariffContext);
     if (/заказ|клиент/.test(userHistory)) return "Для первых обращений можно развивать профессиональные контакты и выбрать ограниченный круг задач. Гарантий заказов нет.";
-    if (refused || history.some(row => row.role === "assistant" && /Что пока осталось|вопрос сроков/.test(row.message))) return "Хорошо. Можно вернуться к обсуждению, когда вам будет удобно.";
-    return /не сейчас/.test(q) ? "Это больше вопрос сроков или пока не определились с самим направлением?" :
-      "Что пока осталось неясным — стоимость или как обучение пригодится вам в работе?";
+    if (refused) return "Хорошо. Можно вернуться к обсуждению, когда вам будет удобно.";
+    return "Конечно. Если появятся вопросы по программе, стоимости или документам — помогу разобраться.";
   }
   if (/посоветова/.test(q)) return BENEFITS[program] + " " + commercialText(markdown, program, tariffContext);
   if (/дорого|стоим|стоит|(?:^|[^а-я])цен|рассроч|9\s*330/.test(q)) {
@@ -132,6 +133,7 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
     }
     if (program === "construction_expertise") return "Для поступления на «Стройэксперт» достаточно СПО или высшего образования любого профиля. Строительный опыт не обязателен. Если образование получено, а документа нет под рукой, порядок подтверждения уточнит менеджер.";
   }
+  if (/судеб|суд|заключени/.test(q) && /no_higher_or_secondary_vocational/.test(diagnosticContext)) return "Без оконченного СПО или высшего образования «Стройэксперт» недоступен. Прикладным стартом может быть «Приёмка квартир» — осмотр и фиксация дефектов; она не даёт квалификацию судебного эксперта. После получения СПО или высшего образования можно отдельно рассмотреть «Стройэксперт».";
   if (/судеб|суд|заключени/.test(q)) return "«Стройэксперт» включает подготовку к судебным и досудебным экспертным задачам. Диплом подтверждает квалификацию, а назначение экспертом и соответствие конкретной задаче рассматриваются отдельно. Автоматического назначения или принятия заключения судом обучение не гарантирует.";
   if (/260|520/.test(q) && program === "construction_expertise") {
     const commercial = commercialText(markdown, program, tariffContext);

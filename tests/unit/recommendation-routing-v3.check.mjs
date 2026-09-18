@@ -58,7 +58,7 @@ try {
 
   const school = result({ ...base, education_status: "no_higher_or_secondary_vocational" });
   assert.equal(diagnosticProgram(school.facts), "apartment_acceptance");
-  assert.match(school.output.recommendation, /Приёмка квартир/);
+  assert.match(school.output.recommendation, /При.мк[ау] квартир/);
   assert.doesNotMatch(school.output.recommendation, /можно рассмотреть «Стройэксперт»/);
 
   for (const variant of [
@@ -68,8 +68,11 @@ try {
   ]) {
     const routed = result({ ...base, ...variant });
     assert.equal(diagnosticProgram(routed.facts), "construction_expertise");
-    assert.ok(routed.output.recommendation.includes(routed.facts.education));
-    assert.ok(routed.output.recommendation.includes(routed.facts.targetTasks));
+    assert.ok(routed.output.recommendation.toLowerCase().includes(routed.facts.targetTasks.toLowerCase()));
+    const confirmedFacts = [routed.facts.currentArea, routed.facts.currentRole, routed.facts.education, routed.facts.targetTasks]
+      .filter(fact => routed.output.recommendation.toLowerCase().includes(fact.toLowerCase()));
+    assert.ok(confirmedFacts.length >= 2 && confirmedFacts.length <= 3);
+    assert.doesNotMatch(routed.output.recommendation, /для уточнения программы и условий/i);
     assert.doesNotMatch(routed.output.recommendation, /стаж/i);
   }
 
