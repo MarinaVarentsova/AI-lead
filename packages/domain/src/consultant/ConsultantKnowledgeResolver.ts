@@ -17,7 +17,8 @@ function matches(question: string, phrase: string): boolean {
 const PROFANITY = /(?:^|\s)(?:бля(?:дь|ть)?|блять|хуй|хуйн|пизд|ебан|ёбан|ебать|сука|мудак|дебил)(?:\s|$)/i;
 const SMALL_TALK = /^(?:привет|здравствуй(?:те)?|добрый (?:день|вечер|утро)|как дела\??|спасибо|благодарю|понятно|ок(?:ей)?)[!.?\s]*$/i;
 const UNKNOWN_PROGRAM_FACT = /лиценз|договор|возврат|срок доступ|доступ к (?:курс|материал)|признан.*диплом|иностранн.*диплом|требован.*(?:суда|работодател)/i;
-const TRAINING_TOPIC = /обуч|курс|программ|стройэксперт|приемк|приёмк|ижс|(?:^|\s)цен(?:а|у|ы|е|ой)(?:\s|[?.!,]|$)|стоим|рассроч|оплат|диплом|документ|сертификат|квалификац|поступ|образован|дефект|эксперт|работ|клиент|заказ|доход|тариф/i;
+const TRAINING_TOPIC = /обуч|курс|программ|стройэксперт|приемк|приёмк|ижс|(?:^|\s)цен(?:а|у|ы|е|ой)(?:\s|[?.!,]|$)|дорог|деньг|стоим|стоит|стольк|рассроч|оплат|диплом|бумажк|документ|сертификат|квалификац|поступ|образован|дефект|эксперт|работ|трудоустр|гарант|клиент|заказ|доход|тариф|польз|зачем|получу|смогу|развод|маркетинг/i;
+const CONTEXTUAL_DISTRUST = /^(?:ты )?(?:вообще )?(?:что[ -]?нибудь знаешь|что то знаешь)|опять вода|ничего конкретного не сказал|это все\??$/i;
 
 export function classifyConsultantIntent(rawQuestion: string, hasRetrievedTopic = false): ConsultantIntent {
   const question = rawQuestion.trim().toLowerCase().replace(/ё/g, "е");
@@ -66,7 +67,7 @@ export class ConsultantKnowledgeResolver {
     // Stable content fingerprint, not a security hash. Changes invalidate the source version.
     let hash = 2166136261;
     for (const char of markdown.replace(/\r\n/g, "\n")) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-    this.sourceVersion = `inobr-artem-v3.4-${(hash >>> 0).toString(16)}`;
+    this.sourceVersion = `inobr-artem-v3.6-${(hash >>> 0).toString(16)}`;
   }
 
   resolve(input: ConsultantInput): ConsultantRetrievalPacket {
@@ -78,7 +79,9 @@ export class ConsultantKnowledgeResolver {
     const houseAcceptance = diagnostic.program === "house_acceptance" || ["приемк ижс", "проверять частн дом", "дом перед покупк", "готовые дом", "разов проверк"].some(term => matches(question, term));
     const houseControl = diagnostic.program === "house_control" || (!houseAcceptance && ["вести стройк", "по этап", "сопровожден строительств", "строительн контрол ижс"].some(term => matches(question, term)));
     const choice = isConsultantChoiceQuestion(question);
-    const hasTopic = !/погод|гороскоп/.test(question) && (choice || this.sections.some(section => section.keywords.some(keyword => matches(question, keyword))));
+    const contextualDistrust = Boolean(diagnostic.program) && CONTEXTUAL_DISTRUST.test(question);
+    const hasTopic = !/погод|гороскоп/.test(question) && (choice || contextualDistrust || TRAINING_TOPIC.test(question) ||
+      this.sections.some(section => section.keywords.some(keyword => matches(question, keyword))));
     const intent = classifyConsultantIntent(input.question, hasTopic);
     const school = diagnostic.educationStatus === "no_higher_or_secondary_vocational" || matches(question, "у меня только аттестат") || matches(question, "у меня только школа");
     const professional = ["higher", "secondary_vocational", "currently_studying"].includes(diagnostic.educationStatus ?? "");
@@ -89,6 +92,15 @@ export class ConsultantKnowledgeResolver {
       ["контрол", "надзор", "приемк"].some(term => matches(question, term));
     const stroyPriority = !school && !explicitApartment && !explicitHouse && !houseAcceptance && !houseControl && diagnostic.program !== "house_unspecified" && professional;
     const required = new Set<string>();
+    if (contextualDistrust) { required.add("role_benefit"); required.add("construction_expertise"); }
+    const priceIntent = /дорог|конск|деньг|стоим|стоит|стольк|цен|тариф|рассроч|оплат/.test(question);
+    const benefitIntent = /польз|зачем|развод|маркетинг|вода|что (?:я )?(?:получу|смогу)|конкретно.*смогу|смогу делать|за что/.test(question);
+    const documentIntent = /диплом|бумажк|документ|сертификат|удостоверен|фрдо/.test(question);
+    const guaranteeIntent = /гарант.*(?:работ|доход|заказ|трудоустр)|гаранти[юя] работ/.test(question);
+    if (priceIntent) required.add("prices");
+    if (benefitIntent) { required.add("role_benefit"); required.add("construction_expertise"); }
+    if (documentIntent) required.add("documents");
+    if (guaranteeIntent) { required.add("employment"); required.add("guarantees"); }
     if (choice) {
       required.add("admission"); required.add("comparison");
       if (stroyPriority) required.add("stroyexpert");
@@ -106,7 +118,7 @@ export class ConsultantKnowledgeResolver {
     }
     if (matches(question, "судебн") || matches(question, "суд")) { required.add("judicial"); required.add("legal_limits"); }
     if (matches(question, "заказ") || matches(question, "клиент")) { required.add("orders"); required.add("guarantees"); }
-    const professionalBenefit = ["что даст", "как расширить", "профессиональн польз", "для проектиров", "для руководител", "для оценщик", "для прораб", "контрол качества"]
+    const professionalBenefit = ["что даст", "как расширить", "профессиональн польз", "для проектиров", "для руководител", "для оценщик", "для прораб", "контрол качества", "зачем", "реальн польз", "развод", "маркетинг", "что получ", "что смогу"]
       .some(term => matches(question, term));
     if (professionalBenefit) { required.add("role_benefit"); required.add("construction_expertise"); }
     if (matches(question, "квартир") && matches(question, "стройэксперт")) {

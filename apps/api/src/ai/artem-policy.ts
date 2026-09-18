@@ -108,7 +108,7 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
   const refused = contactRefused(question, history);
   if (/телефон.*не хочу|не хочу.*телефон|не звоните|просто отвечайте/.test(q) && !/цен|стоит|документ/.test(q)) return "Хорошо, продолжим здесь.";
   if (/скидк|акци/.test(q)) return "Размер и наличие скидки нужно подтвердить. Действующие предложения может проверить менеджер.";
-  if (/гарант.*(?:работ|доход|заказ|трудоустр)/.test(q) || /заказ|клиент|трудоустр/.test(q)) {
+  if (/гарант.*(?:работ|доход|заказ|трудоустр)|гаранти[юя] работ/.test(q) || /заказ|клиент|трудоустр/.test(q)) {
     const managerCondition = /currentRole=manager_owner/.test(diagnosticContext)
       ? " Если у компании уже есть заказчики, подрядчики или партнёры, можно начать с предложения им ограниченного круга экспертных задач."
       : "";
@@ -121,8 +121,9 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
     return "Конечно. Если появятся вопросы по программе, стоимости или документам — помогу разобраться.";
   }
   if (/посоветова/.test(q)) return BENEFITS[program] + " " + commercialText(markdown, program, tariffContext);
-  if (/дорого|стоим|стоит|(?:^|[^а-я])цен|рассроч|9\s*330/.test(q)) {
-    return (/дорого/.test(q) ? BENEFITS[program] + " " : "") + commercialText(markdown, program, tariffContext);
+  if (/дорого|стоим|стоит|(?:^|[^а-я])цен|рассроч|тариф|деньг|9\s*330/.test(q)) {
+    const commercial = commercialText(markdown, program, tariffContext);
+    return /дорого|конск|деньг|охренел/.test(q) ? commercial + " " + BENEFITS[program] : commercial;
   }
   if (/образован|поступ|аттестат|диплома.*нет|диплом не|экономическ.*диплом/.test(q)) {
     if (/иностран|зарубеж/.test(q + diagnosticContext)) return "По иностранному диплому нужна индивидуальная проверка. Признание документа заранее обещать нельзя; менеджер организует проверку.";
@@ -144,7 +145,7 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
     `Точный выдаваемый документ по программе «${name}» нужно уточнить. Документы «Стройэксперта» на неё автоматически не распространяются.`;
   if (/нет опыта|без опыта|нович/.test(q)) return "Строительный опыт для поступления на «Стройэксперт» не обязателен, достаточно СПО или высшего образования. Осваивать новое направление помогают материалы, задания и итоговая работа с проверкой; самостоятельная работа требует практики.";
   const roleBenefit = professionalBenefit(program, diagnosticContext);
-  if (roleBenefit && /что даст|как (?:расширить|применить)|польз|зачем|для (?:проектиров|руководител|оценщик|прораб|строительн.*контрол)/.test(q)) return roleBenefit;
+  if (roleBenefit && /что даст|что (?:я )?(?:получу|смогу)|как (?:расширить|применить)|польз|зачем|развод|вода|маркетинг|для (?:проектиров|руководител|оценщик|прораб|строительн.*контрол)/.test(q)) return roleBenefit;
   if (/ижс/.test(q) && program === "house_unspecified") return "Вам интереснее разовые проверки готовых домов или сопровождение стройки по этапам?";
   if (explicitProgram(question) || isConsultantChoiceQuestion(question) || /выбрать|подойдет|подходит|рекоменд|зачем|польз/.test(q)) return `Можно рассмотреть «${name}». ${BENEFITS[program]}`;
   if (/начал|формат|дистанц|срок|нет времени/.test(q) && program === "construction_expertise") return "«Стройэксперт» проходит дистанционно, в индивидуальном графике. Есть задания, контроль знаний и итоговая работа. Точную продолжительность и нагрузку по тарифу нужно уточнить.";

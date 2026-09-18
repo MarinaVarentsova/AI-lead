@@ -25,7 +25,7 @@ const hooks = registerHooks({
 });
 try {
   const { ConsultantKnowledgeResolver, createConsultantSections } = await import(new URL("packages/domain/src/consultant/index.ts", root));
-  const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_4.md", root), "utf8");
+  const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_6.md", root), "utf8");
   const resolver = new ConsultantKnowledgeResolver(markdown);
   const fixtures = JSON.parse(readFileSync(new URL("consultant-retrieval.fixtures.json", import.meta.url), "utf8"));
   for (const fixture of fixtures) {
@@ -84,6 +84,16 @@ try {
   assert.equal(resolver.resolve({ question: "расскажи анекдот" }).intent, "off_topic");
   assert.equal(resolver.resolve({ question: "ты дебил" }).intent, "abusive_or_trolling");
   assert.equal(resolver.resolve({ question: "Да это хрень, сколько стоит Стройэксперт?" }).intent, "relevant_training_question");
+  for (const question of ["Да вы охренели, почему это столько стоит?", "Цена конская", "За что такие деньги?",
+    "Что за хрень с тарифами, нормально объяснить можешь?", "Бесит твой ответ. Сколько всё-таки стоит курс?",
+    "Очередной развод на деньги — в чём реальная польза?", "Докажи без рекламной фигни, зачем мне эта программа",
+    "Ты вообще понимаешь, что говоришь? Какой документ я получу?", "Гарантию работы дашь или опять вода?",
+    "Диплом-то настоящий или бумажка?", "Можно без этой воды — что конкретно я смогу делать?"]) {
+    assert.equal(resolver.resolve({ question, diagnosticContext }).intent, "relevant_training_question", question);
+  }
+  const distrust = resolver.resolve({ question: "Ты вообще что-нибудь знаешь?", diagnosticContext: { ...diagnosticContext, program: "construction_expertise" } });
+  assert.equal(distrust.intent, "relevant_training_question");
+  assert.ok(distrust.matchedSections.some(section => section.id === "role_benefit"));
   assert.equal(resolver.resolve({ question: "Какой номер лицензии?" }).intent, "genuine_unknown_program_fact");
   const catalog = createConsultantSections(markdown);
   assert.equal(catalog.length, 23);
