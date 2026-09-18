@@ -29,6 +29,11 @@ try {
   assert.equal(report.scoreStatus(69), "Критично");
 
   const page = readFileSync(new URL("apps/web/src/pages/tester.tsx", root), "utf8");
+  const modeUi = readFileSync(new URL("apps/web/src/lib/tester-modes.ts", root), "utf8");
+  for (const mode of ["Разводило", "Ботан", "Адекват", "Быдло", "Психологиня"]) assert.ok(modeUi.includes(mode));
+  assert.match(page, /Режим stress-testing/);
+  assert.match(page, /modeSpecificSummary/);
+  assert.match(page, /item\.persona\.mode/);
   assert.ok(page.includes("Итоговое заключение руководителя отдела продаж"));
   assert.ok(page.includes("Скопировать задачу для Codex"));
   assert.ok(page.includes("Что нужно исправить в Артёме"));

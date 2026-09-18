@@ -4,7 +4,8 @@ import type { ConsultantExchange } from "../ai/consultant-funnel";
 import { formatDiagnosticResult } from "../ai/format-diagnostic";
 import { DiagnosticAIError } from "../ai/diagnostic-result.types";
 import { generatePersonas, validateRunCount, type Persona } from "./personas";
-import { CRITERIA, EVALUATOR_PROMPT, validateEvaluation, type Evaluation } from "./evaluator";
+import { CRITERIA, evaluatorPromptForMode, validateEvaluation, type Evaluation } from "./evaluator";
+import { TESTER_MODE_DESCRIPTIONS, type TesterMode } from "./stress-modes";
 import { buildDeterministicRunAssessment, RUN_ASSESSMENT_PROMPT, validateRunAssessment, type RunAssessment } from "./run-assessment";
 export interface CaseResult {
   caseNumber: number; persona: Persona; diagnosticAnswers: Persona["answers"]; diagnosticResult: unknown;
@@ -89,7 +90,7 @@ export async function evaluateWithRetry<T>(evaluate: () => Promise<T>, options: 
   return executeAI("evaluator", evaluate, { ...defaultOptions, ...options });
 }
 export async function runTester(count: number, runtime: ArtemRuntime, store: TestStore, personas = generatePersonas(count),
-  executionOptions: Partial<TesterExecutionOptions> = {}) {
+  executionOptions: Partial<TesterExecutionOptions> = {}, requestedMode: TesterMode = personas[0]?.mode ?? "Адекват") {
   validateRunCount(count);
   if (personas.length !== count || personas.some(p => p.questions.length < 1 || p.questions.length > 3)) throw new Error("INVALID_PERSONAS");
   const options = { ...defaultOptions, ...executionOptions };
@@ -135,7 +136,9 @@ export async function runTester(count: number, runtime: ArtemRuntime, store: Tes
       }
 
       currentStage = "evaluator";
-      result.evaluatorResult = await executeAI("evaluator", async () => validateEvaluation(await runtime.provider.generateStructured(EVALUATOR_PROMPT, {
+      const activeMode = persona.mode ?? requestedMode;
+      result.evaluatorResult = await executeAI("evaluator", async () => validateEvaluation(await runtime.provider.generateStructured(evaluatorPromptForMode(activeMode), {
+        activeMode,
         persona, diagnosticAnswers: persona.answers, diagnosticResult: diagnostic,
         transcript: result.transcript, turnMetadata,
         expectedRules: { diagnostic: DiagnosticKnowledgeResolver.buildFactsPacket(resolved), behaviourRules,
@@ -178,7 +181,9 @@ export async function runTester(count: number, runtime: ArtemRuntime, store: Tes
       criterionScores: metrics.criterionScores };
     runEvaluation = buildDeterministicRunAssessment([], scores);
   }
-  const summary = { ...metrics, runEvaluation, codexTask: runEvaluation.codexTask, summaryError, summarySource };
+  const summary = { ...metrics, mode: requestedMode, modeDescription: TESTER_MODE_DESCRIPTIONS[requestedMode],
+    modeSpecificSummary: `${requestedMode}: оценено ${metrics.evaluatedCases} из ${metrics.totalCases}; технических ошибок ${metrics.TECH_ERROR}.`,
+    runEvaluation, codexTask: runEvaluation.codexTask, summaryError, summarySource };
   await store.finish(summary);
   return summary;
 }

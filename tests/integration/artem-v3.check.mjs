@@ -31,6 +31,7 @@ try {
   const { YandexAIProvider } = await import(new URL("apps/api/src/ai/yandex-provider.ts", root));
   const { runTester } = await import(new URL("apps/api/src/tester/runner.ts", root));
   const { generatePersonas } = await import(new URL("apps/api/src/tester/personas.ts", root));
+  const { TESTER_MODES, fallbackStressPersonas } = await import(new URL("apps/api/src/tester/stress-modes.ts", root));
   const { CRITERIA, EVALUATOR_PROMPT } = await import(new URL("apps/api/src/tester/evaluator.ts", root));
   const { DIAGNOSTIC_SCHEMA } = await import(new URL("packages/domain/src/diagnostic/diagnostic-schema.ts", root));
   const canonical = read("knowledge/inobr/artem_unified_knowledge_base_v3_4.md");
@@ -135,6 +136,17 @@ try {
   assert.notEqual(acceptanceCase.verdict, "TECH_ERROR");
   assert.ok(acceptanceCase.diagnosticResult?.result?.recommendation?.trim());
   assert.ok(syntheticSummary.runEvaluation);
+  const modeSmoke = {};
+  for (const mode of TESTER_MODES) {
+    const smokeCases = fallbackStressPersonas(5, mode, () => 0.42);
+    const smokeSaved = [];
+    const smokeSummary = await runTester(5, runtime, { async saveCase(value) { smokeSaved.push(value); },
+      async progress() {}, async finish() {} }, smokeCases, { sleep: async () => {} }, mode);
+    modeSmoke[mode] = { PASS: smokeSummary.PASS, REVIEW: smokeSummary.REVIEW, FAIL: smokeSummary.FAIL,
+      TECH_ERROR: smokeSummary.TECH_ERROR };
+    assert.equal(smokeSaved.length, 5); assert.equal(smokeSummary.mode, mode);
+    assert.deepEqual(modeSmoke[mode], { PASS: 5, REVIEW: 0, FAIL: 0, TECH_ERROR: 0 });
+  }
   assert.match(direct[4].diagnostic.recommendation, /Приёмка квартир.*Приёмка ИЖС/);
   assert.match(direct[5].diagnostic.recommendation, /выпускные документы/i);
   assert.match(direct[6].diagnostic.recommendation, /При.мк[ау] квартир/);
@@ -172,7 +184,7 @@ try {
     /current_area и current_role сами по себе не переключают/, /технадзор ИЖС/, /важнее landing priority/]) {
     assert.match(EVALUATOR_PROMPT, rule);
   }
-  console.log("PASS: v3.4 A–O, canonical source, prod/tester runtime parity, education guards, acceptance choice, refusal and evaluator contract.");
+  console.log("PASS: v3.4 A–O and 5×5 stress-mode smoke; prod/tester runtime parity, education guards, refusal and evaluator contract.");
 } finally {
   hooks.deregister();
 }

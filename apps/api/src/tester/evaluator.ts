@@ -1,3 +1,5 @@
+import { MODE_EVALUATOR_RULES, TESTER_MODE_DESCRIPTIONS, type TesterMode } from "./stress-modes";
+
 export const CRITERIA = ["qualification", "recommendedTrack", "conversion", "personalization", "grounding", "noHallucinations",
   "objections", "sales", "cta", "tone", "noRepeatedQuestions", "maxQuestions"] as const;
 export interface Evaluation {
@@ -39,6 +41,9 @@ maxQuestions: максимум три дополнительных обмена 
 Верни JSON: {score, verdict, criteria:{все 12 ключей:0-100}, strengths:[...], problems:[...], recommendedFixes:[...],
 funnelAssessment:"...", groundingAssessment:"..."}. Приводи конкретные свидетельства из transcript.
 score — среднее 12 критериев; PASS >=85, REVIEW 70-84, FAIL <70. Пиши объяснения по-русски.`;
+export function evaluatorPromptForMode(mode: TesterMode): string {
+  return `${EVALUATOR_PROMPT}\n\nАктивный stress-mode: «${mode}» — ${TESTER_MODE_DESCRIPTIONS[mode]}.\nMode-specific checks: ${MODE_EVALUATOR_RULES[mode]}\nMode-specific failures обязательно перечисляй в problems с префиксом «${mode}:».`;
+}
 function record(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("INVALID_EVALUATION");
   return value as Record<string, unknown>;

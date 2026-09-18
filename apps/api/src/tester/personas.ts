@@ -1,6 +1,10 @@
 import { DiagnosticKnowledgeResolver, type DiagnosticAnswers, CURRENT_AREA_CODES, CURRENT_ROLE_CODES,
   EDUCATION_STATUS_CODES, TARGET_TASKS_CODES } from "@workspace/domain/diagnostic";
-export interface Persona { label: string; answers: DiagnosticAnswers; questions: string[] }
+import type { TesterMode } from "./stress-modes";
+export interface Persona {
+  label: string; answers: DiagnosticAnswers; questions: string[];
+  mode?: TesterMode; intent?: string; scenarioSeed?: string;
+}
 export function validateRunCount(value: unknown): number {
   if (!Number.isInteger(value) || (value as number) < 1 || (value as number) > 10) throw new Error("INVALID_CASE_COUNT");
   return value as number;

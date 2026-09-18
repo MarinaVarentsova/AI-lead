@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from "react";
 import { testerRequest as request, getTesterToken, saveTesterToken, clearTesterToken, TESTER_UNAUTHORIZED_EVENT } from "@/lib/tester-access";
 import { verdictLabel, runStatusLabel, errorLabel, areaLabel, severityLabel, scoreStatus, criterionLabel, type RunAssessmentView } from "@/lib/tester-report";
+import { TESTER_MODES, TESTER_MODE_DESCRIPTIONS, type TesterMode } from "@/lib/tester-modes";
 type Evaluation = { score: number; verdict: string; criteria: Record<string, number>; strengths: string[]; problems: string[]; recommendedFixes: string[]; funnelAssessment: string; groundingAssessment: string };
-type TestCase = { id: string; caseNumber: number; persona: { label: string }; diagnosticAnswers: unknown; diagnosticResult: unknown;
+type TestCase = { id: string; caseNumber: number; persona: { label: string; mode?: TesterMode; intent?: string; scenarioSeed?: string }; diagnosticAnswers: unknown; diagnosticResult: unknown;
   transcript: { role: string; message: string }[] | null; evaluatorResult: Evaluation | null; score: number | null; verdict: string; errorMessage: string | null };
 type Summary = { totalCases: number; PASS: number; REVIEW: number; FAIL: number; averageScore: number | null;
   averageQualificationScore: number | null; averageGroundingScore: number | null; averageSalesFunnelScore: number | null;
   evaluatedCases: number; errorCases: number; error?: string; summaryError?: string;
   criterionScores?: Record<string, number | null>; summarySource?: "ai" | "deterministic";
-  runEvaluation?: RunAssessmentView | null; codexTask?: string; TECH_ERROR?: number };
+  runEvaluation?: RunAssessmentView | null; codexTask?: string; TECH_ERROR?: number; mode?: TesterMode;
+  modeDescription?: string; modeSpecificSummary?: string; generatorSource?: "ai" | "fallback" | "pending" | "continued" };
 type Run = { id: string; status: string; requestedCases: number; completedCases: number; knowledgeVersion: string; summary: Summary | null; parentRunId?: string | null; iterationNumber?: number };
 export default function Tester() {
   const [unlocked, setUnlocked] = useState(() => Boolean(getTesterToken()));
@@ -50,6 +52,7 @@ function TesterPanel() {
   const [copyStatus, setCopyStatus] = useState("");
   const [cases, setCases] = useState<TestCase[]>([]);
   const [count, setCount] = useState(10);
+  const [mode, setMode] = useState<TesterMode>("Адекват");
   const [starting, setStarting] = useState(false);
   const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState("");
@@ -77,11 +80,12 @@ function TesterPanel() {
     void poll();
     return () => { controller.abort(); clearTimeout(timer); };
   }, [run?.id]);
+  useEffect(() => { if (run?.summary?.mode) setMode(run.summary.mode); }, [run?.summary?.mode]);
   const start = async (parentRunId?: string) => {
     if (busy.current || initializing || run?.status === "running" || count < 1 || count > 10) return;
     busy.current = true; setStarting(true); setError("");
     try {
-      setRun(await request<Run>("/api/tester/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ count, parentRunId }) }));
+      setRun(await request<Run>("/api/tester/runs", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ count, parentRunId, mode }) }));
       setCases([]); setParentRun(null); setCopyStatus("");
     } catch (error) {
       setError((error as Error).message);
@@ -95,6 +99,16 @@ function TesterPanel() {
   return <main className="max-w-5xl mx-auto p-4 sm:p-8 space-y-5">
     <h1 className="text-2xl font-semibold">Тестировщик Артёма</h1>
     <p className="text-sm text-muted-foreground">Внутренний MVP. Запуск выполняет платные AI-вызовы. Не используйте персональные данные. Доступ защищён внутренним ключом.</p>
+    <section className="space-y-2" aria-label="Режим stress-testing">
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Режим тестирования">
+        {TESTER_MODES.map(item => <button key={item} type="button" role="tab" aria-selected={mode === item}
+          disabled={initializing || starting || run?.status === "running"} onClick={() => setMode(item)}
+          className={`border rounded px-3 py-2 text-sm disabled:opacity-50 ${mode === item ? "bg-primary text-white border-primary" : "bg-background"}`}>
+          {item}
+        </button>)}
+      </div>
+      <p className="text-sm text-muted-foreground" data-testid="tester-mode-description">{TESTER_MODE_DESCRIPTIONS[mode]}</p>
+    </section>
     <div className="flex flex-wrap gap-3 items-center">
       <label>Кейсов <input aria-label="Количество тестов" type="number" min={1} max={10} value={count}
         disabled={initializing || starting || run?.status === "running"} onChange={event => setCount(Number(event.target.value))} className="border rounded p-2 w-20" /></label>
@@ -108,6 +122,7 @@ function TesterPanel() {
     {error && <p role="alert" className="text-destructive break-words">{error}</p>}
     {run && <section className="border rounded p-4 space-y-2" aria-live="polite">
       <p>Серия {run.iterationNumber ?? 1} из 5 · {runStatusLabel(run.status)} · {run.completedCases} / {run.requestedCases}</p>
+      <p className="font-medium">Режим: {summary?.mode ?? mode}</p>
       <progress className="w-full" max={run.requestedCases} value={run.completedCases} />
       <p className="text-xs break-all">Серия: {run.id} · Версия базы знаний: {run.knowledgeVersion}</p>
       {summary && <>
@@ -120,6 +135,7 @@ function TesterPanel() {
           <div><dt className="inline">Технических ошибок: </dt><dd className="inline font-semibold">{summary.TECH_ERROR ?? summary.errorCases ?? 0}</dd></div>
         </dl>
         <p className="text-sm text-muted-foreground">Технические ошибки не считаются пройденными или проваленными и не участвуют в средних баллах.</p>
+        {summary.modeSpecificSummary && <p className="text-sm"><span className="font-medium">Итог режима:</span> {summary.modeSpecificSummary}</p>}
         {(summary.error || summary.summaryError) && <p>{errorLabel(summary.error || summary.summaryError || "")}</p>}
         {parentRun?.summary && <div className="border-t pt-3">
           <h2 className="font-semibold">Изменение относительно предыдущей серии</h2>
@@ -185,15 +201,16 @@ function TesterPanel() {
       </div>}
     </section>}
     {cases.map(item => <details key={item.id} className="border rounded p-4">
-      <summary className="cursor-pointer font-semibold">Сценарий №{item.caseNumber} · {item.persona.label} · {verdictLabel(item.verdict)} · {item.score ?? "без оценки"}</summary>
+      <summary className="cursor-pointer font-semibold">Сценарий №{item.caseNumber} · {item.persona.label} · Режим: {item.persona.mode ?? summary?.mode ?? "Адекват"} · {verdictLabel(item.verdict)} · {item.score ?? "без оценки"}</summary>
       <div className="space-y-3 mt-4 break-words">
+        <p><span className="font-medium">Цель сценария:</span> {item.persona.intent ?? TESTER_MODE_DESCRIPTIONS[item.persona.mode ?? summary?.mode ?? "Адекват"]}</p>
         <details><summary>Ответы диагностики — технические коды</summary><pre className="whitespace-pre-wrap text-xs">{JSON.stringify(item.diagnosticAnswers, null, 2)}</pre></details>
         <details><summary>Рекомендация Артёма — технические данные</summary><pre className="whitespace-pre-wrap text-sm">{JSON.stringify(item.diagnosticResult, null, 2)}</pre></details>
         <h3>Диалог и рекомендация</h3>{item.transcript?.map((line,i) => <p key={i} className="whitespace-pre-wrap"><strong>{line.role === "user" ? "Кандидат" : "Артём"}: </strong>{line.message}</p>)}
         {item.errorMessage && <p role="alert">{errorLabel(item.errorMessage)}</p>}
         {item.evaluatorResult && <>
           <p>{item.evaluatorResult.funnelAssessment}</p><p>{item.evaluatorResult.groundingAssessment}</p>
-          {([ ["Сильные стороны", item.evaluatorResult.strengths], ["Проблемы", item.evaluatorResult.problems], ["Рекомендуемые исправления", item.evaluatorResult.recommendedFixes] ] as const)
+          {([ ["Сильные стороны", item.evaluatorResult.strengths], ["Проблемы режима и общие", item.evaluatorResult.problems], ["Рекомендуемые исправления", item.evaluatorResult.recommendedFixes] ] as const)
             .map(([title, items]) => <div key={title}><h3 className="font-semibold">{title}</h3><ul className="list-disc pl-5">{items.map((text,i) => <li key={i}>{text}</li>)}</ul></div>)}
         </>}
       </div>
