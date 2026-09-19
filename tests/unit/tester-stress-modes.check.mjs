@@ -47,7 +47,10 @@ try {
   for (const rule of [/professional.*precision|factual precision/i, /textual CTA.*не требуй|Не требуй textual CTA/i,
     /3–4 месяца/, /6–8 месяцев/, /учебные задания.*реценз/i, /чисто справочном follow-up/i,
     /сферы услуг/i, /unknown document/i]) assert.match(botanyPrompt, rule);
-  assert.match(evaluatorPromptForMode("Адекват"), /ясность.*персонализацию.*routing/s);
+  const adequatePrompt = evaluatorPromptForMode("Адекват");
+  for (const rule of [/корректная рекомендация/i, /что выбрать.*не off-topic/i, /не требуй textual CTA/i,
+    /я подумаю/i, /Учебные задания.*не hallucination/i, /широкой сферой/i, /поиска клиентов.*без sales plan/i,
+    /смысл ответа.*не exact wording/i]) assert.match(adequatePrompt, rule);
   assert.match(evaluatorPromptForMode("Быдло"), /Не штрафуй.*мат.*штрафуй ответное оскорбление/s);
   assert.match(evaluatorPromptForMode("Психологиня"), /Полный off-topic.*смешанном сообщении.*учебную часть/s);
   const ai = await modes.generateStressPersonas(1, "Адекват", { async generateStructured(system) {

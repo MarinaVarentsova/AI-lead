@@ -153,7 +153,12 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
   const roleBenefit = professionalBenefit(program, diagnosticContext);
   if (roleBenefit && /что даст|что (?:я )?(?:получу|смогу)|как (?:расширить|применить)|польз|зачем|развод|вода|маркетинг|для (?:проектиров|руководител|оценщик|прораб|строительн.*контрол)/.test(q)) return roleBenefit;
   if (/ижс/.test(q) && program === "house_unspecified") return "Вам интереснее разовые проверки готовых домов или сопровождение стройки по этапам?";
-  if (explicitProgram(question) || isConsultantChoiceQuestion(question) || /выбрать|подойдет|подходит|рекоменд|зачем|польз/.test(q)) return `Можно рассмотреть «${name}». ${BENEFITS[program]}`;
+  if (isConsultantChoiceQuestion(question)) {
+    if (program === "acceptance_choice") return "Оба направления остаются допустимыми: «Приёмка квартир» посвящена осмотру квартиры и фиксации дефектов, а «Приёмка ИЖС» — более сложной проверке частного дома. Чтобы выбрать одно, уточните, с каким объектом хотите работать в первую очередь — квартирой или частным домом?";
+    const benefit = professionalBenefit(program, diagnosticContext) ?? BENEFITS[program];
+    return `В вашем случае основная рекомендация — «${name}». ${benefit}`;
+  }
+  if (explicitProgram(question) || /выбрать|подойдет|подходит|рекоменд|зачем|польз/.test(q)) return `Можно рассмотреть «${name}». ${BENEFITS[program]}`;
   if (/начал|формат|дистанц|срок|нет времени/.test(q) && program === "construction_expertise") return "«Стройэксперт» проходит дистанционно, в индивидуальном графике. Есть задания, контроль знаний и итоговая работа. Точную продолжительность и нагрузку по тарифу нужно уточнить.";
   return `По выбранной программе могу подтвердить следующее: ${BENEFITS[program]} Уточните, какой именно аспект обучения хотите разобрать.`;
 }

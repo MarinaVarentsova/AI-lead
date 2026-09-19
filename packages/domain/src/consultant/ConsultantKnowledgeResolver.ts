@@ -33,7 +33,9 @@ export function classifyConsultantIntent(rawQuestion: string, hasRetrievedTopic 
 export function isConsultantChoiceQuestion(value: string): boolean {
   const question = normalize(value);
   return ["что выбрать", "что мне выбрать", "кем быть", "кем стать", "какое направление",
-    "какой курс", "что подходит", "что лучше для меня", "куда идти", "что в итоге выбрать"]
+    "какой курс", "что подходит", "что лучше для меня", "что мне лучше выбрать", "а что лучше мне",
+    "так что все таки брать", "какой вариант мне подходит", "что посоветуете", "что выбрать из этого",
+    "и что тогда лучше", "куда идти", "что в итоге выбрать"]
     .some(phrase => matches(question, phrase));
 }
 
@@ -67,7 +69,7 @@ export class ConsultantKnowledgeResolver {
     // Stable content fingerprint, not a security hash. Changes invalidate the source version.
     let hash = 2166136261;
     for (const char of markdown.replace(/\r\n/g, "\n")) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-    this.sourceVersion = `inobr-artem-v3.7-${(hash >>> 0).toString(16)}`;
+    this.sourceVersion = `inobr-artem-v3.8-${(hash >>> 0).toString(16)}`;
   }
 
   resolve(input: ConsultantInput): ConsultantRetrievalPacket {

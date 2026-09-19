@@ -329,16 +329,22 @@ try {
   assert.deepEqual(persisted.slice(0, 8).map(row => row.role), ["user", "assistant", "user", "assistant", "user", "assistant", "user", "assistant"]);
   assert.ok(persisted.slice(0, 8).every(row => row.conversationId === fixture.conversationId && row.step === "post_diagnostic_chat"));
   const qualified = { ...fixture.row, educationStatus: "higher", targetTasks: "explore" };
-  for (const message of ["что выбрать", "что мне выбрать", "кем быть", "кем стать", "какое направление", "какой курс", "что подходит", "что лучше для меня", "куда идти", "что в итоге выбрать", "кем быть в итоге что выбрать?"]) {
+  for (const message of ["что выбрать", "что мне выбрать", "что мне лучше выбрать?", "А что лучше мне?", "Так что всё-таки брать?",
+    "Какой вариант мне подходит?", "Что посоветуете?", "Что выбрать из этого?", "И что тогда лучше?", "кем быть", "кем стать",
+    "какое направление", "какой курс", "что подходит", "что лучше для меня", "куда идти", "что в итоге выбрать", "кем быть в итоге что выбрать?"]) {
     const choice = await run({ message, row: qualified });
     assert.notEqual(choice.fallbackReason, "INSUFFICIENT_KNOWLEDGE");
-    assert.ok(choice.message.includes("рассмотреть «Стройэксперт»"));
+    assert.match(choice.message, /основная рекомендация — «Стройэксперт»/i);
+    assert.match(choice.message, /дефект|техническ.*документац|экспертн.*заключ/i);
+    assert.doesNotMatch(choice.message, /ушли от темы обучения/i);
     for (const id of ["stroyexpert", "admission", "comparison"]) assert.ok(choice.matchedSectionIds.includes(id));
   }
   const apartmentChoice = await run({ row: { ...qualified, targetTasks: "apartment_house_acceptance" }, message: "что выбрать" });
   assert.ok(apartmentChoice.message.includes("Приёмка квартир"));
   assert.ok(apartmentChoice.message.includes("Приёмка ИЖС"));
   assert.ok(apartmentChoice.matchedSectionIds.includes("apartment_acceptance"));
+  assert.match(apartmentChoice.message, /квартирой или частным домом/i);
+  assert.doesNotMatch(apartmentChoice.message, /лучше для новичка|лучше для заработка|лучше для профессионала/i);
   const first = await run({ row: qualified });
   assert.ok(!first.message.includes("Если хотите"));
   const history = [{ role: "user", message: "Сколько стоит обучение?" }, { role: "assistant", message: first.message }];
@@ -377,11 +383,11 @@ try {
   try {
     const knowledgeDir = path.join(packaged, "knowledge");
     mkdirSync(knowledgeDir);
-    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_7.md", root), "utf8");
-    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v3_7.md"), markdown);
+    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_8.md", root), "utf8");
+    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v3_8.md"), markdown);
     assert.equal(await loadArtemKnowledge(pathToFileURL(path.join(packaged, "index.mjs")).href), markdown);
     assert.ok(readFileSync(new URL("apps/api/build.mjs", root), "utf8")
-      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v3_7.md")'));
+      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v3_8.md")'));
   } finally {
     rmSync(packaged, { recursive: true, force: true });
   }
@@ -416,7 +422,7 @@ try {
     if (evaluatorAttempts === 1 || evaluatorAttempts === 3 || evaluatorAttempts === 4 || evaluatorAttempts === 5) throw new Error("Evaluator unavailable");
     return good;
   };
-  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_7.md", root), "utf8"), fakeProvider);
+  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_8.md", root), "utf8"), fakeProvider);
   const productionBefore = persisted.length;
   const savedCases = [], progress = [];
   const summary = await runTester(2, runtime, { async saveCase(c) { savedCases.push(c); }, async progress(n) { progress.push(n); }, async finish() {} }, personas.slice(0, 2), { sleep: async () => {} });
