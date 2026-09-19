@@ -37,7 +37,12 @@ try {
     assert.match(evaluatorPromptForMode(mode), new RegExp(`Активный stress-mode: «${mode}»`));
     assert.match(evaluatorPromptForMode(mode), new RegExp(`${mode}:`));
   }
-  assert.match(evaluatorPromptForMode("Разводило"), /выдуманных скидок.*гарантий.*возврата/s);
+  const fraudPrompt = evaluatorPromptForMode("Разводило");
+  for (const rule of [/Unknown не означает no|unknown != no/i, /ложного отрицания/i, /индивидуальной цены/i,
+    /первого взноса/i, /Названия подтверждённых тарифов не являются выдуманным позиционированием/i,
+    /Не требуй маркетинговую пользу сертификата/i, /textual CTA/i]) assert.match(fraudPrompt, rule);
+  assert.match(fraudPrompt, /Базовый.*Средний.*Премиум.*Премиум \+ ИЖС/s);
+  assert.match(fraudPrompt, /доверия заказчиков|новых заказов|пользы в спорах/i);
   const botanyPrompt = evaluatorPromptForMode("Ботан");
   for (const rule of [/professional.*precision|factual precision/i, /textual CTA.*не требуй|Не требуй textual CTA/i,
     /3–4 месяца/, /6–8 месяцев/, /учебные задания.*реценз/i, /чисто справочном follow-up/i,

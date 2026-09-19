@@ -72,12 +72,12 @@ export function contactRefused(question: string, history: ConsultantExchange[]):
 
 /** Prices and tariff composition are extracted only from the approved commercial tables. */
 export function commercialText(markdown: string, program: ArtemProgram, question = ""): string {
-  const commercial = knowledgeSections(markdown).get(12)!;
-  const title = PROGRAM_NAMES[program];
+  const commercial = knowledgeSections(markdown).get(12) ?? "";
+  const title = PROGRAM_NAMES[program] ?? PROGRAM_NAMES.construction_expertise;
   if (program === "house_unspecified" || program === "acceptance_choice") return "Сначала нужно уточнить, речь о приёмке квартиры или проверке частного дома: это разные программы.";
   const block = commercial.split("### " + title + "\n")[1]?.split("\n### ")[0] ?? "";
   const rows = block.split("\n").filter(line => line.startsWith("|") && /₽/.test(line)).map(line =>
-    line.split("|").slice(1, -1).map(cell => cell.trim()));
+    line.split("|").slice(1, -1).map(cell => cell.trim())).filter(row => Boolean(row[0] && row[1]));
   let selected = rows;
   const tariff = [...question.matchAll(/премиум\s*\+\s*ижс|премиум|средн[а-я]*|базов[а-я]*|профи|vip/gi)].at(-1)?.[0]?.toLowerCase();
   if (tariff) {
@@ -107,8 +107,14 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
   const tariffContext = userHistory + " " + question;
   const refused = contactRefused(question, history);
   if (/телефон.*не хочу|не хочу.*телефон|не звоните|просто отвечайте/.test(q) && !/цен|стоит|документ/.test(q)) return "Хорошо, продолжим здесь.";
-  if (/скидк|акци/.test(q)) return "Размер и наличие скидки нужно подтвердить. Действующие предложения может проверить менеджер.";
-  if (/гарант.*(?:работ|доход|заказ|трудоустр)|гаранти[юя] работ/.test(q) || /заказ|клиент|трудоустр/.test(q)) {
+  if (/индивидуальн.*цен|специальн.*цен|конкурент.*дешев/.test(q)) return "Индивидуальная цена в моей базе не подтверждена. " +
+    commercialText(markdown, program, tariffContext) + " Возможность специального предложения нужно уточнить у менеджера.";
+  if (/скидк|акци|бесплатн.*(?:программ|курс)|втор[ауя].*программ.*бесплат/.test(q)) return "В моей базе нет подтверждённой информации о такой скидке или акции. " + commercialText(markdown, program, tariffContext) +
+    " Актуальные специальные предложения, если они есть, нужно уточнить у менеджера.";
+  if (/возврат|верн.*(?:сумм|деньг)|передумаю/.test(q)) return "Условия возврата в моей базе не описаны, поэтому полный возврат подтвердить не могу. Этот параметр лучше уточнить до оплаты.";
+  if (/срок.*доступ|доступ.*материал|навсегда|бессроч/.test(q)) return "Точный срок доступа к материалам в моей базе не зафиксирован, поэтому бессрочный доступ подтвердить не могу.";
+  if (/беспроцент|перв.*взнос|банковск.*услов/.test(q)) return "Беспроцентная рассрочка и отсутствие первого взноса в моей базе не подтверждены. Точные условия оплаты нужно уточнить.";
+  if (/(?:гарант|обещ).*?(?:работ|доход|заказ|трудоустр)|гаранти[юя] работ/.test(q) || /заказ|клиент|трудоустр/.test(q)) {
     const managerCondition = /currentRole=manager_owner/.test(diagnosticContext)
       ? " Если у компании уже есть заказчики, подрядчики или партнёры, можно начать с предложения им ограниченного круга экспертных задач."
       : "";

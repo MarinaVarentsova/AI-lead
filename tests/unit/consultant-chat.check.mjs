@@ -285,6 +285,30 @@ try {
   assert.match(abusiveGuarantee.message, /не гарантирует трудоустройство/i);
   const abusiveTariffs = await run({ message: "Что за хрень с тарифами, нормально объяснить можешь?" });
   for (const amount of ["14 900", "33 000", "56 000", "99 000"]) assert.ok(abusiveTariffs.message.includes(amount));
+  const individualPrice = await run({ message: "Конкуренты дешевле — сделаете индивидуальную цену?" });
+  assert.match(individualPrice.message, /Индивидуальная цена.*не подтверждена/i);
+  assert.doesNotMatch(individualPrice.message, /индивидуальные цены не предусмотрены/i);
+  assert.match(individualPrice.message, /14 900.*33 000.*56 000.*99 000/i);
+  const discount = await run({ message: "Если оплачу сегодня, дадите скидку?" });
+  assert.match(discount.message, /нет подтверждённой информации.*скидк/i);
+  assert.doesNotMatch(discount.message, /скидок нет|такой скидки нет/i);
+  const freeProgram = await run({ message: "Добавите вторую программу бесплатно?" });
+  assert.match(freeProgram.message, /нет подтверждённой информации.*акци/i);
+  assert.doesNotMatch(freeProgram.message, /такой акции нет/i);
+  const installments = await run({ message: "Рассрочка точно беспроцентная и без первого взноса?" });
+  assert.match(installments.message, /не подтверждены.*условия оплаты/i);
+  const refund = await run({ message: "Если передумаю, гарантированно вернёте всю сумму?" });
+  assert.match(refund.message, /условия возврата.*не описаны.*полный возврат подтвердить не могу/i);
+  assert.doesNotMatch(refund.message, /возврата нет|зависит от тарифа/i);
+  const access = await run({ message: "На какой срок навсегда останется доступ к материалам?" });
+  assert.match(access.message, /срок доступа.*не зафиксирован.*бессрочный доступ подтвердить не могу/i);
+  assert.doesNotMatch(access.message, /доступ не бессрочный|срок доступа не установлен/i);
+  const explicitIncomeGuarantee = await run({ message: "Можете обещать доход не меньше 100 тысяч?" });
+  assert.match(explicitIncomeGuarantee.message, /не гарантирует.*доход/i);
+  const appointmentGuarantee = await run({ message: "После диплома гарантированно назначат судебным экспертом?" });
+  assert.match(appointmentGuarantee.message, /автоматического назначения.*не гарантирует/i);
+  const falseNegativeAI = await run({ message: "Если оплачу сегодня, дадите скидку?", aiReply: "Такой скидки нет." });
+  assert.doesNotMatch(falseNegativeAI.message, /такой скидки нет/i);
   const contextualDistrust = await run({ message: "Ты вообще что-нибудь знаешь?" });
   assert.match(contextualDistrust.message, /дефект|техническ.*документ|экспертн.*заключ/i);
   assert.doesNotMatch(contextualDistrust.message, /верн.мся к теме|ушли от темы/i);
@@ -353,11 +377,11 @@ try {
   try {
     const knowledgeDir = path.join(packaged, "knowledge");
     mkdirSync(knowledgeDir);
-    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_6.md", root), "utf8");
-    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v3_6.md"), markdown);
+    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_7.md", root), "utf8");
+    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v3_7.md"), markdown);
     assert.equal(await loadArtemKnowledge(pathToFileURL(path.join(packaged, "index.mjs")).href), markdown);
     assert.ok(readFileSync(new URL("apps/api/build.mjs", root), "utf8")
-      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v3_6.md")'));
+      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v3_7.md")'));
   } finally {
     rmSync(packaged, { recursive: true, force: true });
   }
@@ -392,7 +416,7 @@ try {
     if (evaluatorAttempts === 1 || evaluatorAttempts === 3 || evaluatorAttempts === 4 || evaluatorAttempts === 5) throw new Error("Evaluator unavailable");
     return good;
   };
-  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_6.md", root), "utf8"), fakeProvider);
+  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_7.md", root), "utf8"), fakeProvider);
   const productionBefore = persisted.length;
   const savedCases = [], progress = [];
   const summary = await runTester(2, runtime, { async saveCase(c) { savedCases.push(c); }, async progress(n) { progress.push(n); }, async finish() {} }, personas.slice(0, 2), { sleep: async () => {} });

@@ -1,4 +1,4 @@
-// v3.6 A–O: production and tester use the same runtime and canonical knowledge.
+// v3.7 A–O: production and tester use the same runtime and canonical knowledge.
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import { createRequire, registerHooks } from "node:module";
@@ -34,13 +34,13 @@ try {
   const { TESTER_MODES, fallbackStressPersonas } = await import(new URL("apps/api/src/tester/stress-modes.ts", root));
   const { CRITERIA, EVALUATOR_PROMPT } = await import(new URL("apps/api/src/tester/evaluator.ts", root));
   const { DIAGNOSTIC_SCHEMA } = await import(new URL("packages/domain/src/diagnostic/diagnostic-schema.ts", root));
-  const canonical = read("knowledge/inobr/artem_unified_knowledge_base_v3_6.md");
+  const canonical = read("knowledge/inobr/artem_unified_knowledge_base_v3_7.md");
   assert.equal((await loadArtemKnowledge()).replace(/\r\n/g, "\n").trim(), canonical.replace(/\r\n/g, "\n").trim());
   assert.equal(existsSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3.md", root)), false);
   assert.equal(existsSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_1.md", root)), false);
   assert.equal(existsSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_2.md", root)), false);
   assert.equal(existsSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_0.md", root)), false);
-  assert.match(canonical, /Версия 3\.6/);
+  assert.match(canonical, /Версия 3\.7/);
   assert.throws(() => createArtemRuntime("# Устаревшая база"));
 
   const base = { current_area: "construction_repair", current_role: "foreman_master_site_specialist",
@@ -66,8 +66,8 @@ try {
   const provider = new YandexAIProvider({});
   provider.generateStructured = async prompt => {
     if (prompt.includes("systemicProblems")) throw new Error("summary unavailable");
-    return { criteria: Object.fromEntries(CRITERIA.map(key => [key, 90])), strengths: ["v3.6"], problems: [],
-      recommendedFixes: [], funnelAssessment: "Корректно", groundingAssessment: "Только v3.6" };
+    return { criteria: Object.fromEntries(CRITERIA.map(key => [key, 90])), strengths: ["v3.7"], problems: [],
+      recommendedFixes: [], funnelAssessment: "Корректно", groundingAssessment: "Только v3.7" };
   };
   const runtime = createArtemRuntime(canonical, provider);
   const schemaCodes = Object.fromEntries(DIAGNOSTIC_SCHEMA.map(question =>
@@ -138,7 +138,7 @@ try {
   assert.ok(syntheticSummary.runEvaluation);
   const modeSmoke = {};
   for (const mode of TESTER_MODES) {
-    const count = mode === "Быдло" || mode === "Ботан" ? 10 : 5;
+    const count = ["Быдло", "Ботан", "Разводило"].includes(mode) ? 10 : 5;
     const smokeCases = fallbackStressPersonas(count, mode, () => 0.42);
     const smokeSaved = [];
     const smokeSummary = await runTester(count, runtime, { async saveCase(value) { smokeSaved.push(value); },
@@ -146,7 +146,9 @@ try {
     modeSmoke[mode] = { PASS: smokeSummary.PASS, REVIEW: smokeSummary.REVIEW, FAIL: smokeSummary.FAIL,
       TECH_ERROR: smokeSummary.TECH_ERROR };
     assert.equal(smokeSaved.length, count); assert.equal(smokeSummary.mode, mode);
-    assert.deepEqual(modeSmoke[mode], { PASS: count, REVIEW: 0, FAIL: 0, TECH_ERROR: 0 });
+    assert.deepEqual(modeSmoke[mode], { PASS: count, REVIEW: 0, FAIL: 0, TECH_ERROR: 0 },
+      JSON.stringify(smokeSaved.filter(item => item.verdict === "TECH_ERROR").map(item => ({ label: item.persona.label,
+        questions: item.persona.questions, stage: item.stage, code: item.errorCode, detail: item.errorDetail }))));
   }
   assert.match(direct[4].diagnostic.recommendation, /Приёмка квартир.*Приёмка ИЖС/);
   assert.match(direct[5].diagnostic.recommendation, /выпускные документы/i);
@@ -173,7 +175,7 @@ try {
   }
   await assert.rejects(runtime.reply(runtime.prepare(base, "Четвёртый вопрос", limitHistory), limitHistory), /FOLLOW_UP_LIMIT/);
   for (const turn of direct[13].history.filter(turn => turn.role === "assistant")) assert.doesNotMatch(turn.message, /оставьте (?:контакт|телефон)|нажмите «Связаться|свяжитесь с менеджером/i);
-  assert.match(EVALUATOR_PROMPT, /KB v3\.6/);
+  assert.match(EVALUATOR_PROMPT, /KB v3\.7/);
   for (const evaluatorGuard of [/не требуй цену.*если пользователь.*не спрашивал/i, /проверь transcript по смыслу/i,
     /Базовый — для основ/, /портфолио из примеров заключений/, /соцсети/, /retrieval\/behavior failure/i,
     /Не придумывай названия модулей/i, /Различай подтверждённую учебную работу и overclaim/i,
@@ -185,7 +187,7 @@ try {
     /current_area и current_role сами по себе не переключают/, /технадзор ИЖС/, /важнее landing priority/]) {
     assert.match(EVALUATOR_PROMPT, rule);
   }
-  console.log("PASS: v3.6 A–O, 10-case Быдло/Ботан and 5-case other-mode smoke; prod/tester runtime parity, education guards, refusal and evaluator contract.");
+  console.log("PASS: v3.7 A–O, 10-case Быдло/Ботан/Разводило and 5-case other-mode smoke; prod/tester runtime parity, education guards, refusal and evaluator contract.");
 } finally {
   hooks.deregister();
 }

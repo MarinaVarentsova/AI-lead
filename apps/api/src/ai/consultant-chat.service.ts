@@ -48,10 +48,16 @@ export class ConsultantChatService {
         /в базе знаний|Пользователь имеет|рекомендация должна|no_professional_education|recommendedTrack|diagnosticContext/i.test(message)) throw new DiagnosticAIError("AI_INVALID_RESULT");
       if (facts.diagnosticContext.includes("no_professional_education") &&
         /(?:рекомендую|вам подходит|можете поступить)[^.!?]{0,60}Стройэксперт/i.test(message)) throw new DiagnosticAIError("AI_INVALID_RESULT");
+      if (/скидк|акци|индивидуальн.*цен|возврат|срок.*доступ|бессроч|перв.*взнос|беспроцент/i.test(facts.question) &&
+        /скидок нет|такой скидки нет|такой акции нет|индивидуальн[^.!?]{0,40}не предусмотр|возврат[^.!?]{0,40}зависит от тарифа|доступ не бессроч|срок доступа не установлен/i.test(message)) {
+        throw new DiagnosticAIError("AI_INVALID_RESULT");
+      }
       return { message: message.trim(), isAI: true, provider: "yandex",
         matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null };
     } catch (error) {
-      return { message: genuineUnknown ? unknownProgramFactReply(facts.question) : consultantFallback(facts, markdown), isAI: false, provider: "fallback",
+      const commercialUnknown = /возврат|доступ.*материал|срок.*доступ|навсегда|бессроч/i.test(facts.question);
+      const fallbackMessage = genuineUnknown && !commercialUnknown ? unknownProgramFactReply(facts.question) : consultantFallback(facts, markdown);
+      return { message: fallbackMessage, isAI: false, provider: "fallback",
         matchedSectionIds: facts.matchedSections.map(section => section.id),
         fallbackReason: genuineUnknown ? "INSUFFICIENT_KNOWLEDGE" : error instanceof DiagnosticAIError ? error.code : "AI_REQUEST_FAILED" };
     }
