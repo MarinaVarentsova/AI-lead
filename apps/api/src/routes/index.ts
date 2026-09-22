@@ -9,6 +9,7 @@ import knowledgeBaseRouter from "./knowledge-base";
 import diagnoseRouter from "./diagnose";
 import consultantChatRouter from "./consultant-chat";
 import eventsRouter from "./events";
+import managerLeadContextRouter from "./manager-lead-context";
 
 import testerRouter from "./tester";
 
@@ -24,6 +25,7 @@ router.use(knowledgeBaseRouter);
 router.use(diagnoseRouter);
 router.use(consultantChatRouter);
 router.use(eventsRouter);
+router.use(managerLeadContextRouter);
 router.use(testerRouter);
 
 export default router;
