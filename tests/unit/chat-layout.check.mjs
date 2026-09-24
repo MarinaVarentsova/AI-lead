@@ -44,7 +44,7 @@ const widget = read("apps/web/src/components/chat-widget.tsx");
 const css = read("apps/web/src/index.css");
 assert.ok(widget.includes('data-testid="chat-bottom-anchor"'));
 assert.ok(widget.includes('min-h-0 min-w-0 flex-1 overflow-y-auto'));
-assert.ok(widget.indexOf('{renderContactSection()}') > widget.indexOf('aria-label="Диалог"'));
+assert.ok(widget.lastIndexOf('{renderContactSection()}') > widget.indexOf('aria-label="Диалог"'));
 assert.ok(widget.indexOf('{renderContactSection()}') < widget.indexOf('ref={bottomRef}'));
 for (const ref of ["currentQuestionRef", "diagnosticResultRef", "postDiagnosticInputRef", "latestAssistantMessageRef", "contactFormRef"]) assert.ok(widget.includes(`ref={${ref}}`) || widget.includes(`? ${ref}`));
 assert.ok(css.includes("scroll-margin-top"));

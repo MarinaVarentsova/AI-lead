@@ -483,6 +483,75 @@
 .consultation-modal .chat-dialogue { background: #f2f6f3; }
 .consultation-modal .chat-widget { color: #152b25; }
 .consultation-modal .chat-widget .bg-white { box-shadow: 0 8px 24px rgba(7,61,51,.055); }
+
+.manager-form-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  overflow-y: auto;
+  background: rgba(3, 35, 29, .62);
+  backdrop-filter: blur(3px);
+}
+.manager-form-modal {
+  position: relative;
+  width: min(100%, 520px);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 34px;
+  border: 1px solid rgba(7, 61, 51, .14);
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(3, 35, 29, .28);
+}
+.manager-form-modal__close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid rgba(7, 61, 51, .18);
+  border-radius: 50%;
+  color: #073d33;
+  background: #f3f7f5;
+}
+.manager-form-modal__close svg { width: 18px; height: 18px; }
+.manager-form-modal__heading { padding-right: 38px; }
+.manager-form-modal__heading > span {
+  color: #a87912;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.manager-form-modal__heading h2 { margin-top: 7px; color: #073d33; font-size: 30px; line-height: 1.12; font-weight: 800; }
+.manager-form-modal__heading p { margin-top: 9px; color: #60736c; font-size: 15px; line-height: 1.5; }
+.manager-form-modal__form { display: grid; gap: 15px; margin-top: 24px; }
+.manager-form-modal__form label { display: grid; gap: 7px; color: #294c43; font-size: 13px; font-weight: 700; }
+.manager-form-modal__form input:not([type="hidden"]) { min-height: 48px; border-color: #9ab8b0; font-size: 16px; }
+.manager-form-modal__form button, .manager-form-modal__state button, .manager-form-modal__success button {
+  min-height: 50px;
+  border-radius: 12px;
+  background: #f5b827;
+  color: #073d33;
+  font-size: 16px;
+  font-weight: 800;
+}
+.manager-form-modal__state, .manager-form-modal__success { display: grid; justify-items: start; gap: 12px; margin-top: 26px; color: #48645c; }
+.manager-form-modal__success svg { width: 34px; height: 34px; color: #0a715e; }
+.manager-form-modal__success h3 { color: #073d33; font-size: 22px; font-weight: 800; }
+.manager-form-modal__error { color: #b42318; font-size: 14px; }
+
+@media (max-width: 640px) {
+  .manager-form-overlay { position: fixed; padding: 12px; }
+  .manager-form-modal { width: 100%; padding: 26px 20px 22px; border-radius: 18px; }
+  .manager-form-modal__heading h2 { font-size: 25px; }
+  .manager-form-modal__close { top: 12px; right: 12px; width: 38px; height: 38px; }
+}
 .chat-dialogue { overflow-anchor: none; scrollbar-gutter: stable; }
 .chat-dialogue > div { min-width: 0; overflow-wrap: anywhere; }
 .chat-widget textarea, .chat-widget input { max-width: 100%; font-size: 16px; }

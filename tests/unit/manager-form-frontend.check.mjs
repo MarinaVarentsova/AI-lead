@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+const root = new URL("../../", import.meta.url);
+const widget = readFileSync(new URL("apps/web/src/components/chat-widget.tsx", root), "utf8");
+const helper = readFileSync(new URL("apps/web/src/lib/manager-form.ts", root), "utf8");
+const css = readFileSync(new URL("apps/web/src/index.css", root), "utf8");
+const route = readFileSync(new URL("apps/api/src/routes/manager-form.ts", root), "utf8");
+
+assert.match(widget, /loadManagerFormContext\(conversationId\)/);
+assert.match(widget, /role="dialog"[\s\S]*aria-modal="true"/);
+assert.match(widget, /formParams\[dealCustomFields\]\[11904802\]/);
+for (const field of ["contactEmail", "contactFullName", "contactPhone"]) assert.match(widget, new RegExp(`value=\\{${field}\\}`));
+assert.match(widget, /setContactPhase\(null\)/); assert.doesNotMatch(widget, /CONTACT_CHANNELS|submitContact/);
+assert.match(helper, /sourceUrl:\s*window\.location\.href/); assert.match(helper, /referrer:\s*document\.referrer/);
+assert.match(route, /submitGetCourseManagerForm[\s\S]*recordEvent\(sessionId, "manager_form_submit"\)/);
+assert.match(css, /\.manager-form-overlay[\s\S]*overflow-y:\s*auto/);
+assert.match(css, /@media \(max-width:\s*640px\)[\s\S]*\.manager-form-modal/);
+console.log("PASS G-L: modal fields, hidden consultation context, close preservation, success-only event and responsive layout wiring.");

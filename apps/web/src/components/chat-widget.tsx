@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Loader2, CheckCircle2, ChevronRight, ArrowUpRight,
+import { Send, Loader2, CheckCircle2, ChevronRight, ArrowUpRight, X,
   FileText, Users, ChartNoAxesColumnIncreasing } from "lucide-react";
 import {
   useCreateSession,
@@ -11,7 +11,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { createChatScroll, createQuestionFocusGate } from "@/lib/chat-scroll";
 import { sendConsultantTurn, createConsultantRequestId, CONSULTANT_ERROR } from "@/lib/consultant-chat";
-import { submitContact, CONTACT_ERROR, type ContactPayload } from "@/lib/contact";
+import { loadManagerFormContext, MANAGER_CONTEXT_ERROR, MANAGER_SUBMIT_ERROR,
+  submitManagerForm } from "@/lib/manager-form";
 import {
   completePersistedDiagnostic, DIAGNOSTIC_ERROR,
   type DiagnosticPayload, type DiagnoseResponse, type StructuredDiagnosticResult,
@@ -35,17 +36,10 @@ type DiagnosticAnswer = {
   raw: string;
 };
 
-type ContactPhase = "channel" | "details" | "submitted";
+type ContactPhase = "loading" | "ready" | "submitted";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CONTACT_CHANNELS = [
-  { code: "call", label: "Звонок", placeholder: "Ваш номер телефона", type: "tel" },
-  { code: "whatsapp", label: "WhatsApp", placeholder: "Номер WhatsApp", type: "tel" },
-  { code: "telegram", label: "Telegram", placeholder: "@username или номер", type: "text" },
-  { code: "max", label: "MAX", placeholder: "Номер телефона", type: "tel" },
-  { code: "email", label: "E-mail", placeholder: "Ваш e-mail", type: "email" },
-];
 const INOBR_LOGO_SRC = "/inobr-logo.jpg";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -170,8 +164,11 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
 
   // Contact form
   const [contactPhase, setContactPhase] = useState<ContactPhase | null>(null);
-  const [selectedChannel, setSelectedChannel] = useState("");
-  const [contactInput, setContactInput] = useState("");
+  const [managerComment, setManagerComment] = useState("");
+  const [managerContextError, setManagerContextError] = useState(false);
+  const [contactEmail, setContactEmail] = useState("");
+  const [contactFullName, setContactFullName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
   const [contactSubmitting, setContactSubmitting] = useState(false);
   const [contactError, setContactError] = useState(false);
   const contactBusy = useRef(false);
@@ -408,45 +405,35 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
   };
 
   const handleManagerContactClick = async () => {
+    setContactPhase("loading");
+    setManagerContextError(false);
+    setContactError(false);
     if (conversationId) {
-      try {
-        await recordManagerContactClick(conversationId);
-      } catch (error) {
+      void recordManagerContactClick(conversationId).catch((error) => {
         console.error("MANAGER_CONTACT_EVENT_FAILED", error);
-      }
+      });
     }
-    showNextStep("contact");
-    setContactPhase((phase) => phase ?? "channel");
+    if (!conversationId) { setManagerContextError(true); return; }
+    try {
+      setManagerComment(await loadManagerFormContext(conversationId));
+      setContactPhase("ready");
+    } catch {
+      setManagerContextError(true);
+    }
   };
 
   // ─── Contact form ────────────────────────────────────────────────────────────
 
-  const handleSelectChannel = (code: string) => {
-    showNextStep("contact");
-    setContactError(false);
-    setSelectedChannel(code);
-    setContactInput("");
-    setContactPhase("details");
-  };
-
   const handleSubmitContact = async () => {
-    if (contactBusy.current || !conversationId || !selectedChannel || !contactInput.trim()) return;
+    if (contactBusy.current || !conversationId || !contactEmail.trim() || !contactFullName.trim() || !contactPhone.trim()) return;
     contactBusy.current = true;
     setContactError(false);
     setContactSubmitting(true);
 
-    const channelCode = selectedChannel;
-    const payload: ContactPayload = {
-      conversationId,
-      contactChannel: channelCode,
-    };
-
-    if (channelCode === "email") payload.email = contactInput.trim();
-    else if (channelCode === "telegram") payload.telegram = contactInput.trim();
-    else payload.phone = contactInput.trim();
-
     try {
-      await submitContact(payload, () => setContactPhase("submitted"));
+      await submitManagerForm({ sessionId: conversationId, email: contactEmail.trim(),
+        fullName: contactFullName.trim(), phone: contactPhone.trim() });
+      setContactPhase("submitted");
     } catch {
       setContactError(true);
     } finally {
@@ -529,112 +516,37 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
 
   const renderContactSection = () => {
     if (!contactPhase) return null;
-
-    if (contactPhase === "submitted") {
-      return (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mx-4 mb-4 rounded-xl border border-border bg-white shadow-sm p-4"
-          data-testid="status-completion"
-        >
-          <div className="flex items-center gap-2 mb-2">
-            <CheckCircle2 className="w-5 h-5 text-primary" />
-            <span className="font-semibold text-[15px]">Заявка принята</span>
-          </div>
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Специалист ИНОБР свяжется с вами в ближайшее время для консультации.
-          </p>
-        </motion.div>
-      );
-    }
-
-    if (contactPhase === "channel") {
-      return (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mx-4 mb-4 rounded-xl border border-border bg-white shadow-sm p-4 space-y-3"
-        >
-          <div>
-            <p className="font-semibold text-[15px] text-foreground mb-0.5">
-              Получить персональную консультацию
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Как вам удобнее продолжить?
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {CONTACT_CHANNELS.map((ch) => (
-              <button
-                key={ch.code}
-                onClick={() => handleSelectChannel(ch.code)}
-                aria-label={`Связаться через ${ch.label}`}
-                className="min-h-[44px] px-4 py-2 text-sm font-medium rounded-xl border-2 border-primary text-primary bg-white hover:bg-secondary transition-all duration-150"
-              >
-                {ch.label}
-              </button>
-            ))}
-          </div>
-        </motion.div>
-      );
-    }
-
-    if (contactPhase === "details") {
-      const ch = CONTACT_CHANNELS.find((c) => c.code === selectedChannel);
-      if (!ch) return null;
-
-      return (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="mx-4 mb-4 rounded-xl border border-border bg-white shadow-sm p-4 space-y-3"
-        >
-          <p className="text-sm text-muted-foreground">
-            Специалист ИНОБР поможет уточнить программу, документы и условия обучения.
-          </p>
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-              {ch.label}
-            </label>
-            <Input
-              type={ch.type}
-              disabled={contactSubmitting}
-              value={contactInput}
-              onChange={(e) => setContactInput(e.target.value)}
-              placeholder={ch.placeholder}
-              aria-label={ch.placeholder}
-              className="bg-white border-border rounded-lg text-sm"
-              autoFocus
-            />
-          </div>
-          {contactError && <p role="alert" className="text-sm text-destructive">{CONTACT_ERROR}</p>}
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="flex-1 rounded-lg text-sm border-border"
-              onClick={() => { showNextStep("contact"); setContactPhase("channel"); }}
-              disabled={contactSubmitting}
-            >
-              Назад
-            </Button>
-            <Button
-              className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm"
-              onClick={handleSubmitContact}
-              disabled={!contactInput.trim() || contactSubmitting}
-            >
-              {contactSubmitting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                "Отправить"
-              )}
-            </Button>
-          </div>
-        </motion.div>
-      );
-    }
-
-    return null;
+    const close = () => setContactPhase(null);
+    return <div className="manager-form-overlay" role="dialog" aria-modal="true" aria-labelledby="manager-form-title">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="manager-form-modal">
+        <button className="manager-form-modal__close" type="button" onClick={close} aria-label="Закрыть форму"><X /></button>
+        <div className="manager-form-modal__heading">
+          <span>Персональная консультация</span>
+          <h2 id="manager-form-title">Связаться с менеджером</h2>
+          <p>Оставьте контакты — специалист ИНОБР свяжется с вами.</p>
+        </div>
+        {contactPhase === "submitted" ? <div className="manager-form-modal__success" data-testid="status-completion">
+          <CheckCircle2 aria-hidden="true" /><h3>Заявка принята</h3>
+          <p>Заявка отправлена. Менеджер свяжется с вами.</p>
+          <Button onClick={close}>Закрыть</Button>
+        </div> : contactPhase === "loading" ? <div className="manager-form-modal__state" role="status">
+          {managerContextError ? <><p role="alert">{MANAGER_CONTEXT_ERROR}</p>
+            <Button onClick={() => void handleManagerContactClick()}>Повторить</Button></> : <><Loader2 className="animate-spin" /> Подготавливаем форму...</>}
+        </div> : <form className="manager-form-modal__form" onSubmit={(event) => { event.preventDefault(); void handleSubmitContact(); }}>
+          <label>Email<Input value={contactEmail} onChange={(event) => setContactEmail(event.target.value)}
+            maxLength={254} type="email" autoComplete="email" required /></label>
+          <label>Имя<Input value={contactFullName} onChange={(event) => setContactFullName(event.target.value)}
+            maxLength={200} autoComplete="name" required /></label>
+          <label>Телефон<Input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)}
+            maxLength={50} type="tel" autoComplete="tel" required /></label>
+          <input type="hidden" name="formParams[dealCustomFields][11904802]" value={managerComment} readOnly />
+          {contactError && <p role="alert" className="manager-form-modal__error">{MANAGER_SUBMIT_ERROR}</p>}
+          <Button type="submit" disabled={contactSubmitting || !contactEmail.trim() || !contactFullName.trim() || !contactPhone.trim()}>
+            {contactSubmitting ? <Loader2 className="animate-spin" /> : "Оставить заявку"}
+          </Button>
+        </form>}
+      </motion.div>
+    </div>;
   };
 
   // ─── Immediate diagnostic initialization ─────────────────────────────────────
@@ -740,10 +652,11 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
                 showNextStep("input"); setPostDiagnosticState("post-diagnostic-ready");
               }}
               onGetConsultation={() => {
-                setRecommendationViewActive(false); onPostDiagnosticViewChange?.("default"); void handleManagerContactClick();
+                void handleManagerContactClick();
               }} />
           )}
         </main>
+        {renderContactSection()}
       </div>
     );
   }
@@ -798,7 +711,6 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
           {contactPhase !== "submitted" && (
             <div className="diagnostic-consultation__complete" ref={limitCtaRef}>
               <Button className="diagnostic-consultation__manager" onClick={() => {
-                setConsultationViewActive(false); onPostDiagnosticViewChange?.("default");
                 void handleManagerContactClick();
               }}><span className="diagnostic-consultation__manager-label">Связаться с менеджером</span>
                 <ArrowUpRight aria-hidden="true" />
@@ -806,6 +718,7 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
             </div>
           )}
         </main>
+        {renderContactSection()}
       </div>
     );
   }
