@@ -34,8 +34,9 @@ export class ConsultantChatService {
     const markdown = this.markdown ?? await loadArtemKnowledge();
     const commercialQuestion = /рассроч|оплат|частями|график.*плат|платить.*месяц|ежемесяч|перв.*взнос|разбить.*плат|сколько стоит|стоимость|какая цена|какие цены|цен[аыуеой]|тариф/i.test(facts.question) &&
       !/скидк|акци|индивидуальн|специальн.*цен|конкурент.*дешев|бесплатн/i.test(facts.question);
+    const directFactQuestion = /какой документ|что (?:я )?получу после обуч|можно (?:ли )?начать|когда (?:можно )?начать|что входит|содержан.*программ|как проходит обуч|формат обуч|есть практика|практическ.*задани|сколько длится|продолжительность/i.test(facts.question);
     const managerContactQuestion = /как со мной свяж|как связаться.*менеджер|свяжется менеджер/i.test(facts.question);
-    if (commercialQuestion || managerContactQuestion) return {
+    if (commercialQuestion || managerContactQuestion || directFactQuestion) return {
       message: consultantFallback(facts, markdown), isAI: false, provider: "fallback",
       matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null,
     };

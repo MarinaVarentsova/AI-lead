@@ -97,7 +97,7 @@ try {
     { role: "user", text: "Какой документ я получу?" },
     { role: "assistant", text: "Диплом о профессиональной переподготовке." },
   ]);
-  assert.equal(context.summarySource, "ai"); assert.equal(context.knowledgeBaseVersion, "inobr-artem-v3.9");
+  assert.equal(context.summarySource, "ai"); assert.equal(context.knowledgeBaseVersion, "inobr-artem-v4.0-followup");
   assert.equal(context.createdAt, "2026-09-22T10:00:00.000Z");
   assert.equal(summaryInput.recommendationText, recommendation);
   assert.equal(JSON.stringify(summaryInput).includes("Скрытая оценка"), false);

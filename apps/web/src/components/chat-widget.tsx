@@ -442,6 +442,18 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
     }
   };
 
+  const closeManagerForm = () => {
+    setContactPhase(null);
+    window.location.href = "https://inobr-expert.ru";
+  };
+
+  useEffect(() => {
+    if (!contactPhase) return;
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") closeManagerForm(); };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [contactPhase]);
+
   // ─── Chips renderer ─────────────────────────────────────────────────────────
 
   const renderChips = (qIndex: number, reviewing = false) => {
@@ -516,10 +528,10 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
 
   const renderContactSection = () => {
     if (!contactPhase) return null;
-    const close = () => setContactPhase(null);
-    return <div className="manager-form-overlay" role="dialog" aria-modal="true" aria-labelledby="manager-form-title">
+    return <div className="manager-form-overlay" role="dialog" aria-modal="true" aria-labelledby="manager-form-title"
+      onMouseDown={(event) => { if (event.target === event.currentTarget) closeManagerForm(); }}>
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="manager-form-modal">
-        <button className="manager-form-modal__close" type="button" onClick={close} aria-label="Закрыть форму"><X /></button>
+        <button className="manager-form-modal__close" type="button" onClick={closeManagerForm} aria-label="Закрыть форму"><X /></button>
         <div className="manager-form-modal__heading">
           <span>Персональная консультация</span>
           <h2 id="manager-form-title">Связаться с менеджером</h2>
@@ -528,7 +540,7 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
         {contactPhase === "submitted" ? <div className="manager-form-modal__success" data-testid="status-completion">
           <CheckCircle2 aria-hidden="true" /><h3>Заявка принята</h3>
           <p>Заявка отправлена. Менеджер свяжется с вами.</p>
-          <Button onClick={close}>Закрыть</Button>
+          <Button onClick={closeManagerForm}>Закрыть</Button>
         </div> : contactPhase === "loading" ? <div className="manager-form-modal__state" role="status">
           {managerContextError ? <><p role="alert">{MANAGER_CONTEXT_ERROR}</p>
             <Button onClick={() => void handleManagerContactClick()}>Повторить</Button></> : <><Loader2 className="animate-spin" /> Подготавливаем форму...</>}

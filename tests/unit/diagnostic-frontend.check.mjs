@@ -171,7 +171,7 @@ try {
   assert.ok(widget.includes("Задать вопрос"));
   assert.ok(widget.includes("<ProgressBar current={4} total={4} />"));
   assert.ok(widget.includes("onClick={onGetConsultation}"));
-  assert.ok(widget.includes("await recordManagerContactClick(conversationId)"));
+  assert.match(widget, /void recordManagerContactClick\(conversationId\)\.catch/);
   assert.ok(widget.includes('onGetConsultation={() => { void handleManagerContactClick(); }}'));
   assert.ok(widget.includes('onPostDiagnosticViewChange?.("consultation")'));
   assert.ok(widget.includes('const consultantAnswerCount = consultantMessages.filter((message) => message.role === "bot").length'));

@@ -337,7 +337,7 @@ try {
     "какое направление", "какой курс", "что подходит", "что лучше для меня", "куда идти", "что в итоге выбрать", "кем быть в итоге что выбрать?"]) {
     const choice = await run({ message, row: qualified });
     assert.notEqual(choice.fallbackReason, "INSUFFICIENT_KNOWLEDGE");
-    assert.match(choice.message, /основная рекомендация — «Стройэксперт»/i);
+    assert.match(choice.message, /Лучше выбрать «Стройэксперт»/i);
     assert.match(choice.message, /дефект|техническ.*документац|экспертн.*заключ/i);
     assert.doesNotMatch(choice.message, /ушли от темы обучения/i);
     for (const id of ["stroyexpert", "admission", "comparison"]) assert.ok(choice.matchedSectionIds.includes(id));
@@ -352,7 +352,7 @@ try {
   assert.ok(!first.message.includes("Если хотите"));
   const history = [{ role: "user", message: "Сколько стоит обучение?" }, { role: "assistant", message: first.message }];
   const second = await run({ row: qualified, history });
-  assert.ok(!second.message.includes("Если хотите"), "No mechanical second-turn CTA in v3");
+  assert.ok(!second.message.includes("Если хотите"), "No mechanical second-turn CTA");
   const third = await run({ row: qualified, history: [...history, { role: "assistant", message: second.message }] });
   assert.ok(!third.message.includes("Если хотите"));
   const refusal = await run({ row: qualified, history, message: "Не хочу оставлять контакт. Сколько стоит обучение?" });
@@ -373,6 +373,20 @@ try {
   const afterManager = await run({ row: qualified, history: [...completeHistory,
     { role: "user", message: "Есть рассрочка?" }, { role: "assistant", message: managerReply.message }], message: "Какой документ?" });
   assert.match(afterManager.message, /диплом/i);
+  for (const repeated of [/я бы рекомендовал/i, /под вашу задачу/i, /с учётом вашего опыта/i, /в вашем случае/i]) {
+    assert.doesNotMatch(afterManager.message, repeated);
+  }
+  const directPrice = await run({ row: qualified, message: "Сколько стоит?" });
+  assert.match(directPrice.message, /₽/); assert.doesNotMatch(directPrice.message, /поможет|полезн|рекоменд/i);
+  const directStart = await run({ row: qualified, message: "Можно начать сейчас?" });
+  assert.match(directStart.message, /дистанционно|индивидуальн.*график/i);
+  assert.doesNotMatch(directStart.message, /под вашу задачу|в вашем случае|рекоменд/i);
+  const directContent = await run({ row: qualified, message: "Что входит в программу?" });
+  assert.match(directContent.message, /материал|задани|итогов.*работ/i);
+  assert.doesNotMatch(directContent.message, /под вашу задачу|в вашем случае|я бы рекомендовал/i);
+  const repeatedChoice = await run({ row: qualified, message: "Что мне лучше выбрать?" });
+  assert.match(repeatedChoice.message, /Стройэксперт/); assert.match(repeatedChoice.message, /дефект|документац|заключени/i);
+  assert.doesNotMatch(repeatedChoice.message, /вы указали|вы выбрали|судя по вашим ответам/i);
   const contactQuestion = await run({ row: qualified, message: "Как со мной свяжется менеджер?" });
   assert.doesNotMatch(contactQuestion.message, /(?:оставьте|напишите|пришлите|укажите|сообщите).*(?:телефон|email|telegram|whatsapp|контакт)/i);
   const mediumPrice = await run({ row: qualified, history: [{ role: "user", message: "Мне подходит Средний" },
@@ -410,11 +424,11 @@ try {
   try {
     const knowledgeDir = path.join(packaged, "knowledge");
     mkdirSync(knowledgeDir);
-    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_9.md", root), "utf8");
-    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v3_9.md"), markdown);
+    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_0_followup.md", root), "utf8");
+    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v4_0_followup.md"), markdown);
     assert.equal(await loadArtemKnowledge(pathToFileURL(path.join(packaged, "index.mjs")).href), markdown);
     assert.ok(readFileSync(new URL("apps/api/build.mjs", root), "utf8")
-      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v3_9.md")'));
+      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v4_0_followup.md")'));
   } finally {
     rmSync(packaged, { recursive: true, force: true });
   }
@@ -449,7 +463,7 @@ try {
     if (evaluatorAttempts === 1 || evaluatorAttempts === 3 || evaluatorAttempts === 4 || evaluatorAttempts === 5) throw new Error("Evaluator unavailable");
     return good;
   };
-  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_9.md", root), "utf8"), fakeProvider);
+  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_0_followup.md", root), "utf8"), fakeProvider);
   const productionBefore = persisted.length;
   const savedCases = [], progress = [];
   const summary = await runTester(2, runtime, { async saveCase(c) { savedCases.push(c); }, async progress(n) { progress.push(n); }, async finish() {} }, personas.slice(0, 2), { sleep: async () => {} });

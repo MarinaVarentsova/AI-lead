@@ -33,7 +33,7 @@ try {
     diagnostic: { currentArea: "Проектирование", currentRole: "Проектировщик", educationStatus: "Высшее",
       targetTasks: "Исследовать дефекты" }, dialogSummary: "Краткое резюме без домыслов.",
     transcript: [{ role: "user", text: "Сколько стоит?" }, { role: "assistant", text: "Подтверждённая цена." }],
-    knowledgeBaseVersion: "inobr-artem-v3.9", createdAt: "2026-09-24T00:00:00.000Z", summarySource: "ai",
+    knowledgeBaseVersion: "inobr-artem-v4.0-followup", createdAt: "2026-09-24T00:00:00.000Z", summarySource: "ai",
   };
   const comment = formatGetCourseManagerComment(context);
   for (const expected of [context.sessionId, context.recommendedProgram, context.recommendationText,
