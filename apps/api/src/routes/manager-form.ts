@@ -27,15 +27,17 @@ router.get("/manager-form/context/:sessionId", async (req, res): Promise<void> =
 });
 
 router.post("/manager-form/submit", async (req, res): Promise<void> => {
-  const { sessionId, email, fullName, phone, sourceUrl, referrer } = req.body ?? {};
+  const { sessionId, email, fullName, phone, personalDataConsent, marketingConsent, sourceUrl, referrer } = req.body ?? {};
   if (!UUID_RE.test(sessionId) || !text(email, 254) || !text(fullName, 200) || !text(phone, 50) ||
-    !text(sourceUrl, 2000) || typeof referrer !== "string" || referrer.length > 2000) {
+    personalDataConsent !== true || marketingConsent !== true || !text(sourceUrl, 2000) ||
+    typeof referrer !== "string" || referrer.length > 2000) {
     res.status(400).json({ error: "MANAGER_FORM_INVALID" }); return;
   }
   try {
     if (!await findSession(sessionId)) { res.status(404).json({ error: "SESSION_NOT_FOUND" }); return; }
     const { comment } = await contextFor(sessionId);
     await submitGetCourseManagerForm({ email: email.trim(), fullName: fullName.trim(), phone: phone.trim(),
+      personalDataConsent: true, marketingConsent: true,
       sourceUrl: sourceUrl.trim(), referrer: referrer.trim() }, comment);
     try { await recordEvent(sessionId, "manager_form_submit"); }
     catch { req.log.error({ sessionId, stage: "manager_form_event", errorCode: "MANAGER_FORM_EVENT_FAILED" },

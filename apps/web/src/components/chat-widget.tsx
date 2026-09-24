@@ -169,6 +169,8 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
   const [contactEmail, setContactEmail] = useState("");
   const [contactFullName, setContactFullName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
+  const [personalDataConsent, setPersonalDataConsent] = useState(false);
+  const [marketingConsent, setMarketingConsent] = useState(false);
   const [contactSubmitting, setContactSubmitting] = useState(false);
   const [contactError, setContactError] = useState(false);
   const contactBusy = useRef(false);
@@ -425,14 +427,15 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
   // ─── Contact form ────────────────────────────────────────────────────────────
 
   const handleSubmitContact = async () => {
-    if (contactBusy.current || !conversationId || !contactEmail.trim() || !contactFullName.trim() || !contactPhone.trim()) return;
+    if (contactBusy.current || !conversationId || !contactEmail.trim() || !contactFullName.trim() || !contactPhone.trim() ||
+      !personalDataConsent || !marketingConsent) return;
     contactBusy.current = true;
     setContactError(false);
     setContactSubmitting(true);
 
     try {
       await submitManagerForm({ sessionId: conversationId, email: contactEmail.trim(),
-        fullName: contactFullName.trim(), phone: contactPhone.trim() });
+        fullName: contactFullName.trim(), phone: contactPhone.trim(), personalDataConsent, marketingConsent });
       setContactPhase("submitted");
     } catch {
       setContactError(true);
@@ -551,9 +554,20 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
             maxLength={200} autoComplete="name" required /></label>
           <label>Телефон<Input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)}
             maxLength={50} type="tel" autoComplete="tel" required /></label>
+          <label className="manager-form-modal__consent">
+            <input type="checkbox" name="formParams[dealCustomFields][11904802]" checked={personalDataConsent}
+              onChange={(event) => setPersonalDataConsent(event.target.checked)} required />
+            <span>Я соглашаюсь на обработку персональных данных в соответствии с политикой конфиденциальности. <a href="/soglasie" target="_blank" rel="noreferrer">Согласие</a> и <a href="/politika" target="_blank" rel="noreferrer">политика</a>.</span>
+          </label>
+          <label className="manager-form-modal__consent">
+            <input type="checkbox" name="formParams[dealCustomFields][11904803]" checked={marketingConsent}
+              onChange={(event) => setMarketingConsent(event.target.checked)} required />
+            <span>Я соглашаюсь на получение рекламных рассылок, звонков и сообщений. <a href="/page120" target="_blank" rel="noreferrer">Подробнее</a>.</span>
+          </label>
           <input type="hidden" name="formParams[dealCustomFields][22041910]" value={managerComment} readOnly />
           {contactError && <p role="alert" className="manager-form-modal__error">{MANAGER_SUBMIT_ERROR}</p>}
-          <Button type="submit" disabled={contactSubmitting || !contactEmail.trim() || !contactFullName.trim() || !contactPhone.trim()}>
+          <Button type="submit" disabled={contactSubmitting || !contactEmail.trim() || !contactFullName.trim() ||
+            !contactPhone.trim() || !personalDataConsent || !marketingConsent}>
             {contactSubmitting ? <Loader2 className="animate-spin" /> : "Оставить заявку"}
           </Button>
         </form>}

@@ -533,6 +533,9 @@
 .manager-form-modal__form { display: grid; gap: 15px; margin-top: 24px; }
 .manager-form-modal__form label { display: grid; gap: 7px; color: #294c43; font-size: 13px; font-weight: 700; }
 .manager-form-modal__form input:not([type="hidden"]) { min-height: 48px; border-color: #9ab8b0; font-size: 16px; }
+.manager-form-modal__form .manager-form-modal__consent { grid-template-columns: 20px 1fr; align-items: start; gap: 10px; font-weight: 500; line-height: 1.4; }
+.manager-form-modal__consent input[type="checkbox"] { width: 20px; height: 20px; min-height: 20px; margin: 1px 0 0; accent-color: #08705d; }
+.manager-form-modal__consent a { color: #08705d; text-decoration: underline; text-underline-offset: 2px; }
 .manager-form-modal__form button, .manager-form-modal__state button, .manager-form-modal__success button {
   min-height: 50px;
   border-radius: 12px;

@@ -12,7 +12,8 @@ export async function loadManagerFormContext(sessionId: string): Promise<string>
   return data.comment;
 }
 
-export async function submitManagerForm(input: { sessionId: string; email: string; fullName: string; phone: string }): Promise<void> {
+export async function submitManagerForm(input: { sessionId: string; email: string; fullName: string; phone: string;
+  personalDataConsent: boolean; marketingConsent: boolean }): Promise<void> {
   const response = await apiFetch("/api/manager-form/submit", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ ...input, sourceUrl: window.location.href, referrer: document.referrer }) });
   if (response.status !== 201) throw new Error(MANAGER_SUBMIT_ERROR);

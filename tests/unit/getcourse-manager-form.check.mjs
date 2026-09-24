@@ -48,18 +48,22 @@ try {
     return new Response('window.requestTime = 1770000000; window.requestSimpleSign = "abcdef012345";', { status: 200 });
   };
   await submitGetCourseManagerForm({ email: "test@example.com", fullName: "Тест", phone: "+70000000000",
+    personalDataConsent: true, marketingConsent: true,
     sourceUrl: "https://artem.inobr-expert.ru/", referrer: "https://inobr.ru.com/" }, comment, fetcher);
   assert.equal(requests.length, 2); assert.equal(requests[0].url, GETCOURSE_ENDPOINT);
   const body = requests[1].init.body;
   assert.equal(body.get("formParams[email]"), "test@example.com");
   assert.equal(body.get("formParams[full_name]"), "Тест"); assert.equal(body.get("formParams[phone]"), "+70000000000");
+  assert.equal(body.get("formParams[dealCustomFields][11904802]"), "1");
+  assert.equal(body.get("formParams[dealCustomFields][11904803]"), "1");
   assert.equal(body.get("formParams[dealCustomFields][22041910]"), comment);
-  assert.equal(body.has(`formParams[dealCustomFields][${["119", "04802"].join("")}]`), false);
+  assert.equal(body.get("pdpConfirmCheckbox"), "on");
   assert.equal(body.get("requestTime"), "1770000000"); assert.equal(body.get("requestSimpleSign"), "abcdef012345");
   assert.equal(body.get("__gc__internal__form__helper"), "https://artem.inobr-expert.ru/");
   assert.equal(body.get("__gc__internal__form__helper_ref"), "https://inobr.ru.com/");
 
   await assert.rejects(() => submitGetCourseManagerForm({ email: "a@b.c", fullName: "A", phone: "+7",
+    personalDataConsent: true, marketingConsent: true,
     sourceUrl: "https://example.test", referrer: "" }, comment,
     async (_url, init = {}) => init.method === "POST" ? new Response("Заявка не отправлена", { status: 200 })
       : new Response('window.requestTime=1;window.requestSimpleSign="abc";', { status: 200 })), /GETCOURSE_SUBMIT_FAILED/);

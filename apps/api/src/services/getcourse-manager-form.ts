@@ -9,6 +9,8 @@ export interface GetCourseManagerFormInput {
   email: string;
   fullName: string;
   phone: string;
+  personalDataConsent: true;
+  marketingConsent: true;
   sourceUrl: string;
   referrer: string;
 }
@@ -55,7 +57,10 @@ export async function submitGetCourseManagerForm(input: GetCourseManagerFormInpu
     "formParams[email]": input.email,
     "formParams[full_name]": input.fullName,
     "formParams[phone]": input.phone,
+    "formParams[dealCustomFields][11904802]": "1",
+    "formParams[dealCustomFields][11904803]": "1",
     [`formParams[dealCustomFields][${GETCOURSE_COMMENT_FIELD}]`]: comment,
+    pdpConfirmCheckbox: "on",
     "formParams[setted_offer_id]": "",
     "__gc__internal__form__helper": input.sourceUrl,
     "__gc__internal__form__helper_ref": input.referrer,

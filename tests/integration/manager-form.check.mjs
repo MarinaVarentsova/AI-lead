@@ -75,7 +75,11 @@ try {
     return new Response('window.requestTime=1;window.requestSimpleSign="abc";', { status: 200 });
   };
   const req = { body: { sessionId, email: "test-artem-dialog@example.com", fullName: "ТЕСТ Артем_Экспертович_ДИАЛОГ2",
-    phone: "+70000000000", sourceUrl: "https://artem.inobr-expert.ru/", referrer: "" }, log };
+    phone: "+70000000000", personalDataConsent: true, marketingConsent: true,
+    sourceUrl: "https://artem.inobr-expert.ru/", referrer: "" }, log };
+  const missingConsentRes = response();
+  await postHandler({ ...req, body: { ...req.body, personalDataConsent: false } }, missingConsentRes);
+  assert.equal(missingConsentRes.statusCode, 400);
   await recordEvent(sessionId, "manager_contact_click");
   let submitRes = response(); await postHandler(req, submitRes); assert.equal(submitRes.statusCode, 502);
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_form_submit'")).rows[0].count, 0);
@@ -97,11 +101,13 @@ try {
   assert.equal(postedBody.get("formParams[email]"), "test-artem-dialog@example.com");
   assert.equal(postedBody.get("formParams[full_name]"), "ТЕСТ Артем_Экспертович_ДИАЛОГ2");
   assert.equal(postedBody.get("formParams[phone]"), "+70000000000");
+  assert.equal(postedBody.get("formParams[dealCustomFields][11904802]"), "1");
+  assert.equal(postedBody.get("formParams[dealCustomFields][11904803]"), "1");
+  assert.equal(postedBody.get("pdpConfirmCheckbox"), "on");
   const submittedComment = postedBody.get("formParams[dealCustomFields][22041910]");
   assert.ok(submittedComment); assert.match(submittedComment, /Сколько стоит\?/);
   for (const part of ["Рекомендованная программа:", "Рекомендация Артёма:", "Диагностика:",
     "Краткое резюме:", "Диалог:", "Session ID:", "Версия базы знаний:"]) assert.ok(submittedComment.includes(part));
-  assert.equal(postedBody.has(`formParams[dealCustomFields][${["119", "04802"].join("")}]`), false);
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_contact_click'")).rows[0].count, 1);
   globalThis.fetch = originalFetch;
   if (process.env.GETCOURSE_REAL_SUBMIT === "1") console.log(JSON.stringify({ dialogueField: "formParams[dealCustomFields][22041910]",
