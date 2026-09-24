@@ -175,12 +175,12 @@ try {
   assert.ok(widget.includes('onGetConsultation={() => { void handleManagerContactClick(); }}'));
   assert.ok(widget.includes('onPostDiagnosticViewChange?.("consultation")'));
   assert.ok(widget.includes('const consultantAnswerCount = consultantMessages.filter((message) => message.role === "bot").length'));
-  assert.ok(widget.includes('const questionNumber = Math.min(consultantAnswerCount + 1, 3)'));
-  assert.ok(widget.includes('const canAskQuestion = consultantAnswerCount < 3 && !consultantLimitReached'));
-  assert.ok(widget.includes('Вопрос {questionNumber} из 3'));
+  assert.ok(widget.includes('const questionNumber = consultantAnswerCount + 1'));
+  assert.ok(!widget.includes('consultantLimitReached'));
+  assert.ok(widget.includes('Вопрос {questionNumber}'));
   assert.ok(widget.includes('className="diagnostic-consultation__history"'));
   assert.ok(widget.includes('setConsultantMessages((previous) => [...previous, { id: uid(), role: "bot", content: reply.message }])'));
-  assert.match(widget, /canAskQuestion && \([\s\S]*diagnostic-consultation__composer/);
+  assert.ok(widget.includes('className="diagnostic-consultation__composer"'));
   assert.match(widget, /contactPhase !== "submitted"[\s\S]*diagnostic-consultation__complete/);
   assert.match(widget, /diagnostic-consultation__manager[\s\S]*handleManagerContactClick/);
   const styles = readFileSync(new URL("apps/web/src/index.css", root), "utf8");

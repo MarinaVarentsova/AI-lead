@@ -8,7 +8,6 @@ import { diagnosticProgram, currentProgram, contactRefused } from "./artem-polic
 import { loadArtemKnowledge } from "./artem-knowledge";
 import { redactConsultantQuestion } from "./consultant-chat.prompt";
 export { loadArtemKnowledge } from "./artem-knowledge";
-export const MAX_FOLLOW_UPS = 3;
 export const followUpCount = (history: ConsultantExchange[]) => history.filter(row => row.role === "user").length;
 
 export function createArtemRuntime(markdown: string, provider = new YandexAIProvider()) {
@@ -41,14 +40,12 @@ export function createArtemRuntime(markdown: string, provider = new YandexAIProv
     },
     async reply(facts: ReturnType<ConsultantChatService["prepare"]>, history: ConsultantExchange[]) {
       const count = followUpCount(history);
-      if (count >= MAX_FOLLOW_UPS) throw new Error("FOLLOW_UP_LIMIT");
       const response = await consultant.generate({ ...facts, history });
       response.message = applyConsultantFunnel(response.message, facts.question, history,
         facts.diagnosticContext.includes("Приоритет — Стройэксперт"), response.fallbackReason === "INSUFFICIENT_KNOWLEDGE");
-      const limitReached = count + 1 >= MAX_FOLLOW_UPS;
       // No automatic third-turn CTA: a refused contact remains refused.
       if (contactRefused(facts.question, history)) response.message = applyConsultantFunnel(response.message, facts.question, history, false, false);
-      return { ...response, questionsUsed: count + 1, questionsRemaining: MAX_FOLLOW_UPS - count - 1, limitReached };
+      return { ...response, questionsUsed: count + 1 };
     },
   };
 }

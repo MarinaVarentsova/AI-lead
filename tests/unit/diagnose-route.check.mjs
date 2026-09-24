@@ -172,8 +172,8 @@ try {
   assert.equal(fallback.provider, "fallback");
   assert.equal(fallback.fallbackReason, "AI_CONFIGURATION_ERROR");
   assert.equal(fallback.structuredResult.recommendedTrack, "construction_expertise");
-  assert.match(fallback.structuredResult.recommendation, /У вас|Ваш/);
-  assert.doesNotMatch(fallback.structuredResult.recommendation, /Пользователь имеет|Рекомендация должна учитывать/);
+  assert.match(fallback.structuredResult.recommendation, /Стройэксперт.*дефект|дефект.*Стройэксперт/i);
+  assert.doesNotMatch(fallback.structuredResult.recommendation, /Пользователь имеет|Рекомендация должна учитывать|Вы указали|Ваша задача\s*[—:-]|Судя по вашим ответам/i);
   for (const body of [null, {}, { conversationId: "invalid" }, { conversationId: 123 }]) {
     await run({ body, status: 400 });
     assert.equal(state.reads, 0);

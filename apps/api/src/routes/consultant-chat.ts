@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { randomUUID } from "node:crypto";
 import { DiagnosticValidationError } from "@workspace/domain/diagnostic";
 import { ConsultantValidationError } from "@workspace/domain/consultant";
-import { getArtemRuntime, followUpCount, MAX_FOLLOW_UPS } from "../ai/artem-runtime";
+import { getArtemRuntime, followUpCount } from "../ai/artem-runtime";
 import { appendDialogueLocked, consultationRows, diagnosticAnswersFromDialogue, readDialogue, withDialogueLock } from "../persistence/artem-repository";
 const router: IRouter = Router();
 const uuid = (value: unknown): value is string => typeof value === "string" && /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value);
@@ -38,10 +38,8 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
       if (existing >= 0) {
         const reply = history[existing + 1];
         if (history[existing]!.message !== message || reply?.role !== "assistant") return { status: 409, body: { error: "REQUEST_ID_CONFLICT" } };
-        return { status: 200, body: { message: reply.message, replayed: true, questionsUsed: count,
-          questionsRemaining: Math.max(0, MAX_FOLLOW_UPS - count), limitReached: count >= MAX_FOLLOW_UPS } };
+        return { status: 200, body: { message: reply.message, replayed: true, questionsUsed: count } };
       }
-      if (count >= MAX_FOLLOW_UPS) return { status: 409, body: { error: "FOLLOW_UP_LIMIT", limitReached: true, questionsRemaining: 0 } };
       req.log.info({ requestId, stage: phase, provider }, "CONSULTANT_CONTEXT_LOADED");
       phase = "load_runtime";
       const runtime = await getArtemRuntime();

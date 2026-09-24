@@ -3,8 +3,6 @@ import { apiFetch } from "./api";
 export const CONSULTANT_ERROR = "Не удалось получить ответ. Попробуйте ещё раз.";
 export const CONSULTANT_LENGTH_ERROR = "Вопрос получился слишком длинным. Сократите его до 1000 знаков.";
 
-export class ConsultantLimitError extends Error {}
-
 /** getRandomValues is available on HTTP too; randomUUID requires a secure context. */
 export function createConsultantRequestId(): string {
   const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
@@ -14,7 +12,7 @@ export function createConsultantRequestId(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-export async function sendConsultantTurn(conversationId: string, message: string, requestId?: string): Promise<{ message: string; limitReached: boolean }> {
+export async function sendConsultantTurn(conversationId: string, message: string, requestId?: string): Promise<{ message: string }> {
   const normalized = message.trim();
   if (!normalized) throw new Error(CONSULTANT_ERROR);
   if (normalized.length > 1000) throw new Error(CONSULTANT_LENGTH_ERROR);
@@ -33,16 +31,12 @@ export async function sendConsultantTurn(conversationId: string, message: string
     if (!requestId || attempt > 0 || ![502, 503, 504].includes(response.status)) break;
   }
   if (!response) throw new Error(CONSULTANT_ERROR);
-  if (response.status === 409) {
-    const error = await response.json();
-    if (error?.error === "FOLLOW_UP_LIMIT") throw new ConsultantLimitError("FOLLOW_UP_LIMIT");
-    throw new Error(CONSULTANT_ERROR);
-  }
+  if (response.status === 409) throw new Error(CONSULTANT_ERROR);
   if (!response.ok) throw new Error(CONSULTANT_ERROR);
   const data: unknown = await response.json();
   if (!data || typeof data !== "object" || !("message" in data) ||
     typeof data.message !== "string" || !data.message.trim()) throw new Error(CONSULTANT_ERROR);
-  return { message: data.message, limitReached: "limitReached" in data && data.limitReached === true };
+  return { message: data.message };
 }
 
 export async function sendConsultantMessage(conversationId: string, message: string): Promise<string> {

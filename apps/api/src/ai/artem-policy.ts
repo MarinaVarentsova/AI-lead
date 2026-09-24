@@ -22,12 +22,12 @@ export function personalizedBenefit(facts: DiagnosticFactsPacket, program: Artem
   const { currentArea, currentRole } = facts.answerCodes;
   if (program === "construction_expertise" &&
     (currentArea === "design_estimates" || currentRole === "engineer_designer_estimator")) {
-    return `С учётом ответа «${facts.currentArea}» программа помогает расширить работу с проектной и технической документацией: исследовать дефекты и готовить экспертные заключения.`;
+    return "С учётом опыта в проектировании программа особенно полезна для работы с проектной и технической документацией, исследования дефектов и подготовки экспертных заключений.";
   }
   if (program === "construction_expertise" && currentArea === "construction_control") {
-    return `С учётом ответа «${facts.currentArea}» программа помогает перейти от фиксации качества к исследованию причин дефектов и подготовке экспертных выводов и заключений.`;
+    return "Для задач строительного контроля программа помогает перейти от фиксации качества к исследованию причин дефектов и подготовке экспертных выводов и заключений.";
   }
-  return `Для вашей роли «${facts.currentRole}» это даёт конкретное применение: ${BENEFITS[program].charAt(0).toLowerCase()}${BENEFITS[program].slice(1)}`;
+  return BENEFITS[program];
 }
 
 function professionalBenefit(program: ArtemProgram, context: string): string | null {
@@ -87,16 +87,9 @@ export function commercialText(markdown: string, program: ArtemProgram, question
   if (/9\s*330/.test(question) && program === "construction_expertise") selected = rows.filter(row => row[0] === "Премиум");
   if (!rows.length) {
     const amounts = block.match(/\d[\d ]* ₽/g) ?? [];
-    return `«${title}»: полная стоимость обучения — ${amounts.join(", ")}. Условия рассрочки требуют уточнения.`;
+    return `Стоимость программы «${title}» — ${amounts.join(", ")}.`;
   }
-  return `«${title}»: ` + selected.map(row => {
-    const payment = row[2]?.includes("×") ? `; оплата — ${row[2]}` : "";
-    return `${row[0]} — полная стоимость ${row[1]}${payment}`;
-  }).join("; ") + "." +
-    (program === "apartment_acceptance" ? " Условия рассрочки нужно уточнить." : "") +
-    (/9\s*330/.test(question) && program === "construction_expertise"
-      ? " Прежний платёж 9 330 ₽ больше не является актуальным; график оплаты тарифа «Премиум» нужно подтвердить."
-      : "");
+  return `Стоимость программы «${title}»: ` + selected.map(row => `${row[0]} — ${row[1]}`).join("; ") + ".";
 }
 
 export function fallbackReply(markdown: string, program: ArtemProgram, question: string,
@@ -106,6 +99,13 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
   const userHistory = history.filter(row => row.role === "user").map(row => row.message).join(" ");
   const tariffContext = userHistory + " " + question;
   const refused = contactRefused(question, history);
+  const paymentIntent = /рассроч|оплат(?:а|ить|ить частями|ы|е|ой|у)?|частями|график.*плат|платить.*месяц|ежемесяч|перв.*взнос|разбить.*плат|беспроцент|банковск.*услов/.test(q);
+  const priceIntent = /сколько стоит|стоимость|какая цена|какие цены|цен[аыуеой]|тариф/.test(q);
+  if (paymentIntent) {
+    const price = priceIntent ? commercialText(markdown, program, tariffContext) + " " : "";
+    return price + "Условия оплаты и рассрочки лучше уточнить у менеджера.";
+  }
+  if (/как со мной свяж|как связаться.*менеджер|свяжется менеджер/.test(q)) return "Для обращения используйте кнопку «Связаться с менеджером» в интерфейсе.";
   if (/телефон.*не хочу|не хочу.*телефон|не звоните|просто отвечайте/.test(q) && !/цен|стоит|документ/.test(q)) return "Хорошо, продолжим здесь.";
   if (/индивидуальн.*цен|специальн.*цен|конкурент.*дешев/.test(q)) return "Индивидуальная цена в моей базе не подтверждена. " +
     commercialText(markdown, program, tariffContext) + " Возможность специального предложения нужно уточнить у менеджера.";
@@ -113,7 +113,6 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
     " Актуальные специальные предложения, если они есть, нужно уточнить у менеджера.";
   if (/возврат|верн.*(?:сумм|деньг)|передумаю/.test(q)) return "Условия возврата в моей базе не описаны, поэтому полный возврат подтвердить не могу. Этот параметр лучше уточнить до оплаты.";
   if (/срок.*доступ|доступ.*материал|навсегда|бессроч/.test(q)) return "Точный срок доступа к материалам в моей базе не зафиксирован, поэтому бессрочный доступ подтвердить не могу.";
-  if (/беспроцент|перв.*взнос|банковск.*услов/.test(q)) return "Беспроцентная рассрочка и отсутствие первого взноса в моей базе не подтверждены. Точные условия оплаты нужно уточнить.";
   if (/(?:гарант|обещ).*?(?:работ|доход|заказ|трудоустр)|гаранти[юя] работ/.test(q) || /заказ|клиент|трудоустр/.test(q)) {
     const managerCondition = /currentRole=manager_owner/.test(diagnosticContext)
       ? " Если у компании уже есть заказчики, подрядчики или партнёры, можно начать с предложения им ограниченного круга экспертных задач."
@@ -127,7 +126,7 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
     return "Конечно. Если появятся вопросы по программе, стоимости или документам — помогу разобраться.";
   }
   if (/посоветова/.test(q)) return BENEFITS[program] + " " + commercialText(markdown, program, tariffContext);
-  if (/дорого|стоим|стоит|(?:^|[^а-я])цен|рассроч|тариф|деньг|9\s*330/.test(q)) {
+  if (/дорого|стоим|стоит|(?:^|[^а-я])цен|тариф|деньг|9\s*330/.test(q)) {
     const commercial = commercialText(markdown, program, tariffContext);
     return /дорого|конск|деньг|охренел/.test(q) ? commercial + " " + BENEFITS[program] : commercial;
   }

@@ -191,7 +191,7 @@ try {
   for (const message of ["Сколько стоит обучение?", "Можно ли с экономическим дипломом?", "Можно потом работать судебным экспертом?", "Где брать заказы?"]) {
     const result = await run({ message });
     assert.equal(result.isAI, false);
-    assert.equal(result.fallbackReason, "AI_CONFIGURATION_ERROR");
+    assert.ok(result.fallbackReason === "AI_CONFIGURATION_ERROR" || result.fallbackReason === null);
     examples.push({ question: message, answer: result.message });
   }
   for (const amount of ["14 900", "33 000", "56 000", "99 000"]) assert.ok(examples[0].answer.includes(amount));
@@ -235,7 +235,7 @@ try {
   assert.ok(examples[0].answer.includes("14 900"), "known price must be answered before any CTA");
   const formerPremiumPayment = await run({ message: "9 330 — это весь курс?" });
   assert.match(formerPremiumPayment.message, /Премиум.*56 000/i);
-  assert.match(formerPremiumPayment.message, /9 330.*не является актуальным/i);
+  assert.doesNotMatch(formerPremiumPayment.message, /9 330|график|плат[её]ж/i);
   assert.doesNotMatch(formerPremiumPayment.message, /один из шести платежей/i);
   const school = await run({ row: { ...fixture.row, educationStatus: "no_higher_or_secondary_vocational" } });
   assert.ok(school.message.includes("Приёмка квартир"));
@@ -251,11 +251,13 @@ try {
   await run({ row: null, status: 404 });
   await run({ row: { ...fixture.row, targetTasks: null }, status: 400 });
   const ai = await run({ aiReply: "Стоимость зависит от выбранного тарифа и состава программы. Предусмотрена рассрочка на шесть месяцев." });
-  assert.equal(ai.isAI, true);
+  assert.equal(ai.isAI, false);
+  assert.match(ai.message, /14 900.*33 000.*56 000.*99 000/i);
+  assert.doesNotMatch(ai.message, /шесть месяцев|6\s*[×x]/i);
   await run({ message: "Меня зовут Иван Петров. +79999999999 test@example.org @private_user. Сколько стоит обучение?",
     row: { ...fixture.row, name: "PRIVATE_NAME", phone: "PRIVATE_PHONE", goalRaw: "PRIVATE_RAW" } });
   for (const privateValue of ["Иван", "Петров", "79999999999", "test@example.org", "@private_user", "PRIVATE_"]) {
-    assert.ok(!JSON.stringify(captured).includes(privateValue));
+    assert.ok(!JSON.stringify(captured ?? {}).includes(privateValue));
     assert.ok(!JSON.stringify(state.logs).includes(privateValue));
   }
   await run({ saveFailure: true, status: 500 });
@@ -296,7 +298,8 @@ try {
   assert.match(freeProgram.message, /нет подтверждённой информации.*акци/i);
   assert.doesNotMatch(freeProgram.message, /такой акции нет/i);
   const installments = await run({ message: "Рассрочка точно беспроцентная и без первого взноса?" });
-  assert.match(installments.message, /не подтверждены.*условия оплаты/i);
+  assert.equal(installments.message, "Условия оплаты и рассрочки лучше уточнить у менеджера.");
+  assert.doesNotMatch(installments.message, /\d|телефон|email|telegram|whatsapp|задайте/i);
   const refund = await run({ message: "Если передумаю, гарантированно вернёте всю сумму?" });
   assert.match(refund.message, /условия возврата.*не описаны.*полный возврат подтвердить не могу/i);
   assert.doesNotMatch(refund.message, /возврата нет|зависит от тарифа/i);
@@ -324,7 +327,7 @@ try {
   assert.equal(unknownReply.fallbackReason, null);
   assert.ok(!unknownReply.message.includes("солнечно"));
   await run({ message: "Паспорт 1234 567890. Сколько стоит Стройэксперт?" });
-  assert.ok(!JSON.stringify(captured).includes("567890"));
+  assert.ok(!JSON.stringify(captured ?? {}).includes("567890"));
   assert.ok(persisted.length >= 8);
   assert.deepEqual(persisted.slice(0, 8).map(row => row.role), ["user", "assistant", "user", "assistant", "user", "assistant", "user", "assistant"]);
   assert.ok(persisted.slice(0, 8).every(row => row.conversationId === fixture.conversationId && row.step === "post_diagnostic_chat"));
@@ -360,11 +363,35 @@ try {
   const schoolChoice = await run({ row: { ...qualified, educationStatus: "no_higher_or_secondary_vocational" }, message: "что выбрать" });
   assert.ok(!schoolChoice.message.includes("рассмотреть «Стройэксперт»"));
   assert.ok(schoolChoice.matchedSectionIds.includes("apartment_acceptance"));
-  const completeHistory = [1,2].flatMap(n => [{ id: `u${n}`, role: "user", message: "Цена?" }, { id: `a${n}`, role: "assistant", message: "Ответ по программе." }]);
+  const completeHistory = [1,2,3,4,5].flatMap(n => [{ id: `u${n}`, role: "user", message: "Цена?" }, { id: `a${n}`, role: "assistant", message: "Ответ по программе." }]);
   const finalReply = await run({ row: qualified, history: completeHistory });
-  assert.equal(finalReply.questionsUsed, 3); assert.equal(finalReply.limitReached, true);
-  assert.ok(!finalReply.message.includes("Дальше можно продолжить с менеджером"), "No mechanical third-turn CTA in v3");
-  await run({ row: qualified, history: [...completeHistory, { role: "user", message: "Третий" }, { role: "assistant", message: "Третий ответ" }], status: 409 });
+  assert.equal(finalReply.questionsUsed, 6); assert.ok(finalReply.message);
+  assert.ok(!("limitReached" in finalReply));
+  assert.ok(!finalReply.message.includes("Дальше можно продолжить с менеджером"), "No mechanical terminal CTA");
+  const managerReply = await run({ row: qualified, history: completeHistory, message: "Есть рассрочка?" });
+  assert.equal(managerReply.message, "Условия оплаты и рассрочки лучше уточнить у менеджера.");
+  const afterManager = await run({ row: qualified, history: [...completeHistory,
+    { role: "user", message: "Есть рассрочка?" }, { role: "assistant", message: managerReply.message }], message: "Какой документ?" });
+  assert.match(afterManager.message, /диплом/i);
+  const contactQuestion = await run({ row: qualified, message: "Как со мной свяжется менеджер?" });
+  assert.doesNotMatch(contactQuestion.message, /(?:оставьте|напишите|пришлите|укажите|сообщите).*(?:телефон|email|telegram|whatsapp|контакт)/i);
+  const mediumPrice = await run({ row: qualified, history: [{ role: "user", message: "Мне подходит Средний" },
+    { role: "assistant", message: "Обсудим Средний." }], message: "Сколько стоит?" });
+  assert.match(mediumPrice.message, /Средний.*33 000/i); assert.doesNotMatch(mediumPrice.message, /6\s*[×x]|5 500|рассроч/i);
+  const monthly = await run({ row: qualified, message: "Сколько платить в месяц?" });
+  assert.equal(monthly.message, "Условия оплаты и рассрочки лучше уточнить у менеджера.");
+  const mixedPrice = await run({ row: qualified, history: [{ role: "user", message: "Мне подходит Средний" },
+    { role: "assistant", message: "Обсудим Средний." }], message: "Сколько стоит и можно ли частями?" });
+  assert.match(mixedPrice.message, /33 000/); assert.match(mixedPrice.message, /условия оплаты и рассрочки лучше уточнить/i);
+  assert.doesNotMatch(mixedPrice.message, /5 500|6\s*[×x]/i);
+  const housePro = await run({ row: qualified,
+    history: [{ role: "user", message: "Строительный контроль ИЖС, тариф Профи" }, { role: "assistant", message: "Обсудим Профи." }],
+    message: "Сколько стоит тариф Профи?" });
+  assert.match(housePro.message, /Профи.*150 000/i); assert.doesNotMatch(housePro.message, /3\s*[×x]\s*50 000/);
+  const housePayment = await run({ row: qualified,
+    history: [{ role: "user", message: "Строительный контроль ИЖС, тариф Профи" }, { role: "assistant", message: "Обсудим Профи." }],
+    message: "Как оплатить Профи?" });
+  assert.equal(housePayment.message, "Условия оплаты и рассрочки лучше уточнить у менеджера.");
   const beforeFailedPair = persisted.length;
   await run({ row: qualified, assistantFailure: true, status: 500 });
   assert.equal(persisted.length, beforeFailedPair, "failed assistant insert rolls back the user message");
@@ -383,11 +410,11 @@ try {
   try {
     const knowledgeDir = path.join(packaged, "knowledge");
     mkdirSync(knowledgeDir);
-    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_8.md", root), "utf8");
-    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v3_8.md"), markdown);
+    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_9.md", root), "utf8");
+    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v3_9.md"), markdown);
     assert.equal(await loadArtemKnowledge(pathToFileURL(path.join(packaged, "index.mjs")).href), markdown);
     assert.ok(readFileSync(new URL("apps/api/build.mjs", root), "utf8")
-      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v3_8.md")'));
+      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v3_9.md")'));
   } finally {
     rmSync(packaged, { recursive: true, force: true });
   }
@@ -422,7 +449,7 @@ try {
     if (evaluatorAttempts === 1 || evaluatorAttempts === 3 || evaluatorAttempts === 4 || evaluatorAttempts === 5) throw new Error("Evaluator unavailable");
     return good;
   };
-  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_8.md", root), "utf8"), fakeProvider);
+  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_9.md", root), "utf8"), fakeProvider);
   const productionBefore = persisted.length;
   const savedCases = [], progress = [];
   const summary = await runTester(2, runtime, { async saveCase(c) { savedCases.push(c); }, async progress(n) { progress.push(n); }, async finish() {} }, personas.slice(0, 2), { sleep: async () => {} });

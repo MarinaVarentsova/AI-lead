@@ -21,15 +21,11 @@ export function generateDiagnosticFallback(facts: DiagnosticFactsPacket): Diagno
     : school
       ? "Чтобы подтвердить доступный формат и документы по «Приёмке квартир», нажмите «Связаться с менеджером»."
       : "Чтобы сравнить тарифы и подтвердить состав документов, нажмите «Связаться с менеджером».";
-  const taskFact = `ваша задача — ${facts.targetTasks.charAt(0).toLowerCase()}${facts.targetTasks.slice(1)}`;
-  const opening = `${conclusion.replace(/\.$/, "")}; ${taskFact}`;
-  const educationFact = school || conditional
-    ? `Ваш ответ об образовании — «${facts.education}»${educationCondition ? `; ${educationCondition.charAt(0).toLowerCase()}${educationCondition.slice(1)}` : ""}`
-    : "";
+  const opening = conclusion;
   return {
     summary: "Ваше персональное заключение после четырёх ответов.",
     currentArea: facts.currentArea, currentRole: facts.currentRole, education: facts.education, targetTasks: facts.targetTasks,
-    recommendation: [opening, educationFact, personalizedBenefit(facts, program), next].filter(Boolean).join(" "),
+    recommendation: [opening, personalizedBenefit(facts, program), educationCondition, next].filter(Boolean).join(" "),
     recommendedTrack: facts.recommendedTrackHint ?? "not_defined",
     importantNote: school ? "Для «Стройэксперта» требуется СПО или высшее образование." : conditional
       ? "Выпускные документы выдаются после предъявления оконченного диплома СПО или высшего образования." : null,

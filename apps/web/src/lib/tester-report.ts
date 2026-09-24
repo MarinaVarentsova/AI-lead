@@ -18,7 +18,7 @@ export const criterionLabel = (value: string) => ({
   grounding: "Опора на базу знаний", noHallucinations: "Отсутствие выдумок",
   objections: "Работа с возражениями", sales: "Продажа через пользу",
   cta: "Качество CTA", tone: "Тон общения",
-  noRepeatedQuestions: "Нет повторных вопросов", maxQuestions: "Соблюдение лимита вопросов",
+  noRepeatedQuestions: "Нет повторных вопросов", maxQuestions: "Продолжение консультации",
 }[value] ?? "Критерий");
 export interface RunAssessmentView {
   executiveSummary: string; overallScore: number | null; qualificationScore: number | null; knowledgeGroundingScore: number | null; salesFunnelScore: number | null;

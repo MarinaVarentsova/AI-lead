@@ -9,7 +9,7 @@ const moduleUrl = source => "data:text/javascript;base64," + Buffer.from(ts.tran
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 }).outputText).toString("base64");
 const api = moduleUrl(read("apps/web/src/lib/api.ts").replace("import.meta.env.VITE_API_BASE_URL", '"https://api.example.test/"'));
-const { sendConsultantMessage, sendConsultantTurn, ConsultantLimitError, CONSULTANT_LENGTH_ERROR } = await import(moduleUrl(read("apps/web/src/lib/consultant-chat.ts").replace('"./api"', JSON.stringify(api))));
+const { sendConsultantMessage, sendConsultantTurn, CONSULTANT_LENGTH_ERROR } = await import(moduleUrl(read("apps/web/src/lib/consultant-chat.ts").replace('"./api"', JSON.stringify(api))));
 const originalFetch = globalThis.fetch;
 try {
   const sent = [];
@@ -45,10 +45,10 @@ try {
   globalThis.fetch = async (_url, options) => {
     receivedIds.push(JSON.parse(options.body).requestId);
     if (receivedIds.length === 1) throw new Error("Lost acknowledgement");
-    return Response.json({ message: "Третий ответ. Продолжите с менеджером.", limitReached: true });
+    return Response.json({ message: "Ответ без ограничения." });
   };
   const last = await sendConsultantTurn("same-conversation", "Третий", stableId);
-  assert.equal(last.limitReached, true); assert.deepEqual(receivedIds, [stableId, stableId]);
+  assert.equal(last.message, "Ответ без ограничения."); assert.deepEqual(receivedIds, [stableId, stableId]);
   const retryStatuses = [];
   globalThis.fetch = async () => {
     retryStatuses.push(true);
@@ -56,16 +56,14 @@ try {
   };
   assert.equal((await sendConsultantTurn("same-conversation", "Цена?", stableId)).message, "Ответ после восстановления");
   assert.equal(retryStatuses.length, 2);
-  globalThis.fetch = async () => Response.json({ error: "FOLLOW_UP_LIMIT" }, { status: 409 });
-  await assert.rejects(sendConsultantTurn("same-conversation", "Четвертый", stableId), ConsultantLimitError);
   const widget = read("apps/web/src/components/chat-widget.tsx");
-  assert.ok(widget.includes('postDiagnosticState === "post-diagnostic-ready" && !consultantLimitReached'));
-  assert.ok(widget.includes('setConsultantLimitReached(reply.limitReached)'));
-  assert.ok(widget.includes('Продолжить с менеджером'));
+  assert.ok(widget.includes('postDiagnosticState === "post-diagnostic-ready"'));
+  assert.ok(!widget.includes('consultantLimitReached'));
+  assert.ok(!widget.includes('Продолжить с менеджером'));
   assert.ok(widget.includes('consultantRequest.current?.question !== question'));
   assert.ok(widget.includes('maxLength={1000}'));
   assert.ok(widget.includes('maxLength={200}'));
   assert.match(widget, /contactPhase !== "submitted"[\s\S]*diagnostic-consultation__manager/);
   assert.match(widget, /diagnostic-consultation__history[\s\S]*diagnostic-consultation__composer[\s\S]*diagnostic-consultation__manager/);
-  console.log("PASS: limit response, retry request ID, input/CTA wiring; 8 consultant frontend helper cases: 3 sequential questions, 4 errors, retry; mocked network only.");
+  console.log("PASS: unlimited input, retry request ID and persistent manager CTA wiring; mocked network only.");
 } finally { globalThis.fetch = originalFetch; }

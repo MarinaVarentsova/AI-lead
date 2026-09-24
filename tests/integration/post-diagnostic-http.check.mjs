@@ -110,10 +110,9 @@ try {
   const context = { crypto: { getRandomValues: array => webcrypto.getRandomValues(array) },
     Uint8Array, Response, console: { info: (...args) => clientLogs.push(args), error: (...args) => clientLogs.push(args) },
     fetch, conversationId, questionDraft: "Сколько стоит обучение?",
-    consultantLimitReached: false, consultantBusy: { current: false }, consultantRequest: { current: null },
+    consultantBusy: { current: false }, consultantRequest: { current: null },
     failedQuestion: { current: null }, uid: randomUUID, showNextStep() {},
     setConsultantLoading() {}, setConsultantMessages() {}, setQuestionDraft() {},
-    setConsultantLimitReached(value) { context.consultantLimitReached = value; },
     setConsultantError(value) { context.consultantError = value; },
   };
   // Load actual transport + helpers into the same insecure context.
@@ -140,15 +139,13 @@ try {
   assert.equal(context.consultantRequest.current, null);
   const replay = await post("/api/consultant-chat", { conversationId, message: context.questionDraft, requestId: firstId });
   assert.equal(replay.status, 200); assert.ok(replay.body.message.trim()); assert.equal(replay.body.questionsUsed, 1);
-  for (const message of ["Какие документы нужны?", "Когда начинается обучение?"]) {
+  for (const message of ["Какие документы нужны?", "Когда начинается обучение?", "Четвёртый вопрос?", "Пятый вопрос?", "Шестой вопрос?"]) {
     const result = await post("/api/consultant-chat", { conversationId, message, requestId: randomUUID() });
     assert.equal(result.status, 200); assert.ok(result.body.message.trim());
   }
-  const fourth = await post("/api/consultant-chat", { conversationId, message: "Четвёртый?", requestId: randomUUID() });
-  assert.equal(fourth.status, 409); assert.equal(fourth.body.error, "FOLLOW_UP_LIMIT");
-  assert.equal((await pg.query("SELECT count(*)::int AS n FROM ai_dialogue WHERE stage='consultation' AND speaker='user'")).rows[0].n, 3);
+  assert.equal((await pg.query("SELECT count(*)::int AS n FROM ai_dialogue WHERE stage='consultation' AND speaker='user'")).rows[0].n, 6);
   assert.equal((await pg.query("SELECT count(*)::int AS n FROM ai_dialogue WHERE stage='diagnostic'")).rows[0].n, 8);
-  console.log("PASS: actual insecure-context widget handler → HTTP POST → unified dialogue; retry idempotency and 3-question limit preserved.");
+  console.log("PASS: actual insecure-context widget handler → HTTP POST → unified dialogue; retry idempotency and unlimited consultation preserved.");
 } finally {
   if (server) { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
   hooks.deregister(); delete globalThis.__postDiagnosticDb; await pg.close();

@@ -59,7 +59,7 @@ export function validateDiagnosticResult(value: unknown, facts: DiagnosticFactsP
   if (!normalize(recommendation.split(/[.!?]/)[0] ?? "").includes(normalize(PROGRAM_NAMES[diagnosticProgram(facts)]))) return invalid();
   const confirmed = [facts.currentArea, facts.currentRole, facts.education, facts.targetTasks]
     .filter(fact => publicText.includes(normalize(fact)));
-  if (confirmed.length < 2 || confirmed.length > 3 || !publicText.includes(normalize(PROGRAM_NAMES[diagnosticProgram(facts)])) ||
+  if (confirmed.length > 2 || !publicText.includes(normalize(PROGRAM_NAMES[diagnosticProgram(facts)])) ||
     !/дефект|документац|исследова|заключени|осмотр|проверк|стройк|подрядчик/i.test(recommendation) ||
     !/Связаться с менеджером|уточни/i.test(recommendation) ||
     /для уточнения программы и условий/i.test(recommendation)) return invalid();
@@ -69,8 +69,7 @@ export function validateDiagnosticResult(value: unknown, facts: DiagnosticFactsP
     !/выпускн[а-я]* документ[а-я]*.*после.*диплом/i.test(recommendation)) return invalid();
   if (["summary", "currentArea", "currentRole", "education", "targetTasks", "recommendation"].some(key =>
     /Пользователь имеет|Рекомендация должна|recommendedTrack|education_status|target_tasks/i.test(readText(key)))) return invalid();
-  if (/Пользователь имеет|Рекомендация должна учитывать/iu.test(recommendation) ||
-    !/(?:у вас|ваш|вам|в вашем|с вашим)/iu.test(recommendation)) {
+  if (/Пользователь имеет|Рекомендация должна учитывать|ваша задача\s*[—:-]|вы указали|вы выбрали|вы хотите|судя по вашим ответам/iu.test(recommendation)) {
     return invalid();
   }
   return {

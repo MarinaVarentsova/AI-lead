@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { createChatScroll, createQuestionFocusGate } from "@/lib/chat-scroll";
-import { sendConsultantTurn, createConsultantRequestId, ConsultantLimitError, CONSULTANT_ERROR } from "@/lib/consultant-chat";
+import { sendConsultantTurn, createConsultantRequestId, CONSULTANT_ERROR } from "@/lib/consultant-chat";
 import { submitContact, CONTACT_ERROR, type ContactPayload } from "@/lib/contact";
 import {
   completePersistedDiagnostic, DIAGNOSTIC_ERROR,
@@ -160,7 +160,6 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
   const [consultantMessages, setConsultantMessages] = useState<Message[]>([]);
   const [consultantLoading, setConsultantLoading] = useState(false);
   const [consultantError, setConsultantError] = useState(false);
-  const [consultantLimitReached, setConsultantLimitReached] = useState(false);
   const consultantRequest = useRef<{ question: string; id: string } | null>(null);
   const consultantBusy = useRef(false);
   const failedQuestion = useRef<string | null>(null);
@@ -383,7 +382,7 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
 
   const handleConsultantSubmit = async () => {
     const question = questionDraft.trim();
-    if (consultantLimitReached || consultantBusy.current || !conversationId || !question || question.length > 1000) return;
+    if (consultantBusy.current || !conversationId || !question || question.length > 1000) return;
     showNextStep("user");
     consultantBusy.current = true;
     setConsultantLoading(true);
@@ -396,14 +395,12 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
       if (consultantRequest.current?.question !== question) consultantRequest.current = { question, id: createConsultantRequestId() };
       const reply = await sendConsultantTurn(conversationId, question, consultantRequest.current.id);
       showNextStep("assistant", false);
-      setConsultantLimitReached(reply.limitReached);
       consultantRequest.current = null;
       setConsultantMessages((previous) => [...previous, { id: uid(), role: "bot", content: reply.message }]);
       setQuestionDraft("");
       failedQuestion.current = null;
-    } catch (error) {
-      if (error instanceof ConsultantLimitError) { showNextStep("limit", false); setConsultantLimitReached(true); }
-      else { setConsultantError(true); showNextStep("input", false); }
+    } catch {
+      setConsultantError(true); showNextStep("input", false);
     } finally {
       consultantBusy.current = false;
       setConsultantLoading(false);
@@ -753,8 +750,7 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
 
   if (consultationViewActive) {
     const consultantAnswerCount = consultantMessages.filter((message) => message.role === "bot").length;
-    const questionNumber = Math.min(consultantAnswerCount + 1, 3);
-    const canAskQuestion = consultantAnswerCount < 3 && !consultantLimitReached;
+    const questionNumber = consultantAnswerCount + 1;
 
     return (
       <div className="chat-widget diagnostic-consultation flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
@@ -766,7 +762,7 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
         </header>
         <main className="diagnostic-consultation__body">
           <div className="diagnostic-consultation__heading">
-            <span>Вопрос {questionNumber} из 3</span>
+            <span>Вопрос {questionNumber}</span>
             <h1>{consultantAnswerCount === 0 ? "Что хотите уточнить?" : "Продолжим консультацию"}</h1>
           </div>
 
@@ -782,8 +778,7 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
             </div>}
           </div>
 
-          {canAskQuestion && (
-            <div className="diagnostic-consultation__composer">
+          <div className="diagnostic-consultation__composer">
               <Textarea ref={postDiagnosticInputRef} value={questionDraft} disabled={consultantLoading}
                 maxLength={1000} onChange={(event) => setQuestionDraft(event.target.value)}
                 onKeyDown={(event) => {
@@ -799,8 +794,7 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
                 {consultantLoading ? <Loader2 className="animate-spin" /> : consultantError ? "Повторить" : "Задать вопрос"}
                 {!consultantLoading && <ArrowUpRight aria-hidden="true" />}
               </Button>
-            </div>
-          )}
+          </div>
           {contactPhase !== "submitted" && (
             <div className="diagnostic-consultation__complete" ref={limitCtaRef}>
               <Button className="diagnostic-consultation__manager" onClick={() => {
@@ -935,7 +929,7 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
           {consultantLoading && <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="w-4 h-4 animate-spin" />Готовим ответ...
           </div>}
-          {postDiagnosticState === "post-diagnostic-ready" && !consultantLimitReached && (
+          {postDiagnosticState === "post-diagnostic-ready" && (
             <div className="rounded-xl border border-border bg-white p-4 space-y-2">
               <Textarea
                 ref={postDiagnosticInputRef}
@@ -961,10 +955,6 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
               </Button>
             </div>
           )}
-
-          {consultantLimitReached && <div ref={limitCtaRef} className="chat-focus-target"><Button className="w-full" onClick={() => {
-            showNextStep("contact"); setContactPhase(phase => phase ?? "channel");
-          }}>Продолжить с менеджером</Button></div>}
 
           {/* Forms share the same viewport, so long results cannot squeeze them out. */}
           {contactPhase && <div ref={contactFormRef} className="chat-focus-target">{renderContactSection()}</div>}

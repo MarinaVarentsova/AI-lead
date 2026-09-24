@@ -32,6 +32,13 @@ export class ConsultantChatService {
   async generate(input: ConsultantProviderInput): Promise<ConsultantChatResponse> {
     const facts = selectConsultantInput(input);
     const markdown = this.markdown ?? await loadArtemKnowledge();
+    const commercialQuestion = /рассроч|оплат|частями|график.*плат|платить.*месяц|ежемесяч|перв.*взнос|разбить.*плат|сколько стоит|стоимость|какая цена|какие цены|цен[аыуеой]|тариф/i.test(facts.question) &&
+      !/скидк|акци|индивидуальн|специальн.*цен|конкурент.*дешев|бесплатн/i.test(facts.question);
+    const managerContactQuestion = /как со мной свяж|как связаться.*менеджер|свяжется менеджер/i.test(facts.question);
+    if (commercialQuestion || managerContactQuestion) return {
+      message: consultantFallback(facts, markdown), isAI: false, provider: "fallback",
+      matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null,
+    };
     const unknown = facts.matchedSections.every(section => ["faq", "manager"].includes(section.id));
     const intent = classifyConsultantIntent(facts.question, !unknown);
     if (intent === "small_talk") return { message: SMALL_TALK_REPLY, isAI: false, provider: "fallback",
@@ -45,7 +52,8 @@ export class ConsultantChatService {
       if (unknown || genuineUnknown) throw new Error("INSUFFICIENT_KNOWLEDGE");
       const message = await this.provider.generateConsultantReply(selectConsultantInput(facts));
       if (typeof message !== "string" || !message.trim() || message.length > 6000 ||
-        /в базе знаний|Пользователь имеет|рекомендация должна|no_professional_education|recommendedTrack|diagnosticContext/i.test(message)) throw new DiagnosticAIError("AI_INVALID_RESULT");
+        /в базе знаний|Пользователь имеет|рекомендация должна|no_professional_education|recommendedTrack|diagnosticContext/i.test(message) ||
+        /(?:оставьте|напишите|пришлите|укажите|сообщите)[^.!?]{0,50}(?:телефон|номер|email|e-mail|telegram|телеграм|whatsapp|ватсап|контакт)|как с вами связаться/i.test(message)) throw new DiagnosticAIError("AI_INVALID_RESULT");
       if (facts.diagnosticContext.includes("no_professional_education") &&
         /(?:рекомендую|вам подходит|можете поступить)[^.!?]{0,60}Стройэксперт/i.test(message)) throw new DiagnosticAIError("AI_INVALID_RESULT");
       if (/скидк|акци|индивидуальн.*цен|возврат|срок.*доступ|бессроч|перв.*взнос|беспроцент/i.test(facts.question) &&

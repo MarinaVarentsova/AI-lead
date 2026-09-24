@@ -45,7 +45,7 @@ try {
   assert.match(fraudPrompt, /доверия заказчиков|новых заказов|пользы в спорах/i);
   const botanyPrompt = evaluatorPromptForMode("Ботан");
   for (const rule of [/professional.*precision|factual precision/i, /textual CTA.*не требуй|Не требуй textual CTA/i,
-    /3–4 месяца/, /6–8 месяцев/, /учебные задания.*реценз/i, /чисто справочном follow-up/i,
+    /3–4 месяца/, /6–8 месяцев/, /учебные задания.*реценз/i, /В follow-up не требуй повторения/i,
     /сферы услуг/i, /unknown document/i]) assert.match(botanyPrompt, rule);
   const adequatePrompt = evaluatorPromptForMode("Адекват");
   for (const rule of [/корректная рекомендация/i, /что выбрать.*не off-topic/i, /не требуй textual CTA/i,

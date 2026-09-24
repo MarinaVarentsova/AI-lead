@@ -68,10 +68,11 @@ try {
   ]) {
     const routed = result({ ...base, ...variant });
     assert.equal(diagnosticProgram(routed.facts), "construction_expertise");
-    assert.ok(routed.output.recommendation.toLowerCase().includes(routed.facts.targetTasks.toLowerCase()));
+    assert.match(routed.output.recommendation, /дефект|документац|заключени/i);
     const confirmedFacts = [routed.facts.currentArea, routed.facts.currentRole, routed.facts.education, routed.facts.targetTasks]
       .filter(fact => routed.output.recommendation.toLowerCase().includes(fact.toLowerCase()));
-    assert.ok(confirmedFacts.length >= 2 && confirmedFacts.length <= 3);
+    assert.ok(confirmedFacts.length <= 2);
+    assert.doesNotMatch(routed.output.recommendation, /вы указали|ваша задача\s*[—:-]|вы выбрали|вы хотите|судя по вашим ответам/i);
     assert.doesNotMatch(routed.output.recommendation, /для уточнения программы и условий/i);
     assert.doesNotMatch(routed.output.recommendation, /стаж/i);
   }

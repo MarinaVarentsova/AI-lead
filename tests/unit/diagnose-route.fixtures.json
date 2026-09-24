@@ -13,10 +13,10 @@
     "currentRole": "Ваша роль — прораб, мастер или специалист на объекте.",
     "education": "У вас высшее образование.",
     "targetTasks": "Вы хотите работать с задачами: дефекты и качество строительных работ.",
-    "recommendation": "Стройэксперт подходит под вашу задачу. Ваша текущая сфера — Строительство и ремонт. Вы хотите работать с задачами: дефекты и качество строительных работ. На программе можно изучать дефекты и подготовку заключения. Для условий нажмите «Связаться с менеджером».",
+    "recommendation": "Я бы рекомендовал «Стройэксперт». Программа даёт базу для анализа дефектов, работы с технической документацией и подготовки экспертных заключений. Для сравнения тарифов нажмите «Связаться с менеджером».",
     "recommendedTrack": "construction_expertise",
     "importantNote": null
   },
   "factsPacketKeys": ["sourceVersion", "currentArea", "currentRole", "education", "targetTasks", "rawAnswers", "answerCodes", "guards", "recommendedTrackHint"],
-  "expectedSourceVersion": "inobr-artem-v3.8"
+  "expectedSourceVersion": "inobr-artem-v3.9"
 }
