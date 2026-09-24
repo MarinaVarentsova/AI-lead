@@ -71,21 +71,41 @@ try {
   const originalFetch = globalThis.fetch;
   let shouldFail = true; let postedBody;
   globalThis.fetch = async (_url, init = {}) => {
-    if (init.method === "POST") { postedBody = init.body; return new Response(shouldFail ? "Произошла ошибка" : "success", { status: 200 }); }
+    if (init.method === "POST") { postedBody = init.body; return new Response(shouldFail ? "Не заполнено поле Email" : "success", { status: 200 }); }
     return new Response('window.requestTime=1;window.requestSimpleSign="abc";', { status: 200 });
   };
-  const req = { body: { sessionId, email: "test-artem@example.com", fullName: "ТЕСТ Артем_Экспертович",
+  const req = { body: { sessionId, email: "test-artem-dialog@example.com", fullName: "ТЕСТ Артем_Экспертович_ДИАЛОГ2",
     phone: "+70000000000", sourceUrl: "https://artem.inobr-expert.ru/", referrer: "" }, log };
   await recordEvent(sessionId, "manager_contact_click");
   let submitRes = response(); await postHandler(req, submitRes); assert.equal(submitRes.statusCode, 502);
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_form_submit'")).rows[0].count, 0);
   shouldFail = false;
-  if (process.env.GETCOURSE_REAL_SUBMIT === "1") globalThis.fetch = originalFetch;
+  if (process.env.GETCOURSE_REAL_SUBMIT === "1") globalThis.fetch = async (url, init = {}) => {
+    if (init.method === "POST") postedBody = init.body;
+    const response = await originalFetch(url, init);
+    if (init.method === "POST") {
+      const responseText = await response.clone().text();
+      const validationAt = responseText.search(/Не заполнено поле|Заявка не отправлена/i);
+      console.log(JSON.stringify({ getCourseStatus: response.status,
+        validationMessage: validationAt < 0 ? null : responseText.slice(validationAt, validationAt + 300).replace(/<[^>]+>/g, " ").replace(/\s+/g, " "),
+        responsePreview: responseText.replace(/requestSimpleSign[^\s<]*/gi, "[signature removed]").slice(0, 500) }));
+    }
+    return response;
+  };
   submitRes = response(); await postHandler(req, submitRes); assert.equal(submitRes.statusCode, 201);
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_form_submit'")).rows[0].count, 1);
-  assert.equal(postedBody.get("formParams[email]"), "test-artem@example.com");
-  if (postedBody) assert.match(postedBody.get("formParams[dealCustomFields][11904802]"), /Сколько стоит\?/);
+  assert.equal(postedBody.get("formParams[email]"), "test-artem-dialog@example.com");
+  assert.equal(postedBody.get("formParams[full_name]"), "ТЕСТ Артем_Экспертович_ДИАЛОГ2");
+  assert.equal(postedBody.get("formParams[phone]"), "+70000000000");
+  const submittedComment = postedBody.get("formParams[dealCustomFields][22041910]");
+  assert.ok(submittedComment); assert.match(submittedComment, /Сколько стоит\?/);
+  for (const part of ["Рекомендованная программа:", "Рекомендация Артёма:", "Диагностика:",
+    "Краткое резюме:", "Диалог:", "Session ID:", "Версия базы знаний:"]) assert.ok(submittedComment.includes(part));
+  assert.equal(postedBody.has(`formParams[dealCustomFields][${["119", "04802"].join("")}]`), false);
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_contact_click'")).rows[0].count, 1);
   globalThis.fetch = originalFetch;
+  if (process.env.GETCOURSE_REAL_SUBMIT === "1") console.log(JSON.stringify({ dialogueField: "formParams[dealCustomFields][22041910]",
+    commentLength: submittedComment.length, commentFirst200: submittedComment.slice(0, 200),
+    commentLast200: submittedComment.slice(-200), transcriptPresent: submittedComment.includes("Пользователь: Сколько стоит?") }));
   console.log(`PASS: current session context, simultaneous payload, failed-submit retry and success-only manager_form_submit event${process.env.GETCOURSE_REAL_SUBMIT === "1" ? "; real GetCourse HTTP submit accepted" : ""}.`);
 } finally { hooks.deregister(); await pg.close(); delete globalThis.__managerFormDb; }

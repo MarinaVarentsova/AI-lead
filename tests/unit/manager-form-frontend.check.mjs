@@ -8,7 +8,8 @@ const route = readFileSync(new URL("apps/api/src/routes/manager-form.ts", root),
 
 assert.match(widget, /loadManagerFormContext\(conversationId\)/);
 assert.match(widget, /role="dialog"[\s\S]*aria-modal="true"/);
-assert.match(widget, /formParams\[dealCustomFields\]\[11904802\]/);
+assert.match(widget, /formParams\[dealCustomFields\]\[22041910\]/);
+assert.equal(widget.includes(`formParams[dealCustomFields][${["119", "04802"].join("")}]`), false);
 for (const field of ["contactEmail", "contactFullName", "contactPhone"]) assert.match(widget, new RegExp(`value=\\{${field}\\}`));
 assert.match(widget, /setContactPhase\(null\)[\s\S]*window\.location\.href\s*=\s*"https:\/\/inobr-expert\.ru"/);
 assert.match(widget, /event\.key === "Escape"[\s\S]*closeManagerForm/);

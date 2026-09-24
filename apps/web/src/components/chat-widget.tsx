@@ -551,7 +551,7 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
             maxLength={200} autoComplete="name" required /></label>
           <label>Телефон<Input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)}
             maxLength={50} type="tel" autoComplete="tel" required /></label>
-          <input type="hidden" name="formParams[dealCustomFields][11904802]" value={managerComment} readOnly />
+          <input type="hidden" name="formParams[dealCustomFields][22041910]" value={managerComment} readOnly />
           {contactError && <p role="alert" className="manager-form-modal__error">{MANAGER_SUBMIT_ERROR}</p>}
           <Button type="submit" disabled={contactSubmitting || !contactEmail.trim() || !contactFullName.trim() || !contactPhone.trim()}>
             {contactSubmitting ? <Loader2 className="animate-spin" /> : "Оставить заявку"}

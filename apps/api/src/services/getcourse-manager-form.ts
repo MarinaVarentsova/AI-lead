@@ -2,7 +2,7 @@ import type { ManagerLeadContext } from "./manager-lead-context";
 
 export const GETCOURSE_FORM_ID = "ltForm20566";
 export const GETCOURSE_BLOCK_ID = "2252008810";
-export const GETCOURSE_COMMENT_FIELD = "11904802";
+export const GETCOURSE_COMMENT_FIELD = "22041910";
 export const GETCOURSE_ENDPOINT = `https://inobr.ru.com/pl/lite/block-public/process-html?id=${GETCOURSE_BLOCK_ID}`;
 
 export interface GetCourseManagerFormInput {
@@ -66,7 +66,9 @@ export async function submitGetCourseManagerForm(input: GetCourseManagerFormInpu
   const response = await fetcher(GETCOURSE_ENDPOINT, { method: "POST", redirect: "follow",
     headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" }, body });
   const responseText = await response.text();
-  if (!response.ok || /Не заполнено поле|Произошла ошибка|error-summary|has-error/i.test(responseText)) {
+  // GetCourse includes generic `.has-error`/`error-summary` styles even in successful HTML responses.
+  // Only visible validation/server error messages are submission failures.
+  if (!response.ok || /Не заполнено поле|Заявка не отправлена/i.test(responseText)) {
     throw new Error("GETCOURSE_SUBMIT_FAILED");
   }
 }
