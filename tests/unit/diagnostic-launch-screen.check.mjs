@@ -6,21 +6,15 @@ const widget = readFileSync(new URL("apps/web/src/components/chat-widget.tsx", r
 const home = readFileSync(new URL("apps/web/src/pages/home.tsx", root), "utf8");
 const styles = readFileSync(new URL("apps/web/src/index.css", root), "utf8");
 
-for (const content of [
-  "00 / 04",
-  "Подберём программу",
-  "под ваш опыт и цели",
-  "Ответьте на 4 коротких вопроса — Артём подготовит предварительную рекомендацию.",
-  "Начать диагностику",
-  "Актуальные",
-  "программы",
-  "Под ваш опыт",
-  "Рекомендации",
-  "от эксперта",
-]) assert.ok(widget.includes(content), `missing launch content: ${content}`);
-
-assert.match(widget, /onClick=\{handleStart\}/);
-assert.match(widget, /const handleStart = \(\) => \{\s*if \(!sessionId \|\| diagnosticSchema\.length !== 4\) return;\s*onDiagnosticStarted\?\.\(\)/);
+assert.ok(!widget.includes('data-testid="button-start-diagnostic"'));
+assert.ok(!widget.includes('aria-label="Начать диагностику"'));
+assert.ok(!widget.includes("Подберём программу<br />под ваш опыт и цели"));
+assert.match(widget, /if \(step === 0 && !sessionError && sessionId && !schemaLoading && diagnosticSchema\.length === 4\) handleStart\(\)/);
+assert.match(widget, /const handleStart = \(\) => \{\s*if \(!sessionId \|\| diagnosticSchema\.length !== 4 \|\| initializationStarted\.current\) return;/);
+assert.match(widget, /createSession\.mutate\(undefined,[\s\S]*onSuccess: \(data\) => setSessionId\(data\.sessionId\)/);
+assert.match(widget, /<ProgressBar current=\{1\} total=\{4\} \/>/);
+assert.match(widget, /sessionError \? <div className="diagnostic-recommendation__error" role="alert">[\s\S]*onClick=\{retryInitialization\}/);
+assert.ok(widget.includes("Подготавливаем диагностику..."));
 assert.ok(!widget.includes("Здравствуйте."));
 assert.ok(!widget.includes('data-testid="button-begin-questions"'));
 assert.ok(!widget.includes("handleBeginQuestions"));
@@ -35,9 +29,6 @@ assert.ok(widget.includes('<div className="diagnostic-launch__logo"><img src={IN
 assert.ok(widget.includes('<ArrowUpRight aria-hidden="true" />'));
 assert.ok(existsSync(new URL("apps/web/public/artem-expertovich.jpg", root)));
 assert.match(styles, /\.consultation-modal--launch,[\s\S]*?\.consultation-modal--diagnostic,[\s\S]*?\.consultation-modal--recommendation,[\s\S]*?\.consultation-modal--consultation\s*\{[\s\S]*?width:\s*min\(1150px,[\s\S]*?height:\s*min\(600px/);
-assert.match(styles, /\.diagnostic-launch__copy h1\s*\{[\s\S]*?font-size:\s*52px/);
-assert.match(styles, /\.diagnostic-launch__copy p\s*\{[^}]*font-size:\s*19px/);
-assert.match(styles, /\.diagnostic-launch__button\s*\{[\s\S]*?min-height:\s*70px[^}]*font-size:\s*18px/);
 assert.match(styles, /\.diagnostic-launch-person__card img\s*\{[\s\S]*?height:\s*286px/);
 assert.ok(widget.includes("<ProgressBar current={displayedQIndex + 1} total={4} />"));
 assert.ok(widget.includes("{displayedQuestion.questionText}"));
@@ -50,7 +41,9 @@ assert.match(styles, /\.diagnostic-question__options > button\.is-selected\s*\{[
 assert.match(styles, /\.diagnostic-question__options > button\s*\{[^}]*align-items:\s*center[^}]*justify-content:\s*center[^}]*text-align:\s*center/);
 assert.ok(!styles.includes(".consultation-modal--launch .consultation-modal__close"));
 assert.ok(home.includes('!diagnosticCompleted ? " consultation-modal--diagnostic"'));
+assert.ok(!home.includes("diagnosticStarted"));
+assert.ok(!home.includes("consultation-modal--launch"));
 assert.ok(home.includes('" consultation-modal--recommendation"'));
 assert.ok(home.includes("!diagnosticCompleted || recommendationActive"));
 
-console.log("PASS: launch content/photo, existing start handler and close wiring.");
+console.log("PASS: immediate Q1 initialization, controlled retry, question layout/photo and close wiring.");

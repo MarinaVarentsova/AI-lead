@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Loader2, CheckCircle2, ChevronRight, ArrowUpRight, BookOpen, Target, UserRound,
+import { Send, Loader2, CheckCircle2, ChevronRight, ArrowUpRight,
   FileText, Users, ChartNoAxesColumnIncreasing } from "lucide-react";
 import {
   useCreateSession,
@@ -133,8 +133,7 @@ function ResultCard({ result, onAskQuestion, onGetConsultation }: {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostDiagnosticViewChange }: {
-  onDiagnosticStarted?: () => void;
+export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }: {
   onDiagnosticCompleted?: () => void;
   onPostDiagnosticViewChange?: (view: "consultation" | "default") => void;
 }) {
@@ -168,6 +167,7 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
   const diagnosticBusy = useRef(false);
   const pendingDiagnostic = useRef<DiagnosticPayload | null>(null);
   const answeredCount = useRef(0);
+  const initializationStarted = useRef(false);
 
   // Contact form
   const [contactPhase, setContactPhase] = useState<ContactPhase | null>(null);
@@ -249,8 +249,8 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
   // ─── Launch screen → Q1 ────────────────────────────────────────────────────
 
   const handleStart = () => {
-    if (!sessionId || diagnosticSchema.length !== 4) return;
-    onDiagnosticStarted?.();
+    if (!sessionId || diagnosticSchema.length !== 4 || initializationStarted.current) return;
+    initializationStarted.current = true;
     showNextStep();
     setIsTyping(true);
 
@@ -262,22 +262,37 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
           try {
             await recordDiagnosticQuestion(convId, 1);
             setConversationId(convId);
-            setMessages((prev) => [...prev, { id: uid(), role: "user", content: "Начать" }]);
             setIsTyping(false);
             addBotMessage(diagnosticSchema[0]?.questionText ?? "");
             setStep(2);
             showNextStep("question", false);
           } catch {
             setIsTyping(false);
-            addBotMessage("Не удалось начать диагностику. Проверьте соединение и попробуйте снова.");
+            initializationStarted.current = false;
+            setSessionError(true);
           }
         })(); },
         onError: () => {
           setIsTyping(false);
-          addBotMessage("Не удалось начать диагностику. Проверьте соединение и попробуйте снова.");
+          initializationStarted.current = false;
+          setSessionError(true);
         },
       }
     );
+  };
+
+  useEffect(() => {
+    if (step === 0 && !sessionError && sessionId && !schemaLoading && diagnosticSchema.length === 4) handleStart();
+  }, [step, sessionError, sessionId, schemaLoading, diagnosticSchema]);
+
+  const retryInitialization = () => {
+    initializationStarted.current = false;
+    setSessionError(false);
+    if (diagnosticSchema.length !== 4) void loadDiagnosticSchema();
+    if (!sessionId) createSession.mutate(undefined, {
+      onSuccess: (data) => setSessionId(data.sessionId),
+      onError: () => setSessionError(true),
+    });
   };
 
   // ─── Chip selection ─────────────────────────────────────────────────────────
@@ -625,15 +640,12 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
     return null;
   };
 
-  // ─── Launch screen ────────────────────────────────────────────────────────────
+  // ─── Immediate diagnostic initialization ─────────────────────────────────────
 
   if (step === 0) {
     return (
-      <div className="chat-widget diagnostic-launch flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
-        {/* Header */}
-        <header
-          className="diagnostic-launch__header consultation-chat-header px-7 flex items-center text-white shrink-0"
-        >
+      <div className="chat-widget diagnostic-question flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
+        <header className="diagnostic-launch__header consultation-chat-header px-7 flex items-center text-white shrink-0">
           <div className="diagnostic-launch__logo"><img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" /></div>
           <div className="diagnostic-launch__brand-copy">
             <h2 id="consultation-title">Подбор направления обучения</h2>
@@ -641,74 +653,15 @@ export function ChatWidget({ onDiagnosticStarted, onDiagnosticCompleted, onPostD
           </div>
         </header>
 
-        {/* Body */}
-        <div className="diagnostic-launch__body consultation-chat-intro flex-1 min-h-0 overflow-y-auto">
-          <div className="diagnostic-launch__progress" aria-label="Прогресс диагностики: 0 из 4">
-            <strong>00 / 04</strong>
-            <div aria-hidden="true">
-              <span /><i /><span /><i /><span /><i /><span />
-            </div>
-          </div>
-
-          <div className="diagnostic-launch__copy">
-            <h1>
-              Подберём программу<br />под ваш опыт и цели
-            </h1>
-            <p>
-              Ответьте на 4 коротких вопроса — Артём подготовит предварительную рекомендацию.
-            </p>
-          </div>
-
-          <div className="diagnostic-launch__action">
-            {sessionError ? (
-              <div className="space-y-3">
-                <p className="text-sm text-destructive">
-                  Не удалось начать диагностику. Проверьте соединение и попробуйте снова.
-                </p>
-                <Button
-                  variant="outline"
-                  className="w-full rounded-lg text-sm border-border"
-                  onClick={() => {
-                    setSessionError(false);
-                    void loadDiagnosticSchema();
-                    createSession.mutate(undefined, {
-                      onSuccess: (d) => setSessionId(d.sessionId),
-                      onError: () => setSessionError(true),
-                    });
-                  }}
-                >
-                  Повторить
-                </Button>
-              </div>
-            ) : (
-              <>
-                <Button
-                  data-testid="button-start-diagnostic"
-                  onClick={handleStart}
-                  size="lg"
-                  aria-label="Начать диагностику"
-                  className="diagnostic-launch__button"
-                  disabled={!sessionId || diagnosticSchema.length !== 4}
-                >
-                  {!sessionId || schemaLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      Подготовка...
-                    </>
-                  ) : (
-                    <>Начать диагностику <ArrowUpRight aria-hidden="true" /></>
-                  )}
-                </Button>
-              </>
-            )}
-          </div>
-
-          <div className="diagnostic-launch__benefits" aria-label="Преимущества диагностики">
-            <div><BookOpen aria-hidden="true" /><span>Актуальные<br />программы</span></div>
-            <div><Target aria-hidden="true" /><span>Под ваш опыт<br />и цели</span></div>
-            <div><UserRound aria-hidden="true" /><span>Рекомендации<br />от эксперта</span></div>
-          </div>
-        </div>
+        <main className="diagnostic-question__body">
+          <ProgressBar current={1} total={4} />
+          {sessionError ? <div className="diagnostic-recommendation__error" role="alert">
+            <p>Не удалось начать диагностику. Проверьте соединение и попробуйте снова.</p>
+            <Button onClick={retryInitialization}>Повторить</Button>
+          </div> : <div className="diagnostic-question__loading" role="status">
+            <Loader2 aria-hidden="true" /> Подготавливаем диагностику...
+          </div>}
+        </main>
       </div>
     );
   }

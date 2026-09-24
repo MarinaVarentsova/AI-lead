@@ -5,12 +5,11 @@ import { ChatWidget } from "@/components/chat-widget";
 export default function Home() {
   const pageRef = useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(true);
-  const [diagnosticStarted, setDiagnosticStarted] = useState(false);
   const [diagnosticCompleted, setDiagnosticCompleted] = useState(false);
   const [recommendationActive, setRecommendationActive] = useState(false);
   const [consultationActive, setConsultationActive] = useState(false);
   const closeConsultation = () => {
-    setIsOpen(false); setDiagnosticStarted(false); setDiagnosticCompleted(false);
+    setIsOpen(false); setDiagnosticCompleted(false);
     setRecommendationActive(false); setConsultationActive(false);
   };
   useEffect(() => {
@@ -36,7 +35,7 @@ export default function Home() {
         <div className="consultation-stage__lines"><span /><span /><span /></div>
       </div>
       <button className="consultation-stage__trigger" onClick={() => {
-        setDiagnosticStarted(false); setDiagnosticCompleted(false); setRecommendationActive(false);
+        setDiagnosticCompleted(false); setRecommendationActive(false);
         setConsultationActive(false); setIsOpen(true);
       }}>
         Получить консультацию
@@ -46,8 +45,7 @@ export default function Home() {
         <div className="consultation-overlay" role="presentation" onMouseDown={(event) => {
           if (event.target === event.currentTarget) closeConsultation();
         }}>
-          <section className={`consultation-modal${!diagnosticStarted ? " consultation-modal--launch" :
-            !diagnosticCompleted ? " consultation-modal--diagnostic" : recommendationActive
+          <section className={`consultation-modal${!diagnosticCompleted ? " consultation-modal--diagnostic" : recommendationActive
               ? " consultation-modal--recommendation" : consultationActive
                 ? " consultation-modal--consultation" : ""}`} role="dialog" aria-modal="true" aria-labelledby="consultation-title">
             <button className="consultation-modal__close" onClick={closeConsultation} aria-label="Закрыть консультацию">
@@ -55,8 +53,7 @@ export default function Home() {
             </button>
 
             <div className="consultation-modal__workspace">
-              <ChatWidget onDiagnosticStarted={() => setDiagnosticStarted(true)}
-                onDiagnosticCompleted={() => { setDiagnosticCompleted(true); setRecommendationActive(true); }}
+              <ChatWidget onDiagnosticCompleted={() => { setDiagnosticCompleted(true); setRecommendationActive(true); }}
                 onPostDiagnosticViewChange={(view) => {
                   setRecommendationActive(false);
                   setConsultationActive(view === "consultation");
