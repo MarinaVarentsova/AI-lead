@@ -530,13 +530,10 @@
 }
 .manager-form-modal__heading h2 { margin-top: 7px; color: #073d33; font-size: 30px; line-height: 1.12; font-weight: 800; }
 .manager-form-modal__heading p { margin-top: 9px; color: #60736c; font-size: 15px; line-height: 1.5; }
-.manager-form-modal__form { display: grid; gap: 15px; margin-top: 24px; }
-.manager-form-modal__form label { display: grid; gap: 7px; color: #294c43; font-size: 13px; font-weight: 700; }
-.manager-form-modal__form input:not([type="hidden"]) { min-height: 48px; border-color: #9ab8b0; font-size: 16px; }
-.manager-form-modal__form .manager-form-modal__consent { grid-template-columns: 20px 1fr; align-items: start; gap: 10px; font-weight: 500; line-height: 1.4; }
-.manager-form-modal__consent input[type="checkbox"] { width: 20px; height: 20px; min-height: 20px; margin: 1px 0 0; accent-color: #08705d; }
-.manager-form-modal__consent a { color: #08705d; text-decoration: underline; text-underline-offset: 2px; }
-.manager-form-modal__form button, .manager-form-modal__state button, .manager-form-modal__success button {
+.manager-form-modal__widget-shell { min-height: min(640px, 70vh); margin-top: 18px; }
+.manager-form-modal__widget { display: block; width: 100%; height: min(640px, 70vh); border: 0; }
+.manager-form-modal__widget.is-loading { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.manager-form-modal__state button, .manager-form-modal__success button {
   min-height: 50px;
   border-radius: 12px;
   background: #f5b827;
@@ -554,6 +551,7 @@
   .manager-form-modal { width: 100%; padding: 26px 20px 22px; border-radius: 18px; }
   .manager-form-modal__heading h2 { font-size: 25px; }
   .manager-form-modal__close { top: 12px; right: 12px; width: 38px; height: 38px; }
+  .manager-form-modal__widget-shell, .manager-form-modal__widget { height: 66vh; min-height: 470px; }
 }
 .chat-dialogue { overflow-anchor: none; scrollbar-gutter: stable; }
 .chat-dialogue > div { min-width: 0; overflow-wrap: anywhere; }

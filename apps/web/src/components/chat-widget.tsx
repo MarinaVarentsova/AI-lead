@@ -11,8 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { createChatScroll, createQuestionFocusGate } from "@/lib/chat-scroll";
 import { sendConsultantTurn, createConsultantRequestId, CONSULTANT_ERROR } from "@/lib/consultant-chat";
-import { loadManagerFormContext, MANAGER_CONTEXT_ERROR, MANAGER_SUBMIT_ERROR,
-  submitManagerForm } from "@/lib/manager-form";
+import { managerWidgetUrl, MANAGER_CONTEXT_ERROR } from "@/lib/manager-form";
 import {
   completePersistedDiagnostic, DIAGNOSTIC_ERROR,
   type DiagnosticPayload, type DiagnoseResponse, type StructuredDiagnosticResult,
@@ -164,16 +163,8 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
 
   // Contact form
   const [contactPhase, setContactPhase] = useState<ContactPhase | null>(null);
-  const [managerComment, setManagerComment] = useState("");
   const [managerContextError, setManagerContextError] = useState(false);
-  const [contactEmail, setContactEmail] = useState("");
-  const [contactFullName, setContactFullName] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
-  const [personalDataConsent, setPersonalDataConsent] = useState(false);
-  const [marketingConsent, setMarketingConsent] = useState(false);
-  const [contactSubmitting, setContactSubmitting] = useState(false);
-  const [contactError, setContactError] = useState(false);
-  const contactBusy = useRef(false);
+  const managerWidgetRef = useRef<HTMLIFrameElement>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -406,43 +397,15 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
     }
   };
 
-  const handleManagerContactClick = async () => {
+  const handleManagerContactClick = () => {
     setContactPhase("loading");
     setManagerContextError(false);
-    setContactError(false);
     if (conversationId) {
       void recordManagerContactClick(conversationId).catch((error) => {
         console.error("MANAGER_CONTACT_EVENT_FAILED", error);
       });
     }
     if (!conversationId) { setManagerContextError(true); return; }
-    try {
-      setManagerComment(await loadManagerFormContext(conversationId));
-      setContactPhase("ready");
-    } catch {
-      setManagerContextError(true);
-    }
-  };
-
-  // ─── Contact form ────────────────────────────────────────────────────────────
-
-  const handleSubmitContact = async () => {
-    if (contactBusy.current || !conversationId || !contactEmail.trim() || !contactFullName.trim() || !contactPhone.trim() ||
-      !personalDataConsent || !marketingConsent) return;
-    contactBusy.current = true;
-    setContactError(false);
-    setContactSubmitting(true);
-
-    try {
-      await submitManagerForm({ sessionId: conversationId, email: contactEmail.trim(),
-        fullName: contactFullName.trim(), phone: contactPhone.trim(), personalDataConsent, marketingConsent });
-      setContactPhase("submitted");
-    } catch {
-      setContactError(true);
-    } finally {
-      contactBusy.current = false;
-      setContactSubmitting(false);
-    }
   };
 
   const closeManagerForm = () => {
@@ -456,6 +419,19 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [contactPhase]);
+
+  useEffect(() => {
+    if (!contactPhase || !conversationId) return;
+    const onWidgetMessage = (event: MessageEvent) => {
+      if (event.source !== managerWidgetRef.current?.contentWindow || !event.data ||
+        event.data.type !== "getcourse-manager-widget" || event.data.sessionId !== conversationId) return;
+      if (event.data.status === "ready") setContactPhase("ready");
+      else if (event.data.status === "success") setContactPhase("submitted");
+      else if (event.data.status === "error") setManagerContextError(true);
+    };
+    window.addEventListener("message", onWidgetMessage);
+    return () => window.removeEventListener("message", onWidgetMessage);
+  }, [contactPhase, conversationId]);
 
   // ─── Chips renderer ─────────────────────────────────────────────────────────
 
@@ -544,33 +520,15 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
           <CheckCircle2 aria-hidden="true" /><h3>Заявка принята</h3>
           <p>Заявка отправлена. Менеджер свяжется с вами.</p>
           <Button onClick={closeManagerForm}>Закрыть</Button>
-        </div> : contactPhase === "loading" ? <div className="manager-form-modal__state" role="status">
-          {managerContextError ? <><p role="alert">{MANAGER_CONTEXT_ERROR}</p>
-            <Button onClick={() => void handleManagerContactClick()}>Повторить</Button></> : <><Loader2 className="animate-spin" /> Подготавливаем форму...</>}
-        </div> : <form className="manager-form-modal__form" onSubmit={(event) => { event.preventDefault(); void handleSubmitContact(); }}>
-          <label>Email<Input value={contactEmail} onChange={(event) => setContactEmail(event.target.value)}
-            maxLength={254} type="email" autoComplete="email" required /></label>
-          <label>Имя<Input value={contactFullName} onChange={(event) => setContactFullName(event.target.value)}
-            maxLength={200} autoComplete="name" required /></label>
-          <label>Телефон<Input value={contactPhone} onChange={(event) => setContactPhone(event.target.value)}
-            maxLength={50} type="tel" autoComplete="tel" required /></label>
-          <label className="manager-form-modal__consent">
-            <input type="checkbox" name="formParams[dealCustomFields][11904802]" checked={personalDataConsent}
-              onChange={(event) => setPersonalDataConsent(event.target.checked)} required />
-            <span>Я соглашаюсь на обработку персональных данных в соответствии с политикой конфиденциальности. <a href="/soglasie" target="_blank" rel="noreferrer">Согласие</a> и <a href="/politika" target="_blank" rel="noreferrer">политика</a>.</span>
-          </label>
-          <label className="manager-form-modal__consent">
-            <input type="checkbox" name="formParams[dealCustomFields][11904803]" checked={marketingConsent}
-              onChange={(event) => setMarketingConsent(event.target.checked)} required />
-            <span>Я соглашаюсь на получение рекламных рассылок, звонков и сообщений. <a href="/page120" target="_blank" rel="noreferrer">Подробнее</a>.</span>
-          </label>
-          <input type="hidden" name="formParams[dealCustomFields][22041910]" value={managerComment} readOnly />
-          {contactError && <p role="alert" className="manager-form-modal__error">{MANAGER_SUBMIT_ERROR}</p>}
-          <Button type="submit" disabled={contactSubmitting || !contactEmail.trim() || !contactFullName.trim() ||
-            !contactPhone.trim() || !personalDataConsent || !marketingConsent}>
-            {contactSubmitting ? <Loader2 className="animate-spin" /> : "Оставить заявку"}
-          </Button>
-        </form>}
+        </div> : managerContextError || !conversationId ? <div className="manager-form-modal__state" role="status">
+          <p role="alert">{MANAGER_CONTEXT_ERROR}</p><Button onClick={handleManagerContactClick}>Повторить</Button>
+        </div> : <div className="manager-form-modal__widget-shell">
+          {contactPhase === "loading" && <div className="manager-form-modal__state" role="status">
+            <Loader2 className="animate-spin" /> Подготавливаем форму...</div>}
+          <iframe ref={managerWidgetRef} title="Форма связи с менеджером GetCourse"
+            className={contactPhase === "ready" ? "manager-form-modal__widget" : "manager-form-modal__widget is-loading"}
+            src={managerWidgetUrl(conversationId)} />
+        </div>}
       </motion.div>
     </div>;
   };

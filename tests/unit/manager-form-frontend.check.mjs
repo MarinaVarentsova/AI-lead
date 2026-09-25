@@ -6,24 +6,19 @@ const helper = readFileSync(new URL("apps/web/src/lib/manager-form.ts", root), "
 const css = readFileSync(new URL("apps/web/src/index.css", root), "utf8");
 const route = readFileSync(new URL("apps/api/src/routes/manager-form.ts", root), "utf8");
 
-assert.match(widget, /loadManagerFormContext\(conversationId\)/);
 assert.match(widget, /role="dialog"[\s\S]*aria-modal="true"/);
-assert.match(widget, /formParams\[dealCustomFields\]\[22041910\]/);
-for (const field of ["11904802", "11904803"]) assert.match(widget, new RegExp(`formParams\\[dealCustomFields\\]\\[${field}\\]`));
-for (const state of ["personalDataConsent", "marketingConsent"]) {
-  assert.match(widget, new RegExp(`checked=\\{${state}\\}`));
-  assert.match(widget, new RegExp(`!${state}`));
-}
-for (const href of ["/soglasie", "/politika", "/page120"]) assert.match(widget, new RegExp(`href="${href}"`));
-for (const field of ["contactEmail", "contactFullName", "contactPhone"]) assert.match(widget, new RegExp(`value=\\{${field}\\}`));
+assert.match(widget, /iframe[\s\S]*managerWidgetUrl\(conversationId\)/);
+assert.match(widget, /event\.source !== managerWidgetRef\.current\?\.contentWindow/);
+assert.match(widget, /getcourse-manager-widget/); assert.match(widget, /status === "success"/);
+assert.match(helper, /manager-form\/widget/); assert.match(helper, /sourceUrl:\s*window\.location\.href/);
+assert.doesNotMatch(widget, /contactEmail|contactPhone|personalDataConsent|marketingConsent/);
 assert.match(widget, /setContactPhase\(null\)[\s\S]*window\.location\.href\s*=\s*"https:\/\/inobr-expert\.ru"/);
 assert.match(widget, /event\.key === "Escape"[\s\S]*closeManagerForm/);
 assert.match(widget, /event\.target === event\.currentTarget[\s\S]*closeManagerForm/);
 assert.doesNotMatch(widget, /CONTACT_CHANNELS|submitContact/);
-assert.match(widget, /catch \{[\s\S]*setContactError\(true\)[\s\S]*finally/);
 assert.match(widget, /setContactPhase\("submitted"\)/);
-assert.match(helper, /sourceUrl:\s*window\.location\.href/); assert.match(helper, /referrer:\s*document\.referrer/);
-assert.match(route, /submitGetCourseManagerForm[\s\S]*recordEvent\(sessionId, "manager_form_submit"\)/);
+assert.match(helper, /referrer:\s*document\.referrer/);
+assert.match(route, /submitGetCourseWidgetBody[\s\S]*recordEvent\(sessionId, "manager_form_submit"\)/);
 assert.match(css, /\.manager-form-overlay[\s\S]*overflow-y:\s*auto/);
 assert.match(css, /@media \(max-width:\s*640px\)[\s\S]*\.manager-form-modal/);
 console.log("PASS G-L: modal fields/context, X/Escape/backdrop exit redirect, error retention, success-only event and responsive layout wiring.");

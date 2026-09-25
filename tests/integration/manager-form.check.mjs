@@ -32,7 +32,7 @@ const hooks = registerHooks({
 });
 
 const response = () => ({ statusCode: 200, status(code) { this.statusCode = code; return this; },
-  json(body) { this.body = body; return this; } });
+  json(body) { this.body = body; return this; }, type() { return this; }, send(body) { this.body = body; return this; } });
 const log = { error() {} };
 try {
   await pg.exec(`CREATE TABLE ai_sessions(id uuid PRIMARY KEY,session_key text NOT NULL UNIQUE,first_page_url text,
@@ -64,27 +64,54 @@ try {
     "INSERT INTO ai_dialogue(session_id,message_order,speaker,stage,message_type,text) VALUES($1,$2,$3,$4,$5,$6)",
     [sessionId,index+1,...row]);
   const getHandler = router.stack.find(layer => layer.route?.path === "/manager-form/context/:sessionId").route.stack[0].handle;
-  const postHandler = router.stack.find(layer => layer.route?.path === "/manager-form/submit").route.stack[0].handle;
+  const postHandler = router.stack.find(layer => layer.route?.path === "/manager-form/widget-submit/:sessionId").route.stack[0].handle;
   const contextRes = response(); await getHandler({ params: { sessionId }, log }, contextRes);
   assert.equal(contextRes.statusCode, 200); assert.match(contextRes.body.comment, /Точная рекомендация/);
 
-  const originalFetch = globalThis.fetch;
-  let shouldFail = true; let postedBody;
+  const originalFetch = globalThis.fetch; let shouldFail = true; let postedBody;
   globalThis.fetch = async (_url, init = {}) => {
     if (init.method === "POST") { postedBody = init.body; return new Response(shouldFail ? "Не заполнено поле Email" : "success", { status: 200 }); }
-    return new Response('window.requestTime=1;window.requestSimpleSign="abc";', { status: 200 });
   };
-  const req = { body: { sessionId, email: "test-artem-dialog@example.com", fullName: "ТЕСТ Артем_Экспертович_ДИАЛОГ2",
-    phone: "+70000000000", personalDataConsent: true, marketingConsent: true,
-    sourceUrl: "https://artem.inobr-expert.ru/", referrer: "" }, log };
-  const missingConsentRes = response();
-  await postHandler({ ...req, body: { ...req.body, personalDataConsent: false } }, missingConsentRes);
-  assert.equal(missingConsentRes.statusCode, 400);
+  const formBody = { formParams: { email: "test-artem-dialog@example.com", full_name: "ТЕСТ Артем_Экспертович_WIDGET",
+    phone: "+70000000000", dealCustomFields: { 11904802: "1", 11904803: "1", 22041910: "browser value" } },
+    pdpConfirmCheckbox: "on", requestTime: "1", requestSimpleSign: "abc", isHtmlWidget: "1",
+    __artem_getcourse_action: "https://inobr.ru.com/pl/lite/block-public/process?id=2252008810&gcSession=test" };
+  const req = { params: { sessionId }, body: formBody, headers: { cookie: "PHPSESSID5=test; _csrf=test" }, log };
+  const missingConsentRes = response(); await postHandler({ ...req, body: { ...formBody,
+    formParams: { ...formBody.formParams, dealCustomFields: { ...formBody.formParams.dealCustomFields, 11904803: "" } } } }, missingConsentRes);
+  assert.equal(missingConsentRes.statusCode, 502);
   await recordEvent(sessionId, "manager_contact_click");
   let submitRes = response(); await postHandler(req, submitRes); assert.equal(submitRes.statusCode, 502);
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_form_submit'")).rows[0].count, 0);
   shouldFail = false;
-  if (process.env.GETCOURSE_REAL_SUBMIT === "1") globalThis.fetch = async (url, init = {}) => {
+  if (process.env.GETCOURSE_REAL_SUBMIT === "1") {
+    const widgetResponse = await originalFetch(
+      "https://inobr.ru.com/pl/lite/widget/widget?id=1658046&loc=https%3A%2F%2Fartem.inobr-expert.ru%2F&ref=");
+    const widgetHtml = await widgetResponse.text();
+    const action = /<form[\s\S]*?data-id\s*=\s*["']?2252008810["']?[\s\S]*?action="([^"]+)"/i.exec(widgetHtml)?.[1]
+      ?.replaceAll("&amp;", "&");
+    assert.ok(action?.startsWith("https://inobr.ru.com/pl/lite/block-public/process?"));
+    const realParams = new URLSearchParams();
+    for (const [, tag] of widgetHtml.matchAll(/<input\b([^>]*)>/gi)) {
+      const name = /\bname="([^"]+)"/i.exec(tag)?.[1];
+      if (!name) continue;
+      const value = /\bvalue="([^"]*)"/i.exec(tag)?.[1] ?? "";
+      realParams.append(name.replaceAll("&amp;", "&"), value.replaceAll("&quot;", '"').replaceAll("&amp;", "&"));
+    }
+    realParams.set("formParams[email]", "test-artem-dialog@example.com");
+    realParams.set("formParams[full_name]", "ТЕСТ Артем_Экспертович_WIDGET");
+    realParams.set("formParams[phone]", "+79991234567");
+    realParams.set("formParams[dealCustomFields][11904802]", "1");
+    realParams.set("formParams[dealCustomFields][11904803]", "1");
+    realParams.set("pdpConfirmCheckbox", "on");
+    realParams.set("requestTime", /window\.requestTime\s*=\s*(\d+)/.exec(widgetHtml)?.[1] ?? "");
+    realParams.set("requestSimpleSign", /window\.requestSimpleSign\s*=\s*"([^"]+)"/.exec(widgetHtml)?.[1] ?? "");
+    assert.ok(realParams.get("requestTime"));
+    assert.ok(realParams.get("requestSimpleSign"));
+    realParams.set("__artem_getcourse_action", action);
+    req.body = realParams.toString();
+    req.headers.cookie = widgetResponse.headers.getSetCookie().map(value => value.split(";", 1)[0]).join("; ");
+    globalThis.fetch = async (url, init = {}) => {
     if (init.method === "POST") postedBody = init.body;
     const response = await originalFetch(url, init);
     if (init.method === "POST") {
@@ -95,12 +122,13 @@ try {
         responsePreview: responseText.replace(/requestSimpleSign[^\s<]*/gi, "[signature removed]").slice(0, 500) }));
     }
     return response;
-  };
-  submitRes = response(); await postHandler(req, submitRes); assert.equal(submitRes.statusCode, 201);
+    };
+  }
+  submitRes = response(); await postHandler(req, submitRes); assert.equal(submitRes.statusCode, 200);
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_form_submit'")).rows[0].count, 1);
   assert.equal(postedBody.get("formParams[email]"), "test-artem-dialog@example.com");
-  assert.equal(postedBody.get("formParams[full_name]"), "ТЕСТ Артем_Экспертович_ДИАЛОГ2");
-  assert.equal(postedBody.get("formParams[phone]"), "+70000000000");
+  assert.equal(postedBody.get("formParams[full_name]"), "ТЕСТ Артем_Экспертович_WIDGET");
+  assert.equal(postedBody.get("formParams[phone]"), process.env.GETCOURSE_REAL_SUBMIT === "1" ? "+79991234567" : "+70000000000");
   assert.equal(postedBody.get("formParams[dealCustomFields][11904802]"), "1");
   assert.equal(postedBody.get("formParams[dealCustomFields][11904803]"), "1");
   assert.equal(postedBody.get("pdpConfirmCheckbox"), "on");

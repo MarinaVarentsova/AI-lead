@@ -27,6 +27,10 @@ app.use(
 );
 app.use(cors());
 app.use(express.json());
+app.use("/api/manager-form/widget-submit", express.text({
+  type: "application/x-www-form-urlencoded",
+  limit: "100kb",
+}));
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);

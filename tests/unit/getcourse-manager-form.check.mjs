@@ -9,10 +9,8 @@ const ts = require("typescript");
 const hooks = registerHooks({
   resolve(specifier, context, next) {
     if (specifier.startsWith(".") && context.parentURL?.startsWith("file:")) {
-      for (const suffix of [".ts", "/index.ts"]) {
-        const url = new URL(specifier + suffix, context.parentURL);
-        if (existsSync(url)) return { url: url.href, shortCircuit: true };
-      }
+      for (const suffix of [".ts", "/index.ts"]) { const url = new URL(specifier + suffix, context.parentURL);
+        if (existsSync(url)) return { url: url.href, shortCircuit: true }; }
     }
     return next(specifier, context);
   },
@@ -25,47 +23,50 @@ const hooks = registerHooks({
 });
 
 try {
-  const { formatGetCourseManagerComment, submitGetCourseManagerForm, GETCOURSE_ENDPOINT } =
+  const { formatGetCourseManagerComment, loadGetCourseManagerWidget, serializeGetCourseWidgetBody,
+    submitGetCourseWidgetBody, localizeGetCourseCookies, getCourseCookieHeader,
+    GETCOURSE_ACTION_FIELD, GETCOURSE_ENDPOINT, GETCOURSE_WIDGET_ENDPOINT } =
     await import(new URL("apps/api/src/services/getcourse-manager-form.ts", root));
-  const context = {
-    sessionId: "11111111-1111-4111-8111-111111111111", recommendedProgram: "Стройэксперт",
-    recommendationText: "Точная персональная рекомендация.",
-    diagnostic: { currentArea: "Проектирование", currentRole: "Проектировщик", educationStatus: "Высшее",
-      targetTasks: "Исследовать дефекты" }, dialogSummary: "Краткое резюме без домыслов.",
-    transcript: [{ role: "user", text: "Сколько стоит?" }, { role: "assistant", text: "Подтверждённая цена." }],
-    knowledgeBaseVersion: "inobr-artem-v4.0-followup", createdAt: "2026-09-24T00:00:00.000Z", summarySource: "ai",
-  };
+  const context = { sessionId: "11111111-1111-4111-8111-111111111111", recommendedProgram: "Стройэксперт",
+    recommendationText: "Точная персональная рекомендация.", diagnostic: { currentArea: "Проектирование",
+      currentRole: "Проектировщик", educationStatus: "Высшее", targetTasks: "Исследовать дефекты" },
+    dialogSummary: "Краткое резюме без домыслов.", transcript: [{ role: "user", text: "Сколько стоит?" },
+      { role: "assistant", text: "Подтверждённая цена." }], knowledgeBaseVersion: "inobr-artem-v4.0-followup",
+    createdAt: "2026-09-24T00:00:00.000Z", summarySource: "ai" };
   const comment = formatGetCourseManagerComment(context);
-  for (const expected of [context.sessionId, context.recommendedProgram, context.recommendationText,
-    "Сфера: Проектирование", "Роль: Проектировщик", "Пользователь: Сколько стоит?",
-    "Артём: Подтверждённая цена.", context.knowledgeBaseVersion]) assert.match(comment, new RegExp(expected));
-  assert.doesNotMatch(comment, /summarySource|system prompt|DATABASE_URL|token/i);
+  const widgetFixture = `<!doctype html><html><head></head><body><form id="ltForm5600148" data-id="2252008810" action="${GETCOURSE_ENDPOINT}">
+    <input name="formParams[phone]" data-phone-default-country="auto"><input name="formParams[dealCustomFields][11904802]">
+    <input name="formParams[dealCustomFields][11904803]"><textarea id="field-input-22041910" name="formParams[dealCustomFields][22041910]"></textarea>
+    <script src="/intlTelInputWithUtils.min.js"></script><script src="/phone-mask.js"></script></form></body></html>`;
+  let requestedWidgetUrl = "";
+  const widget = await loadGetCourseManagerWidget({ sessionId: context.sessionId, sourceUrl: "https://artem.inobr-expert.ru/",
+    referrer: "https://inobr-expert.ru/" }, comment, async url => { requestedWidgetUrl = String(url); return new Response(widgetFixture); });
+  const html = widget.html;
+  assert.ok(requestedWidgetUrl.startsWith(GETCOURSE_WIDGET_ENDPOINT));
+  assert.match(requestedWidgetUrl, /loc=https%3A%2F%2Fartem\.inobr-expert\.ru/);
+  assert.match(html, /<base href="https:\/\/inobr\.ru\.com\/">/); assert.match(html, /getcourse-manager-widget/);
+  assert.match(html, /widget-submit\/11111111-1111-4111-8111-111111111111/); assert.match(html, /Сколько стоит\?/);
+  assert.match(html, /__artem_getcourse_action/);
+  assert.match(html, /\[data-id="22041910"\]\{display:none!important\}/);
 
-  const requests = [];
-  const fetcher = async (url, init = {}) => {
-    requests.push({ url, init });
-    if (init.method === "POST") return new Response("<style>.has-error{} .error-summary{}</style><p>Спасибо!</p>", { status: 200 });
-    return new Response('window.requestTime = 1770000000; window.requestSimpleSign = "abcdef012345";', { status: 200 });
-  };
-  await submitGetCourseManagerForm({ email: "test@example.com", fullName: "Тест", phone: "+70000000000",
-    personalDataConsent: true, marketingConsent: true,
-    sourceUrl: "https://artem.inobr-expert.ru/", referrer: "https://inobr.ru.com/" }, comment, fetcher);
-  assert.equal(requests.length, 2); assert.equal(requests[0].url, GETCOURSE_ENDPOINT);
-  const body = requests[1].init.body;
-  assert.equal(body.get("formParams[email]"), "test@example.com");
-  assert.equal(body.get("formParams[full_name]"), "Тест"); assert.equal(body.get("formParams[phone]"), "+70000000000");
+  const body = serializeGetCourseWidgetBody({ formParams: { email: "test@example.com", full_name: "Тест",
+    phone: "+79991234567", dealCustomFields: { 11904802: "1", 11904803: "1", 22041910: "tampered" } },
+    requestTime: "1790252039", requestSimpleSign: "signature", isHtmlWidget: "1",
+    [GETCOURSE_ACTION_FIELD]: "https://inobr.ru.com/pl/lite/block-public/process?id=2252008810&gcSession=test" }, comment);
+  assert.equal(body.get("formParams[email]"), "test@example.com"); assert.equal(body.get("formParams[phone]"), "+79991234567");
   assert.equal(body.get("formParams[dealCustomFields][11904802]"), "1");
   assert.equal(body.get("formParams[dealCustomFields][11904803]"), "1");
   assert.equal(body.get("formParams[dealCustomFields][22041910]"), comment);
-  assert.equal(body.get("pdpConfirmCheckbox"), "on");
-  assert.equal(body.get("requestTime"), "1770000000"); assert.equal(body.get("requestSimpleSign"), "abcdef012345");
-  assert.equal(body.get("__gc__internal__form__helper"), "https://artem.inobr-expert.ru/");
-  assert.equal(body.get("__gc__internal__form__helper_ref"), "https://inobr.ru.com/");
-
-  await assert.rejects(() => submitGetCourseManagerForm({ email: "a@b.c", fullName: "A", phone: "+7",
-    personalDataConsent: true, marketingConsent: true,
-    sourceUrl: "https://example.test", referrer: "" }, comment,
-    async (_url, init = {}) => init.method === "POST" ? new Response("Заявка не отправлена", { status: 200 })
-      : new Response('window.requestTime=1;window.requestSimpleSign="abc";', { status: 200 })), /GETCOURSE_SUBMIT_FAILED/);
-  console.log("PASS A-F: exact manager context, fresh GetCourse signatures, complete form payload and failure handling.");
+  let submitted;
+  await submitGetCourseWidgetBody(body, "PHPSESSID5=session", async (url, init) => { submitted = { url, init }; return new Response("Спасибо!"); });
+  assert.equal(String(submitted.url), "https://inobr.ru.com/pl/lite/block-public/process?id=2252008810&gcSession=test");
+  assert.equal(submitted.init.body, body); assert.equal(body.has(GETCOURSE_ACTION_FIELD), false);
+  const missingConsent = new URLSearchParams(body); missingConsent.delete("formParams[dealCustomFields][11904803]");
+  assert.match(localizeGetCourseCookies(["PHPSESSID5=session; Domain=inobr.ru.com; Path=/; HttpOnly"])[0], /Path=\/api\/manager-form/);
+  assert.equal(getCourseCookieHeader("app=x; PHPSESSID5=session; _csrf=token"), "PHPSESSID5=session; _csrf=token");
+  await assert.rejects(() => submitGetCourseWidgetBody(missingConsent, undefined), /GETCOURSE_WIDGET_CONSENT_REQUIRED/);
+  const rejected = new URLSearchParams(body); rejected.set(GETCOURSE_ACTION_FIELD, GETCOURSE_ENDPOINT);
+  await assert.rejects(() => submitGetCourseWidgetBody(rejected, undefined,
+    async () => new Response('{"success":true,"data":{"formProcessed":false}}')), /GETCOURSE_SUBMIT_FAILED/);
+  console.log("PASS: official widget 1658046, native phone/consent runtime, server-injected dialogue and native payload proxy.");
 } finally { hooks.deregister(); }
