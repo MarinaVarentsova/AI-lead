@@ -24,8 +24,8 @@ const hooks = registerHooks({
 
 try {
   const { formatGetCourseManagerComment, loadGetCourseManagerWidget, serializeGetCourseWidgetBody,
-    submitGetCourseWidgetBody, localizeGetCourseCookies, getCourseCookieHeader,
-    GETCOURSE_ACTION_FIELD, GETCOURSE_ENDPOINT, GETCOURSE_WIDGET_ENDPOINT } =
+    submitGetCourseWidgetBody, localizeGetCourseCookies, getCourseCookieHeader, normalizeGetCoursePhone,
+    GETCOURSE_ACTION_FIELD, GETCOURSE_CANONICAL_PHONE_FIELD, GETCOURSE_ENDPOINT, GETCOURSE_WIDGET_ENDPOINT } =
     await import(new URL("apps/api/src/services/getcourse-manager-form.ts", root));
   const context = { sessionId: "11111111-1111-4111-8111-111111111111", recommendedProgram: "Стройэксперт",
     recommendationText: "Точная персональная рекомендация.", diagnostic: { currentArea: "Проектирование",
@@ -53,6 +53,9 @@ try {
   assert.match(html, /__artem_getcourse_action/);
   assert.match(html, /action\.value="https:\/\/inobr\.ru\.com\/pl\/lite\/block-public\/process-html\?id=2252008810"/);
   assert.match(html, /__artem_manager_form_request_id/);
+  assert.match(html, /__artem_getcourse_canonical_phone/);
+  assert.match(html, /input\.iti__tel-input/);
+  assert.match(html, /form\.addEventListener\("submit",syncPhone,true\)/);
   assert.match(html, /\[data-id="22041910"\]\{display:none!important\}/);
   assert.ok(trace.some(item => item.stage === "getcourse_widget_fetch_success" && item.formFound));
   assert.ok(trace.some(item => item.stage === "getcourse_fields_resolved" && item.dialogue22041910));
@@ -71,6 +74,13 @@ try {
   assert.equal(body.get("formParams[dealCustomFields][11904802]"), "1");
   assert.equal(body.get("formParams[dealCustomFields][11904803]"), "1");
   assert.equal(body.get("formParams[dealCustomFields][22041910]"), comment);
+  assert.equal(normalizeGetCoursePhone("+7 (980) 731-73-27"), "+79807317327");
+  assert.equal(normalizeGetCoursePhone("9807317327"), "+79807317327");
+  assert.equal(normalizeGetCoursePhone("8 980 731-73-27"), "+79807317327");
+  assert.equal(normalizeGetCoursePhone("8980143545534634531545656"), undefined);
+  const corruptedPhoneBody = serializeGetCourseWidgetBody(`formParams%5Bphone%5D=8980143545534634531545656&formParams%5Bphone%5D=%2B7+%28980%29+731-73-27&${GETCOURSE_CANONICAL_PHONE_FIELD}=%2B7+%28980%29+731-73-27`, comment);
+  assert.deepEqual(corruptedPhoneBody.getAll("formParams[phone]"), ["+79807317327"]);
+  assert.equal(corruptedPhoneBody.has(GETCOURSE_CANONICAL_PHONE_FIELD), false);
   let submitted;
   const submitResult = await submitGetCourseWidgetBody(body, "PHPSESSID5=session", async (url, init) => { submitted = { url, init };
     return new Response('{"success":true,"data":{"parts":[]}}', { headers: { "content-type": "application/json" } }); },

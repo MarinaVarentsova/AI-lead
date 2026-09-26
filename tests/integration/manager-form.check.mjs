@@ -79,6 +79,7 @@ try {
   };
   const formBody = { formParams: { email: "test-artem-debug@example.com", full_name: "ТЕСТ Артем_Экспертович_DEBUG",
     phone: "+70000000000", dealCustomFields: { 11904802: "1", 11904803: "1", 22041910: "browser value" } },
+    __artem_getcourse_canonical_phone: "+7 (000) 000-00-00",
     pdpConfirmCheckbox: "on", requestTime: "1", requestSimpleSign: "abc", isHtmlWidget: "1",
     __artem_getcourse_action: "https://inobr.ru.com/pl/lite/block-public/process?id=2252008810&gcSession=test" };
   const req = { params: { sessionId }, body: formBody, headers: { cookie: "PHPSESSID5=test; _csrf=test" }, log };
@@ -142,6 +143,7 @@ try {
   assert.equal(postedBody.get("formParams[email]"), "test-artem-debug@example.com");
   assert.equal(postedBody.get("formParams[full_name]"), "ТЕСТ Артем_Экспертович_DEBUG");
   assert.equal(postedBody.get("formParams[phone]"), process.env.GETCOURSE_REAL_SUBMIT === "1" ? "+79991234567" : "+70000000000");
+  assert.equal(postedBody.has("__artem_getcourse_canonical_phone"), false);
   assert.equal(postedBody.get("formParams[dealCustomFields][11904802]"), "1");
   assert.equal(postedBody.get("formParams[dealCustomFields][11904803]"), "1");
   assert.equal(postedBody.get("pdpConfirmCheckbox"), "on");

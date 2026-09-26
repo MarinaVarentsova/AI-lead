@@ -8,6 +8,7 @@ export const GETCOURSE_ENDPOINT = `https://inobr.ru.com/pl/lite/block-public/pro
 export const GETCOURSE_WIDGET_ENDPOINT = `https://inobr.ru.com/pl/lite/widget/widget?id=${GETCOURSE_WIDGET_ID}`;
 export const GETCOURSE_ACTION_FIELD = "__artem_getcourse_action";
 export const MANAGER_FORM_REQUEST_ID_FIELD = "__artem_manager_form_request_id";
+export const GETCOURSE_CANONICAL_PHONE_FIELD = "__artem_getcourse_canonical_phone";
 
 export type ManagerFormTrace = (stage: string, details?: Record<string, unknown>) => void;
 
@@ -87,7 +88,7 @@ export async function loadGetCourseManagerWidget(input: { sessionId: string; man
     helper: html.includes("__gc__internal__form__helper"), helperRef: html.includes("__gc__internal__form__helper_ref"),
     requestTime: /window\.requestTime\s*=/.test(html), requestSimpleSign: /window\.requestSimpleSign\s*=/.test(html) });
   const bridge = `<style>[data-id="${GETCOURSE_COMMENT_FIELD}"]{display:none!important}</style><script>
-window.addEventListener("load",function(){setTimeout(function(){var form=document.querySelector('form[data-id="${GETCOURSE_BLOCK_ID}"]');if(form){var action=document.createElement("input");action.type="hidden";action.name=${JSON.stringify(GETCOURSE_ACTION_FIELD)};action.value=${JSON.stringify(upstreamAction)};form.appendChild(action);var requestId=document.createElement("input");requestId.type="hidden";requestId.name=${JSON.stringify(MANAGER_FORM_REQUEST_ID_FIELD)};requestId.value=${JSON.stringify(input.managerFormRequestId)};form.appendChild(requestId);form.action=window.location.origin+${JSON.stringify(`/api/manager-form/widget-submit/${input.sessionId}`)};window.parent.postMessage({type:"getcourse-manager-widget",status:"ready",sessionId:${JSON.stringify(input.sessionId)}} ,"*");}},0);});
+window.addEventListener("load",function(){setTimeout(function(){var form=document.querySelector('form[data-id="${GETCOURSE_BLOCK_ID}"]');if(form){var action=document.createElement("input");action.type="hidden";action.name=${JSON.stringify(GETCOURSE_ACTION_FIELD)};action.value=${JSON.stringify(upstreamAction)};form.appendChild(action);var requestId=document.createElement("input");requestId.type="hidden";requestId.name=${JSON.stringify(MANAGER_FORM_REQUEST_ID_FIELD)};requestId.value=${JSON.stringify(input.managerFormRequestId)};form.appendChild(requestId);var canonicalPhone=document.createElement("input");canonicalPhone.type="hidden";canonicalPhone.name=${JSON.stringify(GETCOURSE_CANONICAL_PHONE_FIELD)};form.appendChild(canonicalPhone);var visiblePhone=form.querySelector("input.iti__tel-input");var syncPhone=function(){canonicalPhone.value=visiblePhone&&visiblePhone.value||"";};if(visiblePhone){visiblePhone.addEventListener("input",syncPhone);visiblePhone.addEventListener("change",syncPhone);visiblePhone.addEventListener("blur",syncPhone);}form.addEventListener("submit",syncPhone,true);syncPhone();form.action=window.location.origin+${JSON.stringify(`/api/manager-form/widget-submit/${input.sessionId}`)};window.parent.postMessage({type:"getcourse-manager-widget",status:"ready",sessionId:${JSON.stringify(input.sessionId)}} ,"*");}},0);});
 </script>`;
   const getSetCookie = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
   return { html: html.replace(/<\/body>/i, `${bridge}</body>`), cookies: getSetCookie?.call(response.headers) ?? [] };
@@ -122,8 +123,23 @@ function appendFormValue(params: URLSearchParams, name: string, value: unknown):
 export function serializeGetCourseWidgetBody(body: unknown, comment: string): URLSearchParams {
   const params = typeof body === "string" ? new URLSearchParams(body) : new URLSearchParams();
   if (body && typeof body === "object") appendFormValue(params, "", body);
+  const phoneField = "formParams[phone]";
+  const phoneCandidates = [...params.getAll(GETCOURSE_CANONICAL_PHONE_FIELD), ...params.getAll(phoneField)];
+  const phone = phoneCandidates.map(normalizeGetCoursePhone).find((value): value is string => Boolean(value));
+  params.delete(GETCOURSE_CANONICAL_PHONE_FIELD);
+  params.delete(phoneField);
+  if (phone) params.set(phoneField, phone);
   params.set(`formParams[dealCustomFields][${GETCOURSE_COMMENT_FIELD}]`, comment);
   return params;
+}
+
+export function normalizeGetCoursePhone(value: string): string | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  let digits = trimmed.replace(/\D/g, "");
+  if (digits.length === 10 && digits.startsWith("9")) digits = `7${digits}`;
+  if (digits.length === 11 && digits.startsWith("8")) digits = `7${digits.slice(1)}`;
+  return digits.length >= 8 && digits.length <= 15 && digits[0] !== "0" ? `+${digits}` : undefined;
 }
 
 export function validateGetCourseWidgetBody(params: URLSearchParams): void {
@@ -163,6 +179,7 @@ export async function submitGetCourseWidgetBody(params: URLSearchParams, cookie:
   }
   params.delete(GETCOURSE_ACTION_FIELD);
   params.delete(MANAGER_FORM_REQUEST_ID_FIELD);
+  params.delete(GETCOURSE_CANONICAL_PHONE_FIELD);
   trace("getcourse_post_start", { destinationHostname: target.hostname, destinationPath: target.pathname,
     method: "POST", timestamp: new Date().toISOString() });
   let response: Response;
