@@ -136,8 +136,10 @@ export function validateGetCourseWidgetBody(params: URLSearchParams): void {
   if (!params.get(`formParams[dealCustomFields][${GETCOURSE_COMMENT_FIELD}]`)?.trim()) throw new Error("GETCOURSE_WIDGET_COMMENT_REQUIRED");
 }
 
+export interface GetCourseSubmitResult { status: number; contentType: string; body: string }
+
 export async function submitGetCourseWidgetBody(params: URLSearchParams, cookie: string | undefined,
-  fetcher: typeof fetch = fetch, trace: ManagerFormTrace = () => {}): Promise<void> {
+  fetcher: typeof fetch = fetch, trace: ManagerFormTrace = () => {}): Promise<GetCourseSubmitResult> {
   trace("getcourse_payload_built", { emailPresent: Boolean(params.get("formParams[email]")?.trim()),
     fullNamePresent: Boolean(params.get("formParams[full_name]")?.trim()),
     phonePresent: Boolean(params.get("formParams[phone]")?.trim()),
@@ -190,4 +192,5 @@ export async function submitGetCourseWidgetBody(params: URLSearchParams, cookie:
       upstreamStatus: response.status, timeout: false, network: false });
     throw new Error("GETCOURSE_SUBMIT_FAILED");
   }
+  return { status: response.status, contentType: response.headers.get("content-type") ?? "application/json", body: responseText };
 }

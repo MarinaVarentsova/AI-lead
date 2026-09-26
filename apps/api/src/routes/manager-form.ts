@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Request } from "express";
+import { Router, type IRouter, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import { findSession, recordEvent } from "../persistence/artem-repository";
 import { buildManagerLeadContext, ManagerLeadContextError } from "../services/manager-lead-context";
@@ -10,6 +10,9 @@ const router: IRouter = Router();
 const UUID_RE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const text = (value: unknown, max: number): value is string => typeof value === "string" && Boolean(value.trim()) && value.trim().length <= max;
 const widgetMessageHtml = (sessionId: string, status: "success" | "error") => `<!doctype html><html lang="ru"><head><meta charset="utf-8"></head><body><p>${status === "success" ? "Заявка отправлена." : "Не удалось отправить заявку. Попробуйте ещё раз."}</p><script>window.parent.postMessage({type:"getcourse-manager-widget",status:${JSON.stringify(status)},sessionId:${JSON.stringify(sessionId)}},"*");</script></body></html>`;
+const widgetSubmitError = (res: Response, status: number) => res.status(status)
+  .type("application/json").send(JSON.stringify({ success: false,
+    data: { formProcessed: false, error: "Не удалось отправить заявку. Попробуйте ещё раз." } }));
 
 const traceFor = (req: Request,
   sessionId: string, managerFormRequestId: string): ManagerFormTrace => (stage, details = {}) =>
@@ -87,7 +90,7 @@ router.post("/manager-form/widget-submit/:sessionId", async (req, res): Promise<
     if (!await findSession(sessionId)) { res.status(404).type("html").send(widgetMessageHtml(sessionId, "error")); return; }
     const { comment } = await contextFor(sessionId, trace);
     const params = serializeGetCourseWidgetBody(req.body, comment);
-    await submitGetCourseWidgetBody(params, getCourseCookieHeader(req.headers.cookie), fetch, trace);
+    const upstream = await submitGetCourseWidgetBody(params, getCourseCookieHeader(req.headers.cookie), fetch, trace);
     try {
       await recordEvent(sessionId, "manager_form_submit");
       trace("manager_form_submit_event_write", { attempted: true, written: true });
@@ -96,11 +99,11 @@ router.post("/manager-form/widget-submit/:sessionId", async (req, res): Promise<
         errorCode: "MANAGER_FORM_EVENT_FAILED", attempted: true, written: false }, "MANAGER_FORM_EVENT_FAILED");
     }
     trace("manager_form_completed", { result: "success" });
-    res.type("html").send(widgetMessageHtml(sessionId, "success"));
+    res.status(upstream.status).set("Content-Type", upstream.contentType).send(upstream.body);
   } catch (error) {
     if (error instanceof ManagerLeadContextError) {
       trace("manager_form_completed", { result: "internal_error", errorCode: error.code });
-      res.status(error.code === "SESSION_NOT_FOUND" ? 404 : 409).type("html").send(widgetMessageHtml(sessionId, "error")); return;
+      widgetSubmitError(res, error.code === "SESSION_NOT_FOUND" ? 404 : 409); return;
     }
     const errorCode = error instanceof Error ? error.message : "MANAGER_FORM_SUBMIT_FAILED";
     const validationError = ["GETCOURSE_WIDGET_FORM_INVALID", "GETCOURSE_WIDGET_CONSENT_REQUIRED",
@@ -112,7 +115,7 @@ router.post("/manager-form/widget-submit/:sessionId", async (req, res): Promise<
     req.log.error({ managerFormRequestId, sessionId, stage: "manager_form_submit", errorCode,
       httpStatus: validationError ? 400 : 502 },
       "MANAGER_FORM_FAILED");
-    res.status(validationError ? 400 : 502).type("html").send(widgetMessageHtml(sessionId, "error"));
+    widgetSubmitError(res, validationError ? 400 : 502);
   }
 });
 

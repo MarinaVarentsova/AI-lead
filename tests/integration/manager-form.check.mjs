@@ -33,7 +33,9 @@ const hooks = registerHooks({
 
 const response = () => ({ statusCode: 200, status(code) { this.statusCode = code; return this; },
   headers: [], append(name, value) { this.headers.push([name, value]); return this; },
-  json(body) { this.body = body; return this; }, type() { return this; }, send(body) { this.body = body; return this; } });
+  set(name, value) { this.headers.push([name, value]); return this; },
+  json(body) { this.body = body; return this; }, type(value) { this.contentType = value; return this; },
+  send(body) { this.body = body; return this; } });
 const traceLogs = [];
 const log = { info(data) { traceLogs.push(data); }, error(data) { traceLogs.push(data); } };
 try {
@@ -135,6 +137,7 @@ try {
     };
   }
   submitRes = response(); await postHandler(req, submitRes); assert.equal(submitRes.statusCode, 200);
+  assert.equal(submitRes.body, "success");
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_form_submit'")).rows[0].count, 1);
   assert.equal(postedBody.get("formParams[email]"), "test-artem-debug@example.com");
   assert.equal(postedBody.get("formParams[full_name]"), "ТЕСТ Артем_Экспертович_DEBUG");

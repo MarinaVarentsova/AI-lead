@@ -72,9 +72,11 @@ try {
   assert.equal(body.get("formParams[dealCustomFields][11904803]"), "1");
   assert.equal(body.get("formParams[dealCustomFields][22041910]"), comment);
   let submitted;
-  await submitGetCourseWidgetBody(body, "PHPSESSID5=session", async (url, init) => { submitted = { url, init };
+  const submitResult = await submitGetCourseWidgetBody(body, "PHPSESSID5=session", async (url, init) => { submitted = { url, init };
     return new Response('{"success":true,"data":{"parts":[]}}', { headers: { "content-type": "application/json" } }); },
   (stage, details) => trace.push({ stage, ...details }));
+  assert.equal(submitResult.status, 200); assert.equal(submitResult.contentType, "application/json");
+  assert.equal(submitResult.body, '{"success":true,"data":{"parts":[]}}');
   assert.equal(String(submitted.url), "https://inobr.ru.com/pl/lite/block-public/process?id=2252008810&gcSession=test");
   assert.equal(submitted.init.body, body); assert.equal(body.has(GETCOURSE_ACTION_FIELD), false);
   const missingConsent = new URLSearchParams(body); missingConsent.delete("formParams[dealCustomFields][11904803]");
