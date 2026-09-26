@@ -55,7 +55,16 @@ try {
   assert.match(html, /__artem_manager_form_request_id/);
   assert.match(html, /__artem_getcourse_canonical_phone/);
   assert.match(html, /input\.iti__tel-input/);
-  assert.match(html, /form\.addEventListener\("submit",syncPhone,true\)/);
+  assert.match(html, /__artem-form-error/);
+  assert.match(html, /role","alert/);
+  assert.match(html, /Не заполнено поле/);
+  assert.match(html, /Введите ваш эл\. адрес/);
+  assert.match(html, /Введите ваше имя/);
+  assert.match(html, /Введите ваш телефон/);
+  assert.match(html, /Я соглашаюсь на обработку персональных данных/);
+  assert.match(html, /Я соглашаюсь на получение рекламных рассылок/);
+  assert.match(html, /form\.addEventListener\("submit",validate,true\)/);
+  assert.match(html, /event\.stopImmediatePropagation\(\)/);
   assert.match(html, /\[data-id="22041910"\]\{display:none!important\}/);
   assert.ok(trace.some(item => item.stage === "getcourse_widget_fetch_success" && item.formFound));
   assert.ok(trace.some(item => item.stage === "getcourse_fields_resolved" && item.dialogue22041910));
