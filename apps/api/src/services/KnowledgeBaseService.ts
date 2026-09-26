@@ -1,4 +1,4 @@
-/** Canonical v4.0 follow-up source for legacy API readers as well as the shared Artem runtime. */
+/** Canonical v4.2 source for legacy API readers as well as the shared Artem runtime. */
 import { loadArtemKnowledge } from "../ai/artem-knowledge";
 import path from "path";
 import { logger } from "../lib/logger";
@@ -27,7 +27,7 @@ export interface KnowledgeBaseStatus {
 
 const KNOWLEDGE_BASE_SOURCE: KnowledgeSource = "file";
 
-const KNOWLEDGE_FILE_NAME = "artem_unified_knowledge_base_v4_0_followup.md";
+const KNOWLEDGE_FILE_NAME = "artem_unified_knowledge_base_v4_2.md";
 
 /**
  * Resolve the knowledge base file path relative to the workspace root,
@@ -123,7 +123,7 @@ class KnowledgeBaseService {
 
     return [
       {
-        id: "artem-v4.0-followup",
+        id: "artem-v4.2",
         title: "ИНОБР Knowledge Base",
         content,
         category: "general",

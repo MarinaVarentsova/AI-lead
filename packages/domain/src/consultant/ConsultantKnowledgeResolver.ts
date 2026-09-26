@@ -17,7 +17,7 @@ function matches(question: string, phrase: string): boolean {
 const PROFANITY = /(?:^|\s)(?:бля(?:дь|ть)?|блять|хуй|хуйн|пизд|ебан|ёбан|ебать|сука|мудак|дебил)(?:\s|$)/i;
 const SMALL_TALK = /^(?:привет|здравствуй(?:те)?|добрый (?:день|вечер|утро)|как дела\??|спасибо|благодарю|понятно|ок(?:ей)?)[!.?\s]*$/i;
 const UNKNOWN_PROGRAM_FACT = /лиценз|договор|возврат|срок доступ|доступ к (?:курс|материал)|признан.*диплом|иностранн.*диплом|требован.*(?:суда|работодател)/i;
-const TRAINING_TOPIC = /обуч|курс|программ|стройэксперт|приемк|приёмк|ижс|(?:^|\s)цен(?:а|у|ы|е|ой)(?:\s|[?.!,]|$)|дорог|деньг|стоим|стоит|стольк|рассроч|оплат|диплом|бумажк|документ|сертификат|квалификац|поступ|образован|дефект|эксперт|работ|трудоустр|гарант|клиент|заказ|доход|тариф|польз|зачем|получу|смогу|развод|маркетинг/i;
+const TRAINING_TOPIC = /обуч|курс|программ|стройэксперт|приемк|приёмк|ижс|(?:^|\s)цен(?:а|у|ы|е|ой)(?:\s|[?.!,]|$)|дорог|деньг|стоим|стоит|стольк|рассроч|оплат|диплом|бумажк|документ|сертификат|квалификац|поступ|образован|дефект|эксперт|работ|трудоустр|гарант|клиент|заказ|доход|тариф|польз|зачем|получу|смогу|развод|маркетинг|дистанц|очно|длится|практик|задан|промокод|скидк|возврат|запис|оформ|(?:^|\s)сро(?:\s|[?.!,]|$)|старт|расписан/i;
 const CONTEXTUAL_DISTRUST = /^(?:ты )?(?:вообще )?(?:что[ -]?нибудь знаешь|что то знаешь)|опять вода|ничего конкретного не сказал|это все\??$/i;
 
 export function classifyConsultantIntent(rawQuestion: string, hasRetrievedTopic = false): ConsultantIntent {
@@ -69,7 +69,7 @@ export class ConsultantKnowledgeResolver {
     // Stable content fingerprint, not a security hash. Changes invalidate the source version.
     let hash = 2166136261;
     for (const char of markdown.replace(/\r\n/g, "\n")) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-    this.sourceVersion = `inobr-artem-v4.0-followup-${(hash >>> 0).toString(16)}`;
+    this.sourceVersion = `inobr-artem-v4.2-${(hash >>> 0).toString(16)}`;
   }
 
   resolve(input: ConsultantInput): ConsultantRetrievalPacket {

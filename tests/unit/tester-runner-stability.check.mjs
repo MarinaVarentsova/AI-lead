@@ -51,7 +51,7 @@ try {
   function runtimeFor(overrides = {}) {
     const counters = { diagnostic: 0, reply: 0, evaluator: 0, summary: 0 };
     const runtime = {
-      markdown: "## 1. Canonical v4.0 follow-up\nConfirmed knowledge.",
+      markdown: "## 1. Canonical v4.2\nConfirmed knowledge.",
       diagnostic: { async generate() {
         counters.diagnostic++;
         return overrides.diagnostic ? overrides.diagnostic(counters.diagnostic) : { result: diagnosticResult, source: "ai" };

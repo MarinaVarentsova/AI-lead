@@ -20,7 +20,7 @@ function unknownProgramFactReply(question: string): string {
     /возврат/.test(q) ? "условия возврата" : /доступ/.test(q) ? "срок доступа к материалам" :
       /иностран|признан.*диплом/.test(q) ? "признание конкретного диплома" :
         /суд/.test(q) ? "требования конкретного суда" : /работодател/.test(q) ? "требования конкретного работодателя" : "запрошенный параметр программы";
-  return `Подтверждённых данных про ${parameter} сейчас нет. Этот конкретный параметр нужно уточнить у менеджера.`;
+  return `Подтверждённых данных про ${parameter} сейчас нет. Для более подробной информации лучше обратиться к менеджеру. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».`;
 }
 export class ConsultantChatService {
   constructor(private readonly resolver: ConsultantKnowledgeResolver, private readonly provider: ConsultantAIProvider, private readonly markdown?: string) {}
@@ -34,9 +34,10 @@ export class ConsultantChatService {
     const markdown = this.markdown ?? await loadArtemKnowledge();
     const commercialQuestion = /рассроч|оплат|частями|график.*плат|платить.*месяц|ежемесяч|перв.*взнос|разбить.*плат|сколько стоит|стоимость|какая цена|какие цены|цен[аыуеой]|тариф/i.test(facts.question) &&
       !/скидк|акци|индивидуальн|специальн.*цен|конкурент.*дешев|бесплатн/i.test(facts.question);
-    const directFactQuestion = /какой документ|что (?:я )?получу после обуч|можно (?:ли )?начать|когда (?:можно )?начать|что входит|содержан.*программ|как проходит обуч|формат обуч|есть практика|практическ.*задани|сколько длится|продолжительность/i.test(facts.question);
+    const directFactQuestion = /какой документ|что (?:я )?получу после обуч|можно (?:ли )?начать|когда (?:можно )?начать|что входит|содержан.*программ|как проходит обуч|формат обуч|обучение дистанционное|приезжать очно|есть практика|практическ.*задани|сколько длится|продолжительность/i.test(facts.question);
+    const policyMatrixQuestion = /как (?:записаться|поступить|попасть|оформить)|куда записываться|что делать дальше|скидк|промокод|акци|возврат|вернуть деньги|ближайш.*(?:старт|поток)|расписан|срок.*доступ|что такое.*(?:при[её]мк|строительн.*контрол)|что выбрать.*(?:стройэксперт|при[её]мк)|судебн.*эксперт|конкретн.*суд|(?:^|\s)сро(?:\s|[?.!,]|$)|гарант.*(?:работ|доход|заказ)|сколько.*час|чему учат/i.test(facts.question);
     const managerContactQuestion = /как со мной свяж|как связаться.*менеджер|свяжется менеджер/i.test(facts.question);
-    if (commercialQuestion || managerContactQuestion || directFactQuestion) return {
+    if (commercialQuestion || managerContactQuestion || directFactQuestion || policyMatrixQuestion) return {
       message: consultantFallback(facts, markdown), isAI: false, provider: "fallback",
       matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null,
     };

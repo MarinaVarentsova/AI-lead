@@ -31,7 +31,7 @@ try {
     recommendationText: "Точная персональная рекомендация.", diagnostic: { currentArea: "Проектирование",
       currentRole: "Проектировщик", educationStatus: "Высшее", targetTasks: "Исследовать дефекты" },
     dialogSummary: "Краткое резюме без домыслов.", transcript: [{ role: "user", text: "Сколько стоит?" },
-      { role: "assistant", text: "Подтверждённая цена." }], knowledgeBaseVersion: "inobr-artem-v4.0-followup",
+      { role: "assistant", text: "Подтверждённая цена." }], knowledgeBaseVersion: "inobr-artem-v4.2",
     createdAt: "2026-09-24T00:00:00.000Z", summarySource: "ai" };
   const comment = formatGetCourseManagerComment(context);
   const widgetFixture = `<!doctype html><html><head></head><body><form id="ltForm5600148" data-id="2252008810" action="${GETCOURSE_ENDPOINT}">

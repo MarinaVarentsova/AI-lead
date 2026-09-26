@@ -1,11 +1,11 @@
 import type { ConsultantSection } from "./consultant-types";
 export const UNKNOWN_KNOWLEDGE = "Этот конкретный параметр требует проверки. Индивидуальные условия можно уточнить у менеджера.";
 export function createConsultantSections(markdown: string): readonly ConsultantSection[] {
-  if (!markdown.includes("Версия 4.0 · 19 сентября 2026 года.")) throw new Error("Artem v4.0 follow-up source required");
+  if (!markdown.includes("Версия 4.2 · 19 сентября 2026 года.")) throw new Error("Artem v4.2 source required");
   const blocks = new Map<string, string>();
   for (const block of markdown.replace(/\r\n/g, "\n").split(/(?=^## \d+\.)/m)) {
     const id = /^## (\d+)\./.exec(block)?.[1];
-    if (id) blocks.set(id, block.trim());
+    if (id) blocks.set(id, [blocks.get(id), block.trim()].filter(Boolean).join("\n\n"));
   }
   const read = (...ids: string[]) => ids.map(id => { const text = blocks.get(id); if (!text) throw new Error("Missing canonical section " + id); return text; }).join("\n\n");
   const price = (name: string) => read("12").split("### " + name + "\n")[1]?.split("\n### ")[0] ?? "";
@@ -31,6 +31,8 @@ export function createConsultantSections(markdown: string): readonly ConsultantS
     s("orders", "Заказы", ["заказ", "клиент", "на себя"], ["17"]),
     s("guarantees", "Ограничения гарантий", ["гарант", "заказ", "клиент"], ["17"]),
     s("start", "Формат обучения", ["старт", "начать", "срок", "групп", "дистанц", "учиться"], ["7"]),
+    s("enrollment", "Запись и оформление", ["записаться", "оформить обучение", "как поступить", "что делать дальше"], ["17", "18"]),
+    s("commercial_unknown", "Условия для уточнения у менеджера", ["рассроч", "промокод", "скидк", "возврат", "расписан", "срок доступа", "первый взнос"], ["15", "18"]),
     s("objections", "Работа с сомнениями", ["дорого", "скидк", "акци", "сомнева", "подумаю", "не сейчас", "посоветова", "телефон", "оставлять"], ["15", "16"]),
     s("manager", "Уточнение условий", [], ["20"], UNKNOWN_KNOWLEDGE),
     s("comparison", "Выбор направления", ["чем отлич", "сравн", "разниц", "ижс"], ["4"]),
