@@ -32,8 +32,10 @@ const hooks = registerHooks({
 });
 
 const response = () => ({ statusCode: 200, status(code) { this.statusCode = code; return this; },
+  headers: [], append(name, value) { this.headers.push([name, value]); return this; },
   json(body) { this.body = body; return this; }, type() { return this; }, send(body) { this.body = body; return this; } });
-const log = { error() {} };
+const traceLogs = [];
+const log = { info(data) { traceLogs.push(data); }, error(data) { traceLogs.push(data); } };
 try {
   await pg.exec(`CREATE TABLE ai_sessions(id uuid PRIMARY KEY,session_key text NOT NULL UNIQUE,first_page_url text,
     utm_source text,utm_medium text,utm_campaign text,utm_content text,utm_term text,created_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now());
@@ -64,6 +66,7 @@ try {
     "INSERT INTO ai_dialogue(session_id,message_order,speaker,stage,message_type,text) VALUES($1,$2,$3,$4,$5,$6)",
     [sessionId,index+1,...row]);
   const getHandler = router.stack.find(layer => layer.route?.path === "/manager-form/context/:sessionId").route.stack[0].handle;
+  const widgetHandler = router.stack.find(layer => layer.route?.path === "/manager-form/widget/:sessionId").route.stack[0].handle;
   const postHandler = router.stack.find(layer => layer.route?.path === "/manager-form/widget-submit/:sessionId").route.stack[0].handle;
   const contextRes = response(); await getHandler({ params: { sessionId }, log }, contextRes);
   assert.equal(contextRes.statusCode, 200); assert.match(contextRes.body.comment, /Точная рекомендация/);
@@ -72,22 +75,25 @@ try {
   globalThis.fetch = async (_url, init = {}) => {
     if (init.method === "POST") { postedBody = init.body; return new Response(shouldFail ? "Не заполнено поле Email" : "success", { status: 200 }); }
   };
-  const formBody = { formParams: { email: "test-artem-dialog@example.com", full_name: "ТЕСТ Артем_Экспертович_WIDGET",
+  const formBody = { formParams: { email: "test-artem-debug@example.com", full_name: "ТЕСТ Артем_Экспертович_DEBUG",
     phone: "+70000000000", dealCustomFields: { 11904802: "1", 11904803: "1", 22041910: "browser value" } },
     pdpConfirmCheckbox: "on", requestTime: "1", requestSimpleSign: "abc", isHtmlWidget: "1",
     __artem_getcourse_action: "https://inobr.ru.com/pl/lite/block-public/process?id=2252008810&gcSession=test" };
   const req = { params: { sessionId }, body: formBody, headers: { cookie: "PHPSESSID5=test; _csrf=test" }, log };
   const missingConsentRes = response(); await postHandler({ ...req, body: { ...formBody,
     formParams: { ...formBody.formParams, dealCustomFields: { ...formBody.formParams.dealCustomFields, 11904803: "" } } } }, missingConsentRes);
-  assert.equal(missingConsentRes.statusCode, 502);
+  assert.equal(missingConsentRes.statusCode, 400);
   await recordEvent(sessionId, "manager_contact_click");
   let submitRes = response(); await postHandler(req, submitRes); assert.equal(submitRes.statusCode, 502);
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_form_submit'")).rows[0].count, 0);
   shouldFail = false;
+  let realRequestId;
   if (process.env.GETCOURSE_REAL_SUBMIT === "1") {
-    const widgetResponse = await originalFetch(
-      "https://inobr.ru.com/pl/lite/widget/widget?id=1658046&loc=https%3A%2F%2Fartem.inobr-expert.ru%2F&ref=");
-    const widgetHtml = await widgetResponse.text();
+    globalThis.fetch = originalFetch;
+    const widgetRes = response();
+    await widgetHandler({ params: { sessionId }, query: { sourceUrl: "https://artem.inobr-expert.ru/", referrer: "" }, log }, widgetRes);
+    assert.equal(widgetRes.statusCode, 200);
+    const widgetHtml = widgetRes.body;
     const action = /<form[\s\S]*?data-id\s*=\s*["']?2252008810["']?[\s\S]*?action="([^"]+)"/i.exec(widgetHtml)?.[1]
       ?.replaceAll("&amp;", "&");
     assert.ok(action?.startsWith("https://inobr.ru.com/pl/lite/block-public/process?"));
@@ -98,8 +104,8 @@ try {
       const value = /\bvalue="([^"]*)"/i.exec(tag)?.[1] ?? "";
       realParams.append(name.replaceAll("&amp;", "&"), value.replaceAll("&quot;", '"').replaceAll("&amp;", "&"));
     }
-    realParams.set("formParams[email]", "test-artem-dialog@example.com");
-    realParams.set("formParams[full_name]", "ТЕСТ Артем_Экспертович_WIDGET");
+    realParams.set("formParams[email]", "test-artem-debug@example.com");
+    realParams.set("formParams[full_name]", "ТЕСТ Артем_Экспертович_DEBUG");
     realParams.set("formParams[phone]", "+79991234567");
     realParams.set("formParams[dealCustomFields][11904802]", "1");
     realParams.set("formParams[dealCustomFields][11904803]", "1");
@@ -109,8 +115,12 @@ try {
     assert.ok(realParams.get("requestTime"));
     assert.ok(realParams.get("requestSimpleSign"));
     realParams.set("__artem_getcourse_action", action);
+    const managerFormRequestId = /requestId\.value="([0-9a-f-]{36})"/i.exec(widgetHtml)?.[1];
+    assert.ok(managerFormRequestId);
+    realRequestId = managerFormRequestId;
+    realParams.set("__artem_manager_form_request_id", managerFormRequestId);
     req.body = realParams.toString();
-    req.headers.cookie = widgetResponse.headers.getSetCookie().map(value => value.split(";", 1)[0]).join("; ");
+    req.headers.cookie = widgetRes.headers.filter(([name]) => name === "Set-Cookie").map(([, value]) => value.split(";", 1)[0]).join("; ");
     globalThis.fetch = async (url, init = {}) => {
     if (init.method === "POST") postedBody = init.body;
     const response = await originalFetch(url, init);
@@ -126,8 +136,8 @@ try {
   }
   submitRes = response(); await postHandler(req, submitRes); assert.equal(submitRes.statusCode, 200);
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_form_submit'")).rows[0].count, 1);
-  assert.equal(postedBody.get("formParams[email]"), "test-artem-dialog@example.com");
-  assert.equal(postedBody.get("formParams[full_name]"), "ТЕСТ Артем_Экспертович_WIDGET");
+  assert.equal(postedBody.get("formParams[email]"), "test-artem-debug@example.com");
+  assert.equal(postedBody.get("formParams[full_name]"), "ТЕСТ Артем_Экспертович_DEBUG");
   assert.equal(postedBody.get("formParams[phone]"), process.env.GETCOURSE_REAL_SUBMIT === "1" ? "+79991234567" : "+70000000000");
   assert.equal(postedBody.get("formParams[dealCustomFields][11904802]"), "1");
   assert.equal(postedBody.get("formParams[dealCustomFields][11904803]"), "1");
@@ -137,8 +147,20 @@ try {
   for (const part of ["Рекомендованная программа:", "Рекомендация Артёма:", "Диагностика:",
     "Краткое резюме:", "Диалог:", "Session ID:", "Версия базы знаний:"]) assert.ok(submittedComment.includes(part));
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_contact_click'")).rows[0].count, 1);
+  const emptySessionId = randomUUID();
+  await pg.query("INSERT INTO ai_sessions(id,session_key) VALUES($1,$2)", [emptySessionId, "manager-form-empty"]);
+  const contextFailureRes = response();
+  await postHandler({ params: { sessionId: emptySessionId }, body: formBody,
+    headers: { cookie: "PHPSESSID5=test" }, log }, contextFailureRes);
+  assert.equal(contextFailureRes.statusCode, 409);
+  assert.ok(traceLogs.some(item => item.sessionId === emptySessionId && item.stage === "manager_context_error"));
+  const serializedLogs = JSON.stringify(traceLogs);
+  assert.doesNotMatch(serializedLogs, /test-artem-debug@example\.com|\+79991234567|requestSimpleSign":"|Пользователь: Сколько стоит/);
   globalThis.fetch = originalFetch;
-  if (process.env.GETCOURSE_REAL_SUBMIT === "1") console.log(JSON.stringify({ dialogueField: "formParams[dealCustomFields][22041910]",
+  if (process.env.GETCOURSE_REAL_SUBMIT === "1") console.log(JSON.stringify({ managerFormRequestId: realRequestId,
+    timeline: traceLogs.filter(item => item.managerFormRequestId === realRequestId).map(item => ({ stage: item.stage,
+      result: item.result, httpStatus: item.httpStatus, successDetected: item.successDetected, validationError: item.validationError })),
+    dialogueField: "formParams[dealCustomFields][22041910]",
     commentLength: submittedComment.length, commentFirst200: submittedComment.slice(0, 200),
     commentLast200: submittedComment.slice(-200), transcriptPresent: submittedComment.includes("Пользователь: Сколько стоит?") }));
   console.log(`PASS: current session context, simultaneous payload, failed-submit retry and success-only manager_form_submit event${process.env.GETCOURSE_REAL_SUBMIT === "1" ? "; real GetCourse HTTP submit accepted" : ""}.`);
