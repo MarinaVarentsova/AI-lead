@@ -59,6 +59,8 @@ function intentSatisfied(intent, rawMessage, question) {
     case "enrollment": return /запис|оформ/.test(message) && hasManager(message);
     case "education": return /спо/.test(message) && /высш/.test(message) && /любого профиля|профильн.*не обяз/.test(message);
     case "format": return /дистанц/.test(message) && /индивидуальн.*график/.test(message);
+    case "format_online_offline": return /дистанц/.test(message) && /образовательн.*платформ/.test(message) &&
+      /без обязательного очного посещения/.test(message) && /индивидуальн.*график/.test(message);
     case "duration": return /260/.test(message) && /520/.test(message) && /академическ/.test(message);
     case "content": return /дефект/.test(message) && /техническ.*документац/.test(message) && /экспертн.*заключ/.test(message);
     case "practice": return /практическ.*задан/.test(message) && /итогов.*работ/.test(message) && /провер/.test(message);
@@ -70,6 +72,11 @@ function intentSatisfied(intent, rawMessage, question) {
     case "compare": return /стройэксперт/i.test(question) ?
       /стройэксперт/.test(message) && /приемк.*квартир/.test(message) && /осмотр.*квартир/.test(message) && /экспертн.*заключ/.test(message) :
       /приемк.*квартир/.test(message) && /приемк.*ижс/.test(message) && /квартир/.test(message) && /частн.*дом/.test(message);
+    case "tariff_comparison": return includesAll(message.replace(/\s/g, ""), ["14900", "33000", "56000", "99000"]) &&
+      /260.*академическ.*час/.test(message) && /520.*час/.test(message) && /расширенн.*комплект.*документ.*учебн.*материал/.test(message) &&
+      /дополнительн.*программ.*по выбору/.test(message) && /приемк.*объект.*ижс/.test(message) &&
+      !/лучший|оптимальн|для новичк|для профессионал|для судебн/.test(message);
+    case "financing": return /условия оплаты/.test(message) && /рассроч/.test(message) && /кредит/.test(message) && /отсроч/.test(message) && hasManager(message);
     case "schedule_access": return /можно.*начать.*(?:сегодня|завтра|сейчас)/i.test(question)
       ? /дистанц/.test(message) && /индивидуальн.*график/.test(message)
       : hasManager(message);
@@ -85,12 +92,12 @@ function intentSatisfied(intent, rawMessage, question) {
 function evaluate(row, message) {
   const normalized = normalize(message);
   if (!intentSatisfied(row.intent, message, row.question) || hardUnsupportedNo(normalized)) return "FAIL";
-  // KB v4.2 explicitly answers that training can start now; the corpus' generic
+  // KB v4.3 explicitly answers that training can start now; the corpus' generic
   // MANAGER label for these rows is an evaluator expectation error, not a runtime gap.
   const knownImmediateStart = row.intent === "schedule_access" && /можно.*начать.*(?:сегодня|завтра|сейчас)/i.test(row.question);
   const managerPolicy = !knownImmediateStart && (row.policy.startsWith("MANAGER") || row.policy === "MIXED");
   if (managerPolicy && !hasManager(normalized)) return "FAIL";
-  const pureFact = ["price", "format", "content", "practice", "documents", "compare"].includes(row.intent);
+  const pureFact = ["price", "format", "format_online_offline", "tariff_comparison", "content", "practice", "documents", "compare"].includes(row.intent);
   if (pureFact && hasManager(normalized)) return "FAIL";
   if (managerPolicy && !/кнопк|воспользуйтесь/.test(normalized)) return "REVIEW";
   return "PASS";
@@ -101,18 +108,21 @@ try {
     import(new URL("apps/api/src/ai/artem-runtime.ts", root)),
     import(new URL("packages/domain/src/diagnostic/diagnostic-types.ts", root)),
   ]);
-  const csvPath = new URL("tests/regression/artem_client_questions_1000.csv", root);
-  const kbPath = new URL("knowledge/inobr/artem_unified_knowledge_base_v4_2.md", root);
+  const csvPath = new URL("tests/regression/artem_client_questions_1200.csv", root);
+  const kbPath = new URL("knowledge/inobr/artem_unified_knowledge_base_v4_3.md", root);
   const canonical = readFileSync(kbPath, "utf8");
-  const rows = parseCsv(readFileSync(csvPath, "utf8"));
-  assert.equal(rows.length, 1000);
+  const allRows = parseCsv(readFileSync(csvPath, "utf8"));
+  assert.equal(allRows.length, 1200);
+  const requestedIntent = process.env.ARTEM_REGRESSION_INTENT?.trim();
+  const rows = requestedIntent ? allRows.filter(row => row.intent === requestedIntent) : allRows;
+  assert.ok(rows.length, `No corpus rows for intent ${requestedIntent}`);
   assert.equal(await loadArtemKnowledge(), canonical);
-  assert.equal(SOURCE_VERSION, "inobr-artem-v4.2");
+  assert.equal(SOURCE_VERSION, "inobr-artem-v4.3");
   const provider = { generateStructured: async () => { throw new Error("REGRESSION_PROVIDER_DISABLED"); },
     generateConsultantReply: async () => { throw new Error("REGRESSION_PROVIDER_DISABLED"); } };
   const runtime = createArtemRuntime(canonical, provider);
   assert.equal(runtime.markdown, canonical);
-  assert.match(runtime.resolver.resolve({ question: "Сколько стоит?" }).sourceVersion, /^inobr-artem-v4\.2-/);
+  assert.match(runtime.resolver.resolve({ question: "Сколько стоит?" }).sourceVersion, /^inobr-artem-v4\.3-/);
   const answers = { current_area: "design_estimates", current_role: "engineer_designer_estimator",
     education_status: "higher", target_tasks: "defects_quality" };
   const results = [];
@@ -135,6 +145,8 @@ try {
   const report = { total: results.length, ...counts, categories,
     sha256: createHash("sha256").update(canonical).digest("hex"), sourceVersion: SOURCE_VERSION,
     consultantSourceVersion: runtime.resolver.resolve({ question: "Сколько стоит?" }).sourceVersion,
+    failureSamples: results.filter(row => row.verdict !== "PASS").slice(0, 20).map(({ id, category, intent, question, verdict, message }) =>
+      ({ id, category, intent, question, verdict, message })),
     failures: [...new Set(results.filter(row => row.verdict !== "PASS").map(row => row.category))].map(category => {
       const { id, intent, verdict, message } = results.find(row => row.category === category && row.verdict !== "PASS");
       return { id, category, intent, verdict, message };

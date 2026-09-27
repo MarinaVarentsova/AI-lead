@@ -32,12 +32,13 @@ export class ConsultantChatService {
   async generate(input: ConsultantProviderInput): Promise<ConsultantChatResponse> {
     const facts = selectConsultantInput(input);
     const markdown = this.markdown ?? await loadArtemKnowledge();
-    const commercialQuestion = /рассроч|оплат|частями|график.*плат|платить.*месяц|ежемесяч|перв.*взнос|разбить.*плат|сколько стоит|стоимость|какая цена|какие цены|цен[аыуеой]|тариф/i.test(facts.question) &&
+    const commercialQuestion = /рассроч|кредит|отсроч|оплат|частями|график.*плат|платить.*месяц|ежемесяч|перв.*взнос|разбить.*плат|заплатить потом|перенести.*плат|досрочн.*погаш|сколько стоит|стоимость|какая цена|какие цены|цен[аыуеой]|тариф/i.test(facts.question) &&
       !/скидк|акци|индивидуальн|специальн.*цен|конкурент.*дешев|бесплатн/i.test(facts.question);
-    const directFactQuestion = /какой документ|что (?:я )?получу после обуч|можно (?:ли )?начать|когда (?:можно )?начать|что входит|содержан.*программ|как проходит обуч|формат обуч|обучение дистанционное|приезжать очно|есть практика|практическ.*задани|сколько длится|продолжительность/i.test(facts.question);
+    const tariffComparisonQuestion = /чем отличаются.*тариф|разниц.*(?:тариф|базов|средн|премиум|час|документ|материал)|(?:средн|премиум|базов).*отлича|что входит.*(?:тариф|базов|средн|премиум)|какой тариф выбрать|почему тарифы|что.*в каждом тариф|сравнить.*тариф|какие тарифы|в каком тариф|тариф.*разные программ/i.test(facts.question);
+    const directFactQuestion = /какой документ|что (?:я )?получу после обуч|можно (?:ли )?начать|когда (?:можно )?начать|что входит|содержан.*программ|как проходит обуч|формат обуч|обучение дистанционное|онлайн|офлайн|приезжать очно|очн(?:ые|ая|ое|ый).*?(?:занят|встреч|посещ)|другого города|другой страны|посещать институт|обучение дома|своем темпе|своём темпе|есть практика|практическ.*задани|сколько длится|продолжительность/i.test(facts.question);
     const policyMatrixQuestion = /как (?:записаться|поступить|попасть|оформить)|куда записываться|что делать дальше|скидк|промокод|акци|возврат|вернуть деньги|ближайш.*(?:старт|поток)|расписан|срок.*доступ|что такое.*(?:при[её]мк|строительн.*контрол)|что выбрать.*(?:стройэксперт|при[её]мк)|судебн.*эксперт|конкретн.*суд|(?:^|\s)сро(?:\s|[?.!,]|$)|гарант.*(?:работ|доход|заказ)|сколько.*час|чему учат/i.test(facts.question);
     const managerContactQuestion = /как со мной свяж|как связаться.*менеджер|свяжется менеджер/i.test(facts.question);
-    if (commercialQuestion || managerContactQuestion || directFactQuestion || policyMatrixQuestion) return {
+    if (tariffComparisonQuestion || commercialQuestion || managerContactQuestion || directFactQuestion || policyMatrixQuestion) return {
       message: consultantFallback(facts, markdown), isAI: false, provider: "fallback",
       matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null,
     };

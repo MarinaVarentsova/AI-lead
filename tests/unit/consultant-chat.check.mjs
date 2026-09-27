@@ -237,6 +237,16 @@ try {
   assert.match(formerPremiumPayment.message, /Премиум.*56 000/i);
   assert.doesNotMatch(formerPremiumPayment.message, /9 330|график|плат[её]ж/i);
   assert.doesNotMatch(formerPremiumPayment.message, /один из шести платежей/i);
+  const tariffComparison = await run({ message: "Чем Средний отличается от Премиум?" });
+  assert.match(tariffComparison.message, /14 900.*33 000.*56 000.*99 000/is);
+  assert.match(tariffComparison.message, /260.*520.*дополнительн.*программ.*при[её]мк.*ИЖС/is);
+  assert.doesNotMatch(tariffComparison.message, /лучший|оптимальн|для новичк|для профессионал|уточн.*менеджер/i);
+  const financing = await run({ message: "Можно оформить образовательный кредит?" });
+  assert.match(financing.message, /условия оплаты.*рассрочки.*кредита.*отсрочки.*менеджер/is);
+  assert.doesNotMatch(financing.message, /кредита нет|беспроцент|\d+\s*месяц/i);
+  const onlineFormat = await run({ message: "Есть обязательные очные встречи?" });
+  assert.match(onlineFormat.message, /дистанционно.*образовательной платформе.*без обязательного очного посещения.*индивидуальном графике/is);
+  assert.doesNotMatch(onlineFormat.message, /менеджер|требует проверки/i);
   const school = await run({ row: { ...fixture.row, educationStatus: "no_higher_or_secondary_vocational" } });
   assert.ok(school.message.includes("Приёмка квартир"));
   const schoolJudicial = await run({ row: { ...fixture.row, educationStatus: "no_higher_or_secondary_vocational" },
@@ -298,7 +308,7 @@ try {
   assert.match(freeProgram.message, /нет подтверждённой информации.*акци/i);
   assert.doesNotMatch(freeProgram.message, /такой акции нет/i);
   const installments = await run({ message: "Рассрочка точно беспроцентная и без первого взноса?" });
-  assert.equal(installments.message, "Условия оплаты и рассрочки лучше уточнить у менеджера. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».");
+  assert.equal(installments.message, "Условия оплаты, рассрочки, кредита или отсрочки лучше уточнить у менеджера. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».");
   assert.doesNotMatch(installments.message, /\d|телефон|email|telegram|whatsapp|задайте/i);
   const refund = await run({ message: "Если передумаю, гарантированно вернёте всю сумму?" });
   assert.match(refund.message, /условия возврата.*не описаны.*полный возврат подтвердить не могу/i);
@@ -369,7 +379,7 @@ try {
   assert.ok(!("limitReached" in finalReply));
   assert.ok(!finalReply.message.includes("Дальше можно продолжить с менеджером"), "No mechanical terminal CTA");
   const managerReply = await run({ row: qualified, history: completeHistory, message: "Есть рассрочка?" });
-  assert.equal(managerReply.message, "Условия оплаты и рассрочки лучше уточнить у менеджера. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».");
+  assert.equal(managerReply.message, "Условия оплаты, рассрочки, кредита или отсрочки лучше уточнить у менеджера. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».");
   const afterManager = await run({ row: qualified, history: [...completeHistory,
     { role: "user", message: "Есть рассрочка?" }, { role: "assistant", message: managerReply.message }], message: "Какой документ?" });
   assert.match(afterManager.message, /диплом/i);
@@ -393,10 +403,10 @@ try {
     { role: "assistant", message: "Обсудим Средний." }], message: "Сколько стоит?" });
   assert.match(mediumPrice.message, /Средний.*33 000/i); assert.doesNotMatch(mediumPrice.message, /6\s*[×x]|5 500|рассроч/i);
   const monthly = await run({ row: qualified, message: "Сколько платить в месяц?" });
-  assert.equal(monthly.message, "Условия оплаты и рассрочки лучше уточнить у менеджера. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».");
+  assert.equal(monthly.message, "Условия оплаты, рассрочки, кредита или отсрочки лучше уточнить у менеджера. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».");
   const mixedPrice = await run({ row: qualified, history: [{ role: "user", message: "Мне подходит Средний" },
     { role: "assistant", message: "Обсудим Средний." }], message: "Сколько стоит и можно ли частями?" });
-  assert.match(mixedPrice.message, /33 000/); assert.match(mixedPrice.message, /условия оплаты и рассрочки лучше уточнить/i);
+  assert.match(mixedPrice.message, /33 000/); assert.match(mixedPrice.message, /условия оплаты.*рассрочки.*лучше уточнить/i);
   assert.doesNotMatch(mixedPrice.message, /5 500|6\s*[×x]/i);
   const housePro = await run({ row: qualified,
     history: [{ role: "user", message: "Строительный контроль ИЖС, тариф Профи" }, { role: "assistant", message: "Обсудим Профи." }],
@@ -405,7 +415,7 @@ try {
   const housePayment = await run({ row: qualified,
     history: [{ role: "user", message: "Строительный контроль ИЖС, тариф Профи" }, { role: "assistant", message: "Обсудим Профи." }],
     message: "Как оплатить Профи?" });
-  assert.equal(housePayment.message, "Условия оплаты и рассрочки лучше уточнить у менеджера. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».");
+  assert.equal(housePayment.message, "Условия оплаты, рассрочки, кредита или отсрочки лучше уточнить у менеджера. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».");
   const beforeFailedPair = persisted.length;
   await run({ row: qualified, assistantFailure: true, status: 500 });
   assert.equal(persisted.length, beforeFailedPair, "failed assistant insert rolls back the user message");
@@ -424,11 +434,11 @@ try {
   try {
     const knowledgeDir = path.join(packaged, "knowledge");
     mkdirSync(knowledgeDir);
-    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_2.md", root), "utf8");
-    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v4_2.md"), markdown);
+    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_3.md", root), "utf8");
+    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v4_3.md"), markdown);
     assert.equal(await loadArtemKnowledge(pathToFileURL(path.join(packaged, "index.mjs")).href), markdown);
     assert.ok(readFileSync(new URL("apps/api/build.mjs", root), "utf8")
-      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v4_2.md")'));
+      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v4_3.md")'));
   } finally {
     rmSync(packaged, { recursive: true, force: true });
   }
@@ -463,7 +473,7 @@ try {
     if (evaluatorAttempts === 1 || evaluatorAttempts === 3 || evaluatorAttempts === 4 || evaluatorAttempts === 5) throw new Error("Evaluator unavailable");
     return good;
   };
-  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_2.md", root), "utf8"), fakeProvider);
+  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_3.md", root), "utf8"), fakeProvider);
   const productionBefore = persisted.length;
   const savedCases = [], progress = [];
   const summary = await runTester(2, runtime, { async saveCase(c) { savedCases.push(c); }, async progress(n) { progress.push(n); }, async finish() {} }, personas.slice(0, 2), { sleep: async () => {} });

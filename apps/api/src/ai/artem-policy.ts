@@ -17,6 +17,8 @@ export const BENEFITS: Record<ArtemProgram, string> = {
   acceptance_choice: "«Приёмка квартир» — более простой первый этап, а «Приёмка ИЖС» посвящена более сложной проверке частного дома.",
 };
 const MANAGER_CTA = "Для более подробной информации лучше обратиться к менеджеру. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».";
+const FINANCING_CTA = "Условия оплаты, рассрочки, кредита или отсрочки лучше уточнить у менеджера. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».";
+const TARIFF_DETAILS_CTA = "По остальным деталям тарифа лучше уточнить у менеджера. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».";
 
 /** Turns confirmed diagnostic facts into role-specific value without inferring unconfirmed skills. */
 export function personalizedBenefit(facts: DiagnosticFactsPacket, program: ArtemProgram): string {
@@ -93,6 +95,17 @@ export function commercialText(markdown: string, program: ArtemProgram, question
   return `Стоимость программы «${title}»: ` + selected.map(row => `${row[0]} — ${row[1]}`).join("; ") + ".";
 }
 
+function tariffComparisonText(markdown: string, question: string): string {
+  const commercial = knowledgeSections(markdown).get(12) ?? "";
+  const block = commercial.split("### Стройэксперт\n")[1]?.split("\n### ")[0] ?? "";
+  const rows = block.split("\n").filter(line => line.startsWith("|") && /₽/.test(line)).map(line =>
+    line.split("|").slice(1, -1).map(cell => cell.trim())).filter(row => row.length >= 4);
+  const comparison = rows.map(row => `${row[0]} — ${row[1]}, ${row[3]}`).join("; ");
+  const known = `У «Стройэксперта» подтверждены такие различия: ${comparison}.`;
+  return /куратор|вебинар|срок доступа|(?:точн(?:ый|ая|ое|ые)|конкретн).*(?:сертификат|документ)|полный состав|все материал/i.test(question)
+    ? `${known} ${TARIFF_DETAILS_CTA}` : known;
+}
+
 export function fallbackReply(markdown: string, program: ArtemProgram, question: string,
   history: ConsultantExchange[], diagnosticContext: string): string {
   const q = question.toLowerCase().replace(/ё/g, "е");
@@ -100,17 +113,19 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
   const userHistory = history.filter(row => row.role === "user").map(row => row.message).join(" ");
   const tariffContext = userHistory + " " + question;
   const refused = contactRefused(question, history);
-  const paymentIntent = /рассроч|оплат(?:а|ить|ить частями|ы|е|ой|у)?|частями|график.*плат|платить.*месяц|ежемесяч|перв.*взнос|разбить.*плат|беспроцент|банковск.*услов/.test(q);
+  const tariffComparisonIntent = /чем отличаются.*тариф|разниц.*(?:тариф|базов|средн|премиум|час|документ|материал)|(?:средн|премиум|базов).*отлича|что входит.*(?:тариф|базов|средн|премиум)|какой тариф выбрать|почему тарифы|что.*в каждом тариф|сравнить.*тариф|какие тарифы|в каком тариф|разные программы.*тариф|тариф.*разные программ/.test(q);
+  const paymentIntent = /рассроч|кредит|отсроч|оплат(?:а|ить|ить частями|ы|е|ой|у)?|частями|график.*плат|платить.*месяц|ежемесяч|перв.*взнос|разбить.*плат|беспроцент|банковск.*услов|оплатить позже|заплатить потом|перенести.*плат|досрочн.*погаш|процент/.test(q);
   const priceIntent = /сколько стоит|стоимость|какая цена|какие цены|цен[аыуеой]|тариф/.test(q);
   const enrollmentIntent = /как (?:записаться|поступить|попасть|начать|оформить)|куда записываться|что делать дальше/.test(q) &&
     /обуч|курс|программ|запис|поступ|оформ/.test(q);
+  if (tariffComparisonIntent) return tariffComparisonText(markdown, question);
   if (priceIntent && enrollmentIntent) return commercialText(markdown, program, tariffContext) +
     " Для записи и оформления обучения лучше обратиться к менеджеру. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».";
   if (enrollmentIntent) return "Для записи и оформления обучения лучше обратиться к менеджеру. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».";
   if (/документ/.test(q) && /когда.*(?:можно )?начать|точн.*старт/.test(q)) return "После успешного завершения «Стройэксперта» выдаётся диплом о профессиональной переподготовке; сведения о нём вносятся в ФИС ФРДО. " + MANAGER_CTA;
   if (paymentIntent) {
     const price = priceIntent ? commercialText(markdown, program, tariffContext) + " " : "";
-    return price + "Условия оплаты и рассрочки лучше уточнить у менеджера. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».";
+    return price + FINANCING_CTA;
   }
   if (/как со мной свяж|как связаться.*менеджер|свяжется менеджер/.test(q)) return "Для обращения используйте кнопку «Связаться с менеджером» в интерфейсе.";
   if (/телефон.*не хочу|не хочу.*телефон|не звоните|просто отвечайте/.test(q) && !/цен|стоит|документ/.test(q)) return "Хорошо, продолжим здесь.";
@@ -182,6 +197,6 @@ export function fallbackReply(markdown: string, program: ArtemProgram, question:
     return `Лучше выбрать «${name}». ${benefit}`;
   }
   if (explicitProgram(question) || /выбрать|подойдет|подходит|рекоменд|зачем|польз/.test(q)) return `Можно рассмотреть «${name}». ${BENEFITS[program]}`;
-  if (/формат|дистанц|очн|приезжать|нет времени/.test(q) && program === "construction_expertise") return "«Стройэксперт» проходит дистанционно на образовательной платформе, без обязательного очного посещения и ожидания общего набора. Можно заниматься в индивидуальном графике.";
+  if (/формат|дистанц|онлайн|офлайн|очн|приезжать|посещать институт|другого город|другой стран|проходить.*дома|своем темпе|своём темпе|нет времени/.test(q) && program === "construction_expertise") return "«Стройэксперт» проходит дистанционно на образовательной платформе, без обязательного очного посещения и ожидания общего набора. Можно заниматься в индивидуальном графике.";
   return `По выбранной программе могу подтвердить следующее: ${BENEFITS[program]} Уточните, какой именно аспект обучения хотите разобрать.`;
 }
