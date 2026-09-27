@@ -6,6 +6,7 @@ import { diagnosticProgram, PROGRAM_NAMES } from "../ai/artem-policy";
 import { YandexAIProvider } from "../ai/yandex-provider";
 import { logger } from "../lib/logger";
 import type { DialogueRow } from "../persistence/artem-repository";
+import { sourceAttribution, type SourceAttribution, type StoredSourceAttribution } from "./source-attribution";
 
 export const MANAGER_LEAD_SUMMARY_PROMPT = `Сформируй краткое описание диалога для менеджера отдела продаж.
 
@@ -27,7 +28,7 @@ export class ManagerLeadContextError extends Error {
   constructor(readonly code: "SESSION_NOT_FOUND" | "RECOMMENDATION_NOT_READY") { super(code); }
 }
 
-export interface ManagerLeadContext {
+export interface ManagerLeadContext extends SourceAttribution {
   sessionId: string;
   recommendedProgram: string;
   recommendationText: string;
@@ -39,7 +40,7 @@ export interface ManagerLeadContext {
   summarySource: "ai" | "fallback";
 }
 
-interface LeadSession { id: string; createdAt: Date | null }
+interface LeadSession extends StoredSourceAttribution { id: string; createdAt: Date | null }
 interface ManagerLeadDependencies {
   load(sessionId: string): Promise<{ session: LeadSession; dialogue: DialogueRow[] } | null>;
   summarize(prompt: string, input: unknown): Promise<unknown>;
@@ -48,7 +49,10 @@ interface ManagerLeadDependencies {
 
 const defaultDependencies: ManagerLeadDependencies = {
   async load(sessionId) {
-    const [session] = await db.select({ id: aiSessions.id, createdAt: aiSessions.createdAt }).from(aiSessions)
+    const [session] = await db.select({ id: aiSessions.id, createdAt: aiSessions.createdAt,
+      firstPageUrl: aiSessions.firstPageUrl, utmSource: aiSessions.utmSource, utmMedium: aiSessions.utmMedium,
+      utmCampaign: aiSessions.utmCampaign, utmContent: aiSessions.utmContent, utmTerm: aiSessions.utmTerm,
+    }).from(aiSessions)
       .where(eq(aiSessions.id, sessionId)).limit(1);
     if (!session) return null;
     const dialogue = await db.select({ id: aiDialogue.id, sessionId: aiDialogue.sessionId,
@@ -132,5 +136,6 @@ export async function buildManagerLeadContext(sessionId: string,
   }
   return { sessionId, recommendedProgram: program, recommendationText: recommendation.text,
     diagnostic: diagnostic.labels, dialogSummary, transcript, knowledgeBaseVersion: SOURCE_VERSION,
-    createdAt: (loaded.session.createdAt ?? recommendation.createdAt ?? new Date(0)).toISOString(), summarySource };
+    createdAt: (loaded.session.createdAt ?? recommendation.createdAt ?? new Date(0)).toISOString(), summarySource,
+    ...sourceAttribution(loaded.session) };
 }

@@ -12,13 +12,13 @@ assert.match(widget, /event\.source !== managerWidgetRef\.current\?\.contentWind
 assert.match(widget, /getcourse-manager-widget/); assert.match(widget, /status === "success"/);
 assert.match(helper, /manager-form\/widget/); assert.match(helper, /sourceUrl:\s*window\.location\.href/);
 assert.doesNotMatch(widget, /contactEmail|contactPhone|personalDataConsent|marketingConsent/);
-assert.match(widget, /setContactPhase\(null\)[\s\S]*window\.location\.href\s*=\s*"https:\/\/inobr-expert\.ru"/);
+assert.match(widget, /setContactPhase\(null\)[\s\S]*window\.location\.href\s*=\s*"https:\/\/inobr-expert\.ru\/\?utm_source=artem&utm_medium=assistant&utm_campaign=return_to_site&utm_content=manager_modal_close"/);
 assert.match(widget, /event\.key === "Escape"[\s\S]*closeManagerForm/);
 assert.match(widget, /event\.target === event\.currentTarget[\s\S]*closeManagerForm/);
 assert.doesNotMatch(widget, /CONTACT_CHANNELS|submitContact/);
 assert.match(widget, /setContactPhase\("submitted"\)/);
 assert.match(helper, /referrer:\s*document\.referrer/);
-assert.match(route, /submitGetCourseWidgetBody[\s\S]*recordEvent\(sessionId, "manager_form_submit"\)/);
+assert.match(route, /submitGetCourseWidgetBody[\s\S]*recordEvent\(sessionId, "manager_form_submit", sourceEventMetadata\(context\)\)/);
 assert.match(css, /\.manager-form-overlay[\s\S]*overflow-y:\s*auto/);
 assert.match(css, /@media \(max-width:\s*640px\)[\s\S]*\.manager-form-modal/);
 console.log("PASS G-L: modal fields/context, X/Escape/backdrop exit redirect, error retention, success-only event and responsive layout wiring.");

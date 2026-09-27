@@ -10,9 +10,23 @@ router.post("/sessions", async (req, res): Promise<void> => {
     res.status(400).json({ error: "sessionKey must be a non-empty string" }); return;
   }
   const sessionKey = typeof supplied === "string" ? supplied.trim() : randomUUID();
+  const page = req.body?.firstPageUrl;
+  if (page !== undefined && (typeof page !== "string" || page.length > 2000)) {
+    res.status(400).json({ error: "firstPageUrl must be a valid URL" }); return;
+  }
+  let firstPageUrl: string | undefined;
+  if (typeof page === "string" && page.trim()) {
+    try {
+      const parsed = new URL(page.trim());
+      if (!["http:", "https:"].includes(parsed.protocol)) throw new Error("INVALID_PROTOCOL");
+      firstPageUrl = parsed.toString();
+    } catch {
+      res.status(400).json({ error: "firstPageUrl must be a valid URL" }); return;
+    }
+  }
 
   try {
-    const { session, created } = await getOrCreateSession(sessionKey);
+    const { session, created } = await getOrCreateSession(sessionKey, firstPageUrl);
 
     req.log.info({ sessionId: session.id, created }, "SESSION_READY");
     res.status(created ? 201 : 200).json({

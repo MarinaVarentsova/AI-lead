@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Send, Loader2, CheckCircle2, ChevronRight, ArrowUpRight, X,
   FileText, Users, ChartNoAxesColumnIncreasing } from "lucide-react";
 import {
-  useCreateSession,
   useCreateConversation,
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +18,7 @@ import {
 import { getDiagnosticSchema, type DiagnosticSchemaQuestion } from "@/lib/diagnostic-schema";
 import { recordDiagnosticAnswer, recordDiagnosticQuestion } from "@/lib/diagnostic-dialogue";
 import { recordManagerContactClick } from "@/lib/events";
+import { createAttributedSession } from "@/lib/session-attribution";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -181,7 +181,6 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
   const [focusRequest, setFocusRequest] = useState<{ target: FocusTarget; force: boolean } | null>(null);
   const showNextStep = (target: FocusTarget = "question", force = true) => setFocusRequest({ target, force });
 
-  const createSession = useCreateSession();
   const createConversation = useCreateConversation();
   const currentQIndex = step >= 2 && step <= 5 ? step - 2 : 0;
 
@@ -205,10 +204,7 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
   // Create session on mount
   useEffect(() => {
     void loadDiagnosticSchema();
-    createSession.mutate(undefined, {
-      onSuccess: (data) => setSessionId(data.sessionId),
-      onError: () => setSessionError(true),
-    });
+    void createAttributedSession().then(data => setSessionId(data.sessionId)).catch(() => setSessionError(true));
   }, []);
 
   const chatVisible = step > 0;
@@ -278,10 +274,8 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
     initializationStarted.current = false;
     setSessionError(false);
     if (diagnosticSchema.length !== 4) void loadDiagnosticSchema();
-    if (!sessionId) createSession.mutate(undefined, {
-      onSuccess: (data) => setSessionId(data.sessionId),
-      onError: () => setSessionError(true),
-    });
+    if (!sessionId) void createAttributedSession().then(data => setSessionId(data.sessionId))
+      .catch(() => setSessionError(true));
   };
 
   // ─── Chip selection ─────────────────────────────────────────────────────────
@@ -410,7 +404,7 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
 
   const closeManagerForm = () => {
     setContactPhase(null);
-    window.location.href = "https://inobr-expert.ru";
+    window.location.href = "https://inobr-expert.ru/?utm_source=artem&utm_medium=assistant&utm_campaign=return_to_site&utm_content=manager_modal_close";
   };
 
   useEffect(() => {

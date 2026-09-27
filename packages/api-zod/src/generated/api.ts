@@ -17,6 +17,21 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Create a new session when widget opens
+ */
+export const createSessionBodySessionKeyMax = 200;
+
+export const createSessionBodyFirstPageUrlMax = 2000;
+
+
+
+export const CreateSessionBody = zod.object({
+  "sessionKey": zod.string().max(createSessionBodySessionKeyMax).optional(),
+  "firstPageUrl": zod.string().url().max(createSessionBodyFirstPageUrlMax).optional()
+})
+
+
+/**
  * @summary Create a new conversation when diagnostic starts
  */
 export const CreateConversationBody = zod.object({
@@ -27,10 +42,14 @@ export const CreateConversationBody = zod.object({
 /**
  * @summary Save diagnostic answers as a single flat record
  */
+export const saveDiagnosticAnswersBodyCurrentAreaOtherTextMax = 200;
+
+
+
 export const SaveDiagnosticAnswersBody = zod.object({
   "conversationId": zod.string().uuid(),
   "current_area": zod.enum(['construction_repair', 'design_estimates', 'construction_control', 'real_estate_valuation_law', 'other']),
-  "current_area_other_text": zod.string().max(200).optional(),
+  "current_area_other_text": zod.string().max(saveDiagnosticAnswersBodyCurrentAreaOtherTextMax).optional(),
   "current_role": zod.enum(['engineer_designer_estimator', 'foreman_master_site_specialist', 'manager_owner', 'valuer_lawyer_expert', 'not_in_construction']),
   "education_status": zod.enum(['higher', 'secondary_vocational', 'currently_studying', 'no_higher_or_secondary_vocational']),
   "target_tasks": zod.enum(['defects_quality', 'damage_loss', 'apartment_house_acceptance', 'judicial_construction_expertise', 'explore'])
@@ -55,4 +74,3 @@ export const GetDiagnosticSchemaResponseItem = zod.object({
 }))
 })
 export const GetDiagnosticSchemaResponse = zod.array(GetDiagnosticSchemaResponseItem).min(4).max(4)
-

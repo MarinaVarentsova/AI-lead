@@ -11,7 +11,7 @@ assert.ok(!widget.includes('aria-label="Начать диагностику"'));
 assert.ok(!widget.includes("Подберём программу<br />под ваш опыт и цели"));
 assert.match(widget, /if \(step === 0 && !sessionError && sessionId && !schemaLoading && diagnosticSchema\.length === 4\) handleStart\(\)/);
 assert.match(widget, /const handleStart = \(\) => \{\s*if \(!sessionId \|\| diagnosticSchema\.length !== 4 \|\| initializationStarted\.current\) return;/);
-assert.match(widget, /createSession\.mutate\(undefined,[\s\S]*onSuccess: \(data\) => setSessionId\(data\.sessionId\)/);
+assert.match(widget, /createAttributedSession\(\)\.then\(data => setSessionId\(data\.sessionId\)\)/);
 assert.match(widget, /<ProgressBar current=\{1\} total=\{4\} \/>/);
 assert.match(widget, /sessionError \? <div className="diagnostic-recommendation__error" role="alert">[\s\S]*onClick=\{retryInitialization\}/);
 assert.ok(widget.includes("Подготавливаем диагностику..."));

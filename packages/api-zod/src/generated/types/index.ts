@@ -19,4 +19,5 @@ export * from './diagnosticSchemaQuestion';
 export * from './diagnosticSchemaQuestionField';
 export * from './errorResponse';
 export * from './healthStatus';
+export * from './sessionInput';
 export * from './sessionResult';

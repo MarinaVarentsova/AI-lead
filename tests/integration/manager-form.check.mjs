@@ -51,7 +51,10 @@ try {
     import(new URL("apps/api/src/persistence/artem-repository.ts", root))]);
   YandexAIProvider.prototype.generateStructured = async () => ({ summary: "Проектировщику рекомендован Стройэксперт; уточнены цена и документ." });
   const sessionId = randomUUID();
-  await pg.query("INSERT INTO ai_sessions(id,session_key) VALUES($1,$2)", [sessionId, "manager-form"]);
+  await pg.query(`INSERT INTO ai_sessions(id,session_key,first_page_url,utm_source,utm_medium,utm_campaign,utm_content)
+    VALUES($1,$2,$3,$4,$5,$6,$7)`, [sessionId, "manager-form",
+    "https://artem.inobr-expert.ru/?utm_source=yandex&utm_medium=cpc&utm_campaign=stroiexpert&utm_content=hero&gclid=g-first",
+    "yandex", "cpc", "stroiexpert", "hero"]);
   const rows = [
     ["artem","diagnostic","diagnostic_question","В какой сфере вы сейчас работаете?"],
     ["user","diagnostic","diagnostic_answer","Проектирование и сметы"],
@@ -72,6 +75,8 @@ try {
   const postHandler = router.stack.find(layer => layer.route?.path === "/manager-form/widget-submit/:sessionId").route.stack[0].handle;
   const contextRes = response(); await getHandler({ params: { sessionId }, log }, contextRes);
   assert.equal(contextRes.statusCode, 200); assert.match(contextRes.body.comment, /Точная рекомендация/);
+  assert.match(contextRes.body.comment, /Источник обращения:\n\nUTM source: yandex/);
+  assert.match(contextRes.body.comment, /UTM campaign: stroiexpert/); assert.match(contextRes.body.comment, /gclid: g-first/);
 
   const originalFetch = globalThis.fetch; let shouldFail = true; let postedBody;
   globalThis.fetch = async (_url, init = {}) => {
@@ -149,9 +154,13 @@ try {
   assert.equal(postedBody.get("pdpConfirmCheckbox"), "on");
   const submittedComment = postedBody.get("formParams[dealCustomFields][22041910]");
   assert.ok(submittedComment); assert.match(submittedComment, /Сколько стоит\?/);
+  assert.match(submittedComment, /Источник обращения:/); assert.match(submittedComment, /UTM content: hero/);
   for (const part of ["Рекомендованная программа:", "Рекомендация Артёма:", "Диагностика:",
     "Краткое резюме:", "Диалог:", "Session ID:", "Версия базы знаний:"]) assert.ok(submittedComment.includes(part));
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_contact_click'")).rows[0].count, 1);
+  const submitEvent = (await pg.query("SELECT event_data FROM ai_events WHERE event_type='manager_form_submit'")).rows[0];
+  assert.deepEqual(submitEvent.event_data,
+    { utm_source: "yandex", utm_campaign: "stroiexpert", utm_content: "hero" });
   const emptySessionId = randomUUID();
   await pg.query("INSERT INTO ai_sessions(id,session_key) VALUES($1,$2)", [emptySessionId, "manager-form-empty"]);
   const contextFailureRes = response();

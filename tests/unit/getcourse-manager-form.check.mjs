@@ -32,8 +32,16 @@ try {
       currentRole: "Проектировщик", educationStatus: "Высшее", targetTasks: "Исследовать дефекты" },
     dialogSummary: "Краткое резюме без домыслов.", transcript: [{ role: "user", text: "Сколько стоит?" },
       { role: "assistant", text: "Подтверждённая цена." }], knowledgeBaseVersion: "inobr-artem-v4.3",
-    createdAt: "2026-09-24T00:00:00.000Z", summarySource: "ai" };
+    createdAt: "2026-09-24T00:00:00.000Z", summarySource: "ai", utmSource: "yandex", utmMedium: "cpc",
+    utmCampaign: "stroiexpert", utmContent: "hero", utmTerm: "expert", gclid: "g-first", yclid: "y-first" };
   const comment = formatGetCourseManagerComment(context);
+  assert.match(comment, /Источник обращения:\n\nUTM source: yandex/);
+  assert.match(comment, /UTM medium: cpc/); assert.match(comment, /UTM campaign: stroiexpert/);
+  assert.match(comment, /UTM content: hero/); assert.match(comment, /UTM term: expert/);
+  assert.match(comment, /gclid: g-first/); assert.match(comment, /yclid: y-first/);
+  const directComment = formatGetCourseManagerComment({ ...context, utmSource: undefined, utmMedium: undefined,
+    utmCampaign: undefined, utmContent: undefined, utmTerm: undefined, gclid: undefined, yclid: undefined });
+  assert.doesNotMatch(directComment, /Источник обращения:/);
   const widgetFixture = `<!doctype html><html><head></head><body><form id="ltForm5600148" data-id="2252008810" action="${GETCOURSE_ENDPOINT}">
     <input name="formParams[phone]" data-phone-default-country="auto"><input name="formParams[dealCustomFields][11904802]">
     <input name="formParams[dealCustomFields][11904803]"><textarea id="field-input-22041910" name="formParams[dealCustomFields][22041910]"></textarea>

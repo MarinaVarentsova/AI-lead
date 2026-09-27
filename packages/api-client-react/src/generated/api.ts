@@ -27,6 +27,7 @@ import type {
   DiagnosticSchemaQuestion,
   ErrorResponse,
   HealthStatus,
+  SessionInput,
   SessionResult
 } from './api.schemas';
 
@@ -113,12 +114,6 @@ export function useHealthCheck<TData = Awaited<ReturnType<typeof healthCheck>>, 
   return { ...query, queryKey: queryOptions.queryKey };
 }
 
-
-
-
-
-
-
 export const getCreateSessionUrl = () => {
 
 
@@ -130,14 +125,15 @@ export const getCreateSessionUrl = () => {
 /**
  * @summary Create a new session when widget opens
  */
-export const createSession = async ( options?: RequestInit): Promise<SessionResult> => {
+export const createSession = async (sessionInput?: SessionInput, options?: RequestInit): Promise<SessionResult> => {
 
   return customFetch<SessionResult>(getCreateSessionUrl(),
   {
     ...options,
-    method: 'POST'
-
-
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      sessionInput,)
   }
 );}
 
@@ -145,8 +141,8 @@ export const createSession = async ( options?: RequestInit): Promise<SessionResu
 
 
 export const getCreateSessionMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof createSession>>, TError,void, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSession>>, TError,{data?: BodyType<SessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createSession>>, TError,{data?: BodyType<SessionInput>}, TContext> => {
 
 const mutationKey = ['createSession'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -158,10 +154,10 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSession>>, void> = () => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createSession>>, {data?: BodyType<SessionInput>}> = (props) => {
+          const {data} = props ?? {};
 
-
-          return  createSession(requestOptions)
+          return  createSession(data,requestOptions)
         }
 
 
@@ -172,18 +168,18 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
   return  { mutationFn, ...mutationOptions }}
 
     export type CreateSessionMutationResult = NonNullable<Awaited<ReturnType<typeof createSession>>>
-
+    export type CreateSessionMutationBody = BodyType<SessionInput> | undefined
     export type CreateSessionMutationError = ErrorType<unknown>
 
     /**
  * @summary Create a new session when widget opens
  */
 export const useCreateSession = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSession>>, TError,void, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createSession>>, TError,{data?: BodyType<SessionInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof createSession>>,
         TError,
-        void,
+        {data?: BodyType<SessionInput>},
         TContext
       > => {
       return useMutation(getCreateSessionMutationOptions(options));

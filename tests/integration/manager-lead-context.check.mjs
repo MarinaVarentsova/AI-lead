@@ -57,8 +57,10 @@ try {
   assert.match(MANAGER_LEAD_SUMMARY_PROMPT, /Максимум 1000 символов/);
 
   const sessionId = randomUUID();
-  await pg.query("INSERT INTO ai_sessions(id,session_key,created_at) VALUES($1,$2,$3)",
-    [sessionId, "manager-context", "2026-09-22T10:00:00.000Z"]);
+  await pg.query(`INSERT INTO ai_sessions(id,session_key,created_at,first_page_url,utm_source,utm_medium,utm_campaign,utm_content,utm_term)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`, [sessionId, "manager-context", "2026-09-22T10:00:00.000Z",
+    "https://artem.inobr-expert.ru/?utm_source=yandex&utm_medium=cpc&utm_campaign=stroiexpert&utm_content=hero&utm_term=expert&gclid=g-first&yclid=y-first",
+    "yandex", "cpc", "stroiexpert", "hero", "expert"]);
   const recommendation = "В вашем случае основная рекомендация — «Стройэксперт». Она связана с работой с документацией и экспертными заключениями.";
   const rows = [
     ["artem", "diagnostic", "diagnostic_question", "В какой сфере вы сейчас работаете?"],
@@ -99,6 +101,10 @@ try {
   ]);
   assert.equal(context.summarySource, "ai"); assert.equal(context.knowledgeBaseVersion, "inobr-artem-v4.3");
   assert.equal(context.createdAt, "2026-09-22T10:00:00.000Z");
+  assert.deepEqual({ utmSource: context.utmSource, utmMedium: context.utmMedium,
+    utmCampaign: context.utmCampaign, utmContent: context.utmContent, utmTerm: context.utmTerm,
+    gclid: context.gclid, yclid: context.yclid }, { utmSource: "yandex", utmMedium: "cpc",
+    utmCampaign: "stroiexpert", utmContent: "hero", utmTerm: "expert", gclid: "g-first", yclid: "y-first" });
   assert.equal(summaryInput.recommendationText, recommendation);
   assert.equal(JSON.stringify(summaryInput).includes("Скрытая оценка"), false);
 

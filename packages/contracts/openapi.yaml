@@ -35,6 +35,12 @@ paths:
       operationId: createSession
       tags: [sessions]
       summary: Create a new session when widget opens
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
       responses:
         "201":
           description: Session created
@@ -135,6 +141,17 @@ components:
           format: uuid
         sessionKey:
           type: string
+
+    SessionInput:
+      type: object
+      properties:
+        sessionKey:
+          type: string
+          maxLength: 200
+        firstPageUrl:
+          type: string
+          format: uri
+          maxLength: 2000
 
     ConversationInput:
       type: object

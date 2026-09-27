@@ -4,6 +4,7 @@ import { db, aiDialogue, aiEvents, aiSessions } from "@workspace/db";
 import { DIAGNOSTIC_SCHEMA, DiagnosticKnowledgeResolver, diagnosticOptionLabel,
   type DiagnosticAnswers } from "@workspace/domain/diagnostic";
 import { logger } from "../lib/logger";
+import { attributionFromUrl, sourceAttribution, type StoredSourceAttribution } from "../services/source-attribution";
 
 export type DialogueSpeaker = "user" | "artem";
 export type DialogueStage = "diagnostic" | "recommendation" | "consultation";
@@ -24,9 +25,13 @@ const dbErrorCode = (error: unknown): string => {
   return "UNKNOWN";
 };
 
-export async function getOrCreateSession(sessionKey: string = randomUUID()) {
+export async function getOrCreateSession(sessionKey: string = randomUUID(), firstPageUrl?: string) {
+  const attribution = attributionFromUrl(firstPageUrl);
   try {
-    const [created] = await db.insert(aiSessions).values({ sessionKey }).onConflictDoNothing({ target: aiSessions.sessionKey })
+    const [created] = await db.insert(aiSessions).values({ sessionKey, firstPageUrl,
+      utmSource: attribution.utmSource, utmMedium: attribution.utmMedium,
+      utmCampaign: attribution.utmCampaign, utmContent: attribution.utmContent, utmTerm: attribution.utmTerm,
+    }).onConflictDoNothing({ target: aiSessions.sessionKey })
       .returning({ id: aiSessions.id, sessionKey: aiSessions.sessionKey });
     if (created) return { session: created, created: true };
     const [existing] = await db.select({ id: aiSessions.id, sessionKey: aiSessions.sessionKey }).from(aiSessions)
@@ -40,10 +45,15 @@ export async function getOrCreateSession(sessionKey: string = randomUUID()) {
 }
 
 export async function findSession(sessionId: string) {
-  const [session] = await db.select({ id: aiSessions.id, sessionKey: aiSessions.sessionKey }).from(aiSessions)
+  const [session] = await db.select({ id: aiSessions.id, sessionKey: aiSessions.sessionKey,
+    firstPageUrl: aiSessions.firstPageUrl, utmSource: aiSessions.utmSource, utmMedium: aiSessions.utmMedium,
+    utmCampaign: aiSessions.utmCampaign, utmContent: aiSessions.utmContent, utmTerm: aiSessions.utmTerm,
+  }).from(aiSessions)
     .where(eq(aiSessions.id, sessionId)).limit(1);
   return session ?? null;
 }
+
+export const sessionSourceAttribution = (session: StoredSourceAttribution) => sourceAttribution(session);
 
 export async function withDialogueLock<T>(sessionId: string, action: (tx: Transaction) => Promise<T>): Promise<T> {
   return db.transaction(async tx => {

@@ -5,6 +5,7 @@ import { buildManagerLeadContext, ManagerLeadContextError } from "../services/ma
 import { formatGetCourseManagerComment, loadGetCourseManagerWidget, serializeGetCourseWidgetBody,
   getCourseCookieHeader, localizeGetCourseCookies, MANAGER_FORM_REQUEST_ID_FIELD, submitGetCourseWidgetBody,
   type ManagerFormTrace } from "../services/getcourse-manager-form";
+import { sourceEventMetadata } from "../services/source-attribution";
 
 const router: IRouter = Router();
 const UUID_RE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
@@ -88,11 +89,11 @@ router.post("/manager-form/widget-submit/:sessionId", async (req, res): Promise<
   trace("manager_form_request_received", { requestId: managerFormRequestId, timestamp: new Date().toISOString() });
   try {
     if (!await findSession(sessionId)) { res.status(404).type("html").send(widgetMessageHtml(sessionId, "error")); return; }
-    const { comment } = await contextFor(sessionId, trace);
+    const { context, comment } = await contextFor(sessionId, trace);
     const params = serializeGetCourseWidgetBody(req.body, comment);
     const upstream = await submitGetCourseWidgetBody(params, getCourseCookieHeader(req.headers.cookie), fetch, trace);
     try {
-      await recordEvent(sessionId, "manager_form_submit");
+      await recordEvent(sessionId, "manager_form_submit", sourceEventMetadata(context));
       trace("manager_form_submit_event_write", { attempted: true, written: true });
     } catch {
       req.log.error({ managerFormRequestId, sessionId, stage: "manager_form_submit_event_write",

@@ -13,6 +13,7 @@ import type { DiagnosticAnswersInputTargetTasks } from './diagnosticAnswersInput
 export interface DiagnosticAnswersInput {
   conversationId: string;
   current_area: DiagnosticAnswersInputCurrentArea;
+  /** @maxLength 200 */
   current_area_other_text?: string;
   current_role: DiagnosticAnswersInputCurrentRole;
   education_status: DiagnosticAnswersInputEducationStatus;

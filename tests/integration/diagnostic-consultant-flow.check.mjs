@@ -81,12 +81,17 @@ try {
 
   // A/B: create once and reuse the same session_key.
   const sessionKey = "integration-session-key";
-  const first = await invoke(sessions, "/sessions", { sessionKey });
+  const firstPageUrl = "https://artem.inobr-expert.ru/?utm_source=yandex&utm_medium=cpc&utm_campaign=stroiexpert&utm_content=hero&utm_term=expert&gclid=g-first&yclid=y-first";
+  const first = await invoke(sessions, "/sessions", { sessionKey, firstPageUrl });
   const repeated = await invoke(sessions, "/sessions", { sessionKey });
   assert.equal(first.statusCode, 201);
   assert.equal(repeated.statusCode, 200);
   assert.equal(repeated.body.sessionId, first.body.sessionId);
   assert.equal((await pg.query("SELECT count(*)::int AS n FROM ai_sessions WHERE session_key=$1", [sessionKey])).rows[0].n, 1);
+  const attribution = (await pg.query("SELECT * FROM ai_sessions WHERE session_key=$1", [sessionKey])).rows[0];
+  assert.equal(attribution.first_page_url, firstPageUrl); assert.equal(attribution.utm_source, "yandex");
+  assert.equal(attribution.utm_medium, "cpc"); assert.equal(attribution.utm_campaign, "stroiexpert");
+  assert.equal(attribution.utm_content, "hero"); assert.equal(attribution.utm_term, "expert");
 
   const ready = await invoke(conversations, "/conversations", { sessionId: first.body.sessionId });
   assert.equal(ready.statusCode, 201);
@@ -163,7 +168,8 @@ try {
   const eventRows = (await pg.query("SELECT * FROM ai_events WHERE session_id=$1", [sessionId])).rows;
   assert.equal(eventRows.length, 1);
   assert.equal(eventRows[0].event_type, "manager_contact_click");
-  assert.equal(eventRows[0].event_data, null);
+  assert.deepEqual(eventRows[0].event_data,
+    { utm_source: "yandex", utm_campaign: "stroiexpert", utm_content: "hero" });
 
   // K: production runtime must not reference tables removed from the prepared database.
   const productionRoots = ["apps/api/src/routes", "apps/api/src/persistence", "apps/api/src/services"];

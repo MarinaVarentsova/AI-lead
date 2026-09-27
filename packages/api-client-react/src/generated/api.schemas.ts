@@ -18,6 +18,13 @@ export interface SessionResult {
   sessionKey: string;
 }
 
+export interface SessionInput {
+  /** @maxLength 200 */
+  sessionKey?: string;
+  /** @maxLength 2000 */
+  firstPageUrl?: string;
+}
+
 export interface ConversationInput {
   sessionId: string;
 }
@@ -74,6 +81,7 @@ export const DiagnosticAnswersInputTargetTasks = {
 export interface DiagnosticAnswersInput {
   conversationId: string;
   current_area: DiagnosticAnswersInputCurrentArea;
+  /** @maxLength 200 */
   current_area_other_text?: string;
   current_role: DiagnosticAnswersInputCurrentRole;
   education_status: DiagnosticAnswersInputEducationStatus;

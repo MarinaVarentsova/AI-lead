@@ -26,6 +26,15 @@ const sanitizedPreview = (value: string) => value.slice(0, 300)
 export function formatGetCourseManagerComment(context: ManagerLeadContext): string {
   const transcript = context.transcript.map(turn =>
     `${turn.role === "user" ? "Пользователь" : "Артём"}: ${turn.text}`).join("\n");
+  const source = [
+    context.utmSource && `UTM source: ${context.utmSource}`,
+    context.utmMedium && `UTM medium: ${context.utmMedium}`,
+    context.utmCampaign && `UTM campaign: ${context.utmCampaign}`,
+    context.utmContent && `UTM content: ${context.utmContent}`,
+    context.utmTerm && `UTM term: ${context.utmTerm}`,
+    context.gclid && `gclid: ${context.gclid}`,
+    context.yclid && `yclid: ${context.yclid}`,
+  ].filter((value): value is string => Boolean(value));
   return [
     "ИНОБР Ассистент — консультация Артёма", "", "Рекомендованная программа:", context.recommendedProgram,
     "", "Рекомендация Артёма:", context.recommendationText, "", "Диагностика:",
@@ -33,6 +42,7 @@ export function formatGetCourseManagerComment(context: ManagerLeadContext): stri
     `Образование: ${context.diagnostic.educationStatus}`, `Задача: ${context.diagnostic.targetTasks}`,
     "", "Краткое резюме:", context.dialogSummary, "", "Диалог:", transcript || "Дополнительных вопросов не было.",
     "", "Session ID:", context.sessionId, "", "Версия базы знаний:", context.knowledgeBaseVersion,
+    ...(source.length ? ["", "Источник обращения:", "", ...source] : []),
   ].join("\n");
 }
 
