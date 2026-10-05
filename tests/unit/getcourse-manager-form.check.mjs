@@ -104,6 +104,13 @@ try {
   (stage, details) => trace.push({ stage, ...details }));
   assert.equal(submitResult.status, 200); assert.equal(submitResult.contentType, "application/json");
   assert.equal(submitResult.body, '{"success":true,"data":{"parts":[]}}');
+  const payloadTrace = trace.find(item => item.stage === "getcourse_payload_built");
+  assert.equal(payloadTrace.emailPresent, true); assert.equal(payloadTrace.fullNamePresent, true);
+  assert.equal(payloadTrace.phonePresent, true); assert.equal(payloadTrace.consent11904802Value, "1");
+  assert.equal(payloadTrace.consent11904803Value, "1"); assert.equal(payloadTrace.dialogue22041910ContainsTranscript, true);
+  assert.equal(payloadTrace.requestTimePresent, true); assert.equal(payloadTrace.requestSimpleSignPresent, true);
+  assert.equal(payloadTrace.helperPresent, false); assert.equal(payloadTrace.helperRefPresent, false);
+  assert.equal(payloadTrace.isHtmlWidgetPresent, true);
   assert.equal(String(submitted.url), "https://inobr.ru.com/pl/lite/block-public/process?id=2252008810&gcSession=test");
   assert.equal(submitted.init.body, body); assert.equal(body.has(GETCOURSE_ACTION_FIELD), false);
   const missingConsent = new URLSearchParams(body); missingConsent.delete("formParams[dealCustomFields][11904803]");
@@ -116,6 +123,23 @@ try {
     async () => new Response('{"success":true,"data":{"formProcessed":false,"error":"Не получилось обработать форму"}}'),
   (stage, details) => validationTrace.push({ stage, ...details })), /GETCOURSE_SUBMIT_FAILED/);
   assert.ok(validationTrace.some(item => item.stage === "getcourse_post_response" && item.validationError));
+  const htmlFalsePositive = new URLSearchParams(body); htmlFalsePositive.set(GETCOURSE_ACTION_FIELD, GETCOURSE_ENDPOINT);
+  const htmlTrace = [];
+  const htmlSuccess = await submitGetCourseWidgetBody(htmlFalsePositive, undefined,
+    async () => new Response('<!doctype html><html><body><p>Спасибо, форма отправлена.</p><script>const fallback="Заявка не отправлена";</script></body></html>',
+      { headers: { "content-type": "text/html; charset=utf-8" } }),
+  (stage, details) => htmlTrace.push({ stage, ...details }));
+  assert.equal(htmlSuccess.status, 200);
+  assert.ok(htmlTrace.some(item => item.stage === "getcourse_post_response" && item.successDetectorResult === true &&
+    item.validationDetectorResult === false && item.responseFormat === "html"));
+  const explicitJsonSuccess = new URLSearchParams(body); explicitJsonSuccess.set(GETCOURSE_ACTION_FIELD, GETCOURSE_ENDPOINT);
+  await submitGetCourseWidgetBody(explicitJsonSuccess, undefined,
+    async () => new Response('{"success":true,"data":{"formProcessed":true,"parts":["Заявка не отправлена"]}}',
+      { headers: { "content-type": "application/json" } }));
+  const structuredJsonError = new URLSearchParams(body); structuredJsonError.set(GETCOURSE_ACTION_FIELD, GETCOURSE_ENDPOINT);
+  await assert.rejects(() => submitGetCourseWidgetBody(structuredJsonError, undefined,
+    async () => new Response('{"success":true,"data":{"error":"Не заполнено поле Email"}}',
+      { headers: { "content-type": "application/json" } })), /GETCOURSE_SUBMIT_FAILED/);
   const non2xx = new URLSearchParams(body); non2xx.set(GETCOURSE_ACTION_FIELD, GETCOURSE_ENDPOINT);
   const non2xxTrace = [];
   await assert.rejects(() => submitGetCourseWidgetBody(non2xx, undefined,

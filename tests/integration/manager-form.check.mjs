@@ -91,7 +91,9 @@ try {
     }
     if (init.method === "POST") { postedBody = init.body; return new Response(shouldFail ? "Не заполнено поле Email" : "success", { status: 200 }); }
   };
-  const formBody = { formParams: { email: "test-artem-debug@example.com", full_name: "ТЕСТ Артем_Экспертович_TG",
+  const submitName = process.env.GETCOURSE_REAL_SUBMIT === "1" ? "ТЕСТ Артем_Экспертович_PROD_FIX" :
+    "ТЕСТ Артем_Экспертович_TG";
+  const formBody = { formParams: { email: "test-artem-debug@example.com", full_name: submitName,
     phone: "+70000000000", dealCustomFields: { 11904802: "1", 11904803: "1", 22041910: "browser value" } },
     __artem_getcourse_canonical_phone: "+7 (000) 000-00-00",
     pdpConfirmCheckbox: "on", requestTime: "1", requestSimpleSign: "abc", isHtmlWidget: "1",
@@ -123,7 +125,7 @@ try {
       realParams.append(name.replaceAll("&amp;", "&"), value.replaceAll("&quot;", '"').replaceAll("&amp;", "&"));
     }
     realParams.set("formParams[email]", "test-artem-debug@example.com");
-    realParams.set("formParams[full_name]", "ТЕСТ Артем_Экспертович_TG");
+    realParams.set("formParams[full_name]", submitName);
     realParams.set("formParams[phone]", "+79991234567");
     realParams.set("formParams[dealCustomFields][11904802]", "1");
     realParams.set("formParams[dealCustomFields][11904803]", "1");
@@ -162,7 +164,7 @@ try {
   assert.equal(submitRes.body, "success");
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_form_submit'")).rows[0].count, 1);
   assert.equal(postedBody.get("formParams[email]"), "test-artem-debug@example.com");
-  assert.equal(postedBody.get("formParams[full_name]"), "ТЕСТ Артем_Экспертович_TG");
+  assert.equal(postedBody.get("formParams[full_name]"), submitName);
   assert.equal(postedBody.get("formParams[phone]"), process.env.GETCOURSE_REAL_SUBMIT === "1" ? "+79991234567" : "+70000000000");
   assert.equal(postedBody.has("__artem_getcourse_canonical_phone"), false);
   assert.equal(postedBody.get("formParams[dealCustomFields][11904802]"), "1");
@@ -179,7 +181,7 @@ try {
     { utm_source: "yandex", utm_campaign: "stroiexpert", utm_content: "hero" });
   assert.ok(telegramBodies.length >= 1); assert.equal(telegramBodies[0].chat_id, "-5538881072");
   const telegramText = telegramBodies.map(body => body.text).join("\n");
-  assert.match(telegramText, /ТЕСТ Артем_Экспертович_TG/); assert.match(telegramText, /Стройэксперт/);
+  assert.ok(telegramText.includes(submitName)); assert.match(telegramText, /Стройэксперт/);
   assert.match(telegramText, /Сколько стоит\?/); assert.match(telegramText, /utm_source: yandex/);
   if (process.env.GETCOURSE_REAL_SUBMIT !== "1") {
     telegramShouldFail = true;

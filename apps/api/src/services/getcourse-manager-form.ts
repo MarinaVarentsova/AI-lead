@@ -17,11 +17,60 @@ const errorDetails = (error: unknown) => ({
   errorMessage: error instanceof Error ? error.message : String(error),
 });
 
-const sanitizedPreview = (value: string) => value.slice(0, 300)
+const sanitizedPreview = (value: string) => value
   .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[email]")
   .replace(/\+?\d[\d\s()-]{7,}\d/g, "[phone]")
   .replace(/([A-Za-z_-]*hash)["'=:\s]+[A-Za-z0-9._-]+/gi, "$1=[redacted]")
-  .replace(/(requestSimpleSign|token|cookie|authorization)["'=:\s]+[^\s"'<>&]+/gi, "$1=[redacted]");
+  .replace(/(requestSimpleSign|token|cookie|authorization)["'=:\s]+[^\s"'<>&]+/gi, "$1=[redacted]")
+  .slice(0, 500);
+
+const visibleHtmlText = (value: string) => value
+  .replace(/<(script|style|template)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+  .replace(/<[^>]+>/g, " ")
+  .replace(/&nbsp;|&#160;/gi, " ")
+  .replace(/&quot;|&#34;/gi, '"')
+  .replace(/&#39;|&apos;/gi, "'")
+  .replace(/&lt;/gi, "<")
+  .replace(/&gt;/gi, ">")
+  .replace(/&amp;/gi, "&")
+  .replace(/\s+/g, " ");
+
+export interface GetCourseResponseAnalysis {
+  successDetected: boolean;
+  validationError: boolean;
+  success: boolean | undefined;
+  formProcessed: boolean | undefined;
+  responseFormat: "json" | "html" | "text";
+}
+
+export function analyzeGetCourseResponse(response: Response, responseText: string): GetCourseResponseAnalysis {
+  let success: boolean | undefined;
+  let formProcessed: boolean | undefined;
+  let responseFormat: GetCourseResponseAnalysis["responseFormat"] =
+    /text\/html/i.test(response.headers.get("content-type") ?? "") ? "html" : "text";
+  let parsedJson = false;
+  let structuredErrorText = "";
+  try {
+    const result = JSON.parse(responseText) as {
+      success?: boolean;
+      error?: unknown;
+      data?: { formProcessed?: boolean; error?: unknown };
+    };
+    parsedJson = true;
+    responseFormat = "json";
+    success = typeof result.success === "boolean" ? result.success : undefined;
+    formProcessed = typeof result.data?.formProcessed === "boolean" ? result.data.formProcessed : undefined;
+    structuredErrorText = [result.error, result.data?.error].filter(value => typeof value === "string").join(" ");
+  } catch { /* A native GetCourse HTML response is valid and handled below. */ }
+
+  // GetCourse may ship generic error strings inside scripts/templates even when the form was accepted.
+  // Structured JSON flags are authoritative; for HTML only rendered text can represent validation failure.
+  const detectorText = parsedJson ? structuredErrorText : responseFormat === "html" ? visibleHtmlText(responseText) : responseText;
+  const validationError = success === false || formProcessed === false ||
+    /Не заполнено поле|Заявка не отправлена|Не получилось обработать форму/i.test(detectorText);
+  const successDetected = response.ok && !validationError && success !== false && formProcessed !== false;
+  return { successDetected, validationError, success, formProcessed, responseFormat };
+}
 
 export function formatGetCourseManagerComment(context: ManagerLeadContext): string {
   const transcript = context.transcript.map(turn =>
@@ -166,6 +215,7 @@ export interface GetCourseSubmitResult { status: number; contentType: string; bo
 
 export async function submitGetCourseWidgetBody(params: URLSearchParams, cookie: string | undefined,
   fetcher: typeof fetch = fetch, trace: ManagerFormTrace = () => {}): Promise<GetCourseSubmitResult> {
+  const dialogue = params.get(`formParams[dealCustomFields][${GETCOURSE_COMMENT_FIELD}]`) ?? "";
   trace("getcourse_payload_built", { emailPresent: Boolean(params.get("formParams[email]")?.trim()),
     fullNamePresent: Boolean(params.get("formParams[full_name]")?.trim()),
     phonePresent: Boolean(params.get("formParams[phone]")?.trim()),
@@ -173,10 +223,11 @@ export async function submitGetCourseWidgetBody(params: URLSearchParams, cookie:
     consent11904802Value: params.get("formParams[dealCustomFields][11904802]") ?? "",
     consent11904803Present: params.has("formParams[dealCustomFields][11904803]"),
     consent11904803Value: params.get("formParams[dealCustomFields][11904803]") ?? "",
-    dialogue22041910Present: Boolean(params.get(`formParams[dealCustomFields][${GETCOURSE_COMMENT_FIELD}]`)?.trim()),
-    dialogue22041910Length: params.get(`formParams[dealCustomFields][${GETCOURSE_COMMENT_FIELD}]`)?.length ?? 0,
+    dialogue22041910Present: Boolean(dialogue.trim()), dialogue22041910Length: dialogue.length,
+    dialogue22041910ContainsTranscript: /(?:Пользователь|Артём):\s*\S/.test(dialogue),
     requestTimePresent: Boolean(params.get("requestTime")), requestSimpleSignPresent: Boolean(params.get("requestSimpleSign")),
-    helperPresent: params.has("__gc__internal__form__helper"), helperRefPresent: params.has("__gc__internal__form__helper_ref") });
+    helperPresent: params.has("__gc__internal__form__helper"), helperRefPresent: params.has("__gc__internal__form__helper_ref"),
+    isHtmlWidgetPresent: Boolean(params.get("isHtmlWidget")) });
   validateGetCourseWidgetBody(params);
   const action = params.get(GETCOURSE_ACTION_FIELD);
   if (!action) throw new Error("GETCOURSE_WIDGET_ACTION_REQUIRED");
@@ -202,19 +253,14 @@ export async function submitGetCourseWidgetBody(params: URLSearchParams, cookie:
     throw error;
   }
   const responseText = await response.text();
-  let processed: boolean | undefined;
-  let success: boolean | undefined;
-  try {
-    const result = JSON.parse(responseText) as { success?: boolean; data?: { formProcessed?: boolean } };
-    success = typeof result.success === "boolean" ? result.success : undefined;
-    processed = typeof result.data?.formProcessed === "boolean" ? result.data.formProcessed : undefined;
-  }
-  catch { processed = undefined; }
-  const validationError = /Не заполнено поле|Заявка не отправлена|Не получилось обработать форму/i.test(responseText);
-  const successDetected = response.ok && success !== false && processed !== false && !validationError;
+  const analysis = analyzeGetCourseResponse(response, responseText);
   trace("getcourse_post_response", { httpStatus: response.status, contentType: response.headers.get("content-type") ?? "",
-    responseLength: responseText.length, responsePreview: sanitizedPreview(responseText), successDetected, validationError });
-  if (!successDetected) {
+    responseLength: responseText.length, responsePreview: sanitizedPreview(responseText),
+    successDetectorResult: analysis.successDetected, validationDetectorResult: analysis.validationError,
+    formProcessedDetectionResult: analysis.formProcessed ?? null, successDetectionResult: analysis.success ?? null,
+    responseFormat: analysis.responseFormat, successDetected: analysis.successDetected,
+    validationError: analysis.validationError });
+  if (!analysis.successDetected) {
     trace("getcourse_post_error", { errorClass: "GetCourseResponseError", errorMessage: "GETCOURSE_SUBMIT_FAILED",
       upstreamStatus: response.status, timeout: false, network: false });
     throw new Error("GETCOURSE_SUBMIT_FAILED");
