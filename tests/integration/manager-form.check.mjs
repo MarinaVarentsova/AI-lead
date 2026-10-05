@@ -38,6 +38,9 @@ const response = () => ({ statusCode: 200, status(code) { this.statusCode = code
   send(body) { this.body = body; return this; } });
 const traceLogs = [];
 const log = { info(data) { traceLogs.push(data); }, error(data) { traceLogs.push(data); } };
+const savedTelegramEnv = { token: process.env.TELEGRAM_BOT_TOKEN, chatId: process.env.TELEGRAM_CHAT_ID };
+if (process.env.GETCOURSE_REAL_SUBMIT !== "1") process.env.TELEGRAM_BOT_TOKEN = "integration-secret-token";
+process.env.TELEGRAM_CHAT_ID ||= "-5538881072";
 try {
   await pg.exec(`CREATE TABLE ai_sessions(id uuid PRIMARY KEY,session_key text NOT NULL UNIQUE,first_page_url text,
     utm_source text,utm_medium text,utm_campaign text,utm_content text,utm_term text,created_at timestamptz DEFAULT now(),updated_at timestamptz DEFAULT now());
@@ -78,11 +81,17 @@ try {
   assert.match(contextRes.body.comment, /Источник обращения:\n\nUTM source: yandex/);
   assert.match(contextRes.body.comment, /UTM campaign: stroiexpert/); assert.match(contextRes.body.comment, /gclid: g-first/);
 
-  const originalFetch = globalThis.fetch; let shouldFail = true; let postedBody;
-  globalThis.fetch = async (_url, init = {}) => {
+  const originalFetch = globalThis.fetch; let shouldFail = true; let telegramShouldFail = false;
+  let postedBody; const telegramBodies = [];
+  globalThis.fetch = async (url, init = {}) => {
+    if (String(url).startsWith("https://api.telegram.org/")) {
+      telegramBodies.push(JSON.parse(init.body));
+      return telegramShouldFail ? new Response("unavailable", { status: 503 }) :
+        Response.json({ ok: true, result: { message_id: telegramBodies.length } });
+    }
     if (init.method === "POST") { postedBody = init.body; return new Response(shouldFail ? "Не заполнено поле Email" : "success", { status: 200 }); }
   };
-  const formBody = { formParams: { email: "test-artem-debug@example.com", full_name: "ТЕСТ Артем_Экспертович_DEBUG",
+  const formBody = { formParams: { email: "test-artem-debug@example.com", full_name: "ТЕСТ Артем_Экспертович_TG",
     phone: "+70000000000", dealCustomFields: { 11904802: "1", 11904803: "1", 22041910: "browser value" } },
     __artem_getcourse_canonical_phone: "+7 (000) 000-00-00",
     pdpConfirmCheckbox: "on", requestTime: "1", requestSimpleSign: "abc", isHtmlWidget: "1",
@@ -94,6 +103,7 @@ try {
   await recordEvent(sessionId, "manager_contact_click");
   let submitRes = response(); await postHandler(req, submitRes); assert.equal(submitRes.statusCode, 502);
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_form_submit'")).rows[0].count, 0);
+  assert.equal(telegramBodies.length, 0);
   shouldFail = false;
   let realRequestId;
   if (process.env.GETCOURSE_REAL_SUBMIT === "1") {
@@ -113,7 +123,7 @@ try {
       realParams.append(name.replaceAll("&amp;", "&"), value.replaceAll("&quot;", '"').replaceAll("&amp;", "&"));
     }
     realParams.set("formParams[email]", "test-artem-debug@example.com");
-    realParams.set("formParams[full_name]", "ТЕСТ Артем_Экспертович_DEBUG");
+    realParams.set("formParams[full_name]", "ТЕСТ Артем_Экспертович_TG");
     realParams.set("formParams[phone]", "+79991234567");
     realParams.set("formParams[dealCustomFields][11904802]", "1");
     realParams.set("formParams[dealCustomFields][11904803]", "1");
@@ -130,6 +140,12 @@ try {
     req.body = realParams.toString();
     req.headers.cookie = widgetRes.headers.filter(([name]) => name === "Set-Cookie").map(([, value]) => value.split(";", 1)[0]).join("; ");
     globalThis.fetch = async (url, init = {}) => {
+    if (String(url).startsWith("https://api.telegram.org/")) {
+      telegramBodies.push(JSON.parse(init.body));
+      if (process.env.GETCOURSE_REAL_SUBMIT === "1") return originalFetch(url, init);
+      return telegramShouldFail ? new Response("unavailable", { status: 503 }) :
+        Response.json({ ok: true, result: { message_id: telegramBodies.length } });
+    }
     if (init.method === "POST") postedBody = init.body;
     const response = await originalFetch(url, init);
     if (init.method === "POST") {
@@ -146,7 +162,7 @@ try {
   assert.equal(submitRes.body, "success");
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_form_submit'")).rows[0].count, 1);
   assert.equal(postedBody.get("formParams[email]"), "test-artem-debug@example.com");
-  assert.equal(postedBody.get("formParams[full_name]"), "ТЕСТ Артем_Экспертович_DEBUG");
+  assert.equal(postedBody.get("formParams[full_name]"), "ТЕСТ Артем_Экспертович_TG");
   assert.equal(postedBody.get("formParams[phone]"), process.env.GETCOURSE_REAL_SUBMIT === "1" ? "+79991234567" : "+70000000000");
   assert.equal(postedBody.has("__artem_getcourse_canonical_phone"), false);
   assert.equal(postedBody.get("formParams[dealCustomFields][11904802]"), "1");
@@ -161,6 +177,16 @@ try {
   const submitEvent = (await pg.query("SELECT event_data FROM ai_events WHERE event_type='manager_form_submit'")).rows[0];
   assert.deepEqual(submitEvent.event_data,
     { utm_source: "yandex", utm_campaign: "stroiexpert", utm_content: "hero" });
+  assert.ok(telegramBodies.length >= 1); assert.equal(telegramBodies[0].chat_id, "-5538881072");
+  const telegramText = telegramBodies.map(body => body.text).join("\n");
+  assert.match(telegramText, /ТЕСТ Артем_Экспертович_TG/); assert.match(telegramText, /Стройэксперт/);
+  assert.match(telegramText, /Сколько стоит\?/); assert.match(telegramText, /utm_source: yandex/);
+  if (process.env.GETCOURSE_REAL_SUBMIT !== "1") {
+    telegramShouldFail = true;
+    const isolatedFailure = response(); await postHandler(req, isolatedFailure);
+    assert.equal(isolatedFailure.statusCode, 200); assert.equal(isolatedFailure.body, "success");
+    assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_form_submit'")).rows[0].count, 2);
+  }
   const emptySessionId = randomUUID();
   await pg.query("INSERT INTO ai_sessions(id,session_key) VALUES($1,$2)", [emptySessionId, "manager-form-empty"]);
   const contextFailureRes = response();
@@ -169,7 +195,7 @@ try {
   assert.equal(contextFailureRes.statusCode, 409);
   assert.ok(traceLogs.some(item => item.sessionId === emptySessionId && item.stage === "manager_context_error"));
   const serializedLogs = JSON.stringify(traceLogs);
-  assert.doesNotMatch(serializedLogs, /test-artem-debug@example\.com|\+79991234567|requestSimpleSign":"|Пользователь: Сколько стоит/);
+  assert.doesNotMatch(serializedLogs, /test-artem-debug@example\.com|\+79991234567|requestSimpleSign":"|Пользователь: Сколько стоит|integration-secret-token/);
   globalThis.fetch = originalFetch;
   if (process.env.GETCOURSE_REAL_SUBMIT === "1") console.log(JSON.stringify({ managerFormRequestId: realRequestId,
     timeline: traceLogs.filter(item => item.managerFormRequestId === realRequestId).map(item => ({ stage: item.stage,
@@ -178,4 +204,10 @@ try {
     commentLength: submittedComment.length, commentFirst200: submittedComment.slice(0, 200),
     commentLast200: submittedComment.slice(-200), transcriptPresent: submittedComment.includes("Пользователь: Сколько стоит?") }));
   console.log(`PASS: current session context, simultaneous payload, failed-submit retry and success-only manager_form_submit event${process.env.GETCOURSE_REAL_SUBMIT === "1" ? "; real GetCourse HTTP submit accepted" : ""}.`);
-} finally { hooks.deregister(); await pg.close(); delete globalThis.__managerFormDb; }
+} finally {
+  if (savedTelegramEnv.token === undefined) delete process.env.TELEGRAM_BOT_TOKEN;
+  else process.env.TELEGRAM_BOT_TOKEN = savedTelegramEnv.token;
+  if (savedTelegramEnv.chatId === undefined) delete process.env.TELEGRAM_CHAT_ID;
+  else process.env.TELEGRAM_CHAT_ID = savedTelegramEnv.chatId;
+  hooks.deregister(); await pg.close(); delete globalThis.__managerFormDb;
+}

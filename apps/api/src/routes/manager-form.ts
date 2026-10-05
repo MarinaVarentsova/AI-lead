@@ -6,6 +6,7 @@ import { formatGetCourseManagerComment, loadGetCourseManagerWidget, serializeGet
   getCourseCookieHeader, localizeGetCourseCookies, MANAGER_FORM_REQUEST_ID_FIELD, submitGetCourseWidgetBody,
   type ManagerFormTrace } from "../services/getcourse-manager-form";
 import { sourceEventMetadata } from "../services/source-attribution";
+import { managerLeadContacts, sendTelegramManagerLead } from "../services/telegram-manager-notification";
 
 const router: IRouter = Router();
 const UUID_RE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
@@ -99,6 +100,7 @@ router.post("/manager-form/widget-submit/:sessionId", async (req, res): Promise<
       req.log.error({ managerFormRequestId, sessionId, stage: "manager_form_submit_event_write",
         errorCode: "MANAGER_FORM_EVENT_FAILED", attempted: true, written: false }, "MANAGER_FORM_EVENT_FAILED");
     }
+    await sendTelegramManagerLead(context, managerLeadContacts(params), process.env, fetch, trace);
     trace("manager_form_completed", { result: "success" });
     res.status(upstream.status).set("Content-Type", upstream.contentType).send(upstream.body);
   } catch (error) {

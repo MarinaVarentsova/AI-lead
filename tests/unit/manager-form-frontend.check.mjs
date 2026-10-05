@@ -19,6 +19,7 @@ assert.doesNotMatch(widget, /CONTACT_CHANNELS|submitContact/);
 assert.match(widget, /setContactPhase\("submitted"\)/);
 assert.match(helper, /referrer:\s*document\.referrer/);
 assert.match(route, /submitGetCourseWidgetBody[\s\S]*recordEvent\(sessionId, "manager_form_submit", sourceEventMetadata\(context\)\)/);
+assert.match(route, /recordEvent\(sessionId, "manager_form_submit"[\s\S]*sendTelegramManagerLead\(context, managerLeadContacts\(params\)/);
 assert.match(css, /\.manager-form-overlay[\s\S]*overflow-y:\s*auto/);
 assert.match(css, /@media \(max-width:\s*640px\)[\s\S]*\.manager-form-modal/);
 console.log("PASS G-L: modal fields/context, X/Escape/backdrop exit redirect, error retention, success-only event and responsive layout wiring.");
