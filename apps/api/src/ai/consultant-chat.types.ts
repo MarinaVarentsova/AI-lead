@@ -2,7 +2,10 @@ export interface ConsultantProviderInput {
   history?: { role: string; message: string }[];
   question: string;
   diagnosticContext: string;
+  sourceVersion?: string;
   matchedSections: { id: string; title: string; content: string }[];
+  faqMatch?: { id: string; intent: string; policy: "KB" | "MANAGER" | "MIXED"; similarity: number;
+    answer: string; kbReference: string };
 }
 
 export interface ConsultantAIProvider {
@@ -15,4 +18,7 @@ export interface ConsultantChatResponse {
   provider: "yandex" | "fallback";
   matchedSectionIds: string[];
   fallbackReason: string | null;
+  faqMatchUsed?: boolean; faqMatchId?: string; faqIntent?: string; faqPolicy?: string;
+  faqSimilarity?: number; kbReference?: string;
+  sourceVersion?: string;
 }

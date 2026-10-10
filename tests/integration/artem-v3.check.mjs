@@ -27,7 +27,7 @@ const hooks = registerHooks({
 });
 
 try {
-  const { createArtemRuntime, loadArtemKnowledge } = await import(new URL("apps/api/src/ai/artem-runtime.ts", root));
+  const { createArtemRuntime, loadArtemFaq, loadArtemKnowledge } = await import(new URL("apps/api/src/ai/artem-runtime.ts", root));
   const { knowledgeSections } = await import(new URL("apps/api/src/ai/artem-knowledge.ts", root));
   const { YandexAIProvider } = await import(new URL("apps/api/src/ai/yandex-provider.ts", root));
   const { runTester } = await import(new URL("apps/api/src/tester/runner.ts", root));
@@ -36,7 +36,9 @@ try {
   const { CRITERIA, EVALUATOR_PROMPT } = await import(new URL("apps/api/src/tester/evaluator.ts", root));
   const { DIAGNOSTIC_SCHEMA } = await import(new URL("packages/domain/src/diagnostic/diagnostic-schema.ts", root));
   const canonical = read("knowledge/inobr/artem_unified_knowledge_base_v4_4.md");
+  const faq = await loadArtemFaq();
   assert.equal((await loadArtemKnowledge()).replace(/\r\n/g, "\n").trim(), canonical.replace(/\r\n/g, "\n").trim());
+  assert.equal(faq.length, 1200);
   assert.equal(existsSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3.md", root)), false);
   assert.equal(existsSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_1.md", root)), false);
   assert.equal(existsSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v3_2.md", root)), false);
@@ -74,7 +76,9 @@ try {
     return { criteria: Object.fromEntries(CRITERIA.map(key => [key, 90])), strengths: ["v4.4"], problems: [],
       recommendedFixes: [], funnelAssessment: "Корректно", groundingAssessment: "Только v4.4" };
   };
-  const runtime = createArtemRuntime(canonical, provider);
+  const runtime = createArtemRuntime(canonical, provider, faq);
+  assert.equal(runtime.faq, faq, "prod/tester must share the same FAQ collection");
+  assert.match(runtime.resolver.sourceVersion, /^inobr-artem-v4\.4-faq1200-/);
   const schemaCodes = Object.fromEntries(DIAGNOSTIC_SCHEMA.map(question =>
     [question.field, new Set(question.options.map(option => option.code))]));
   for (const persona of generatePersonas(10, () => 0.42)) {
@@ -111,7 +115,7 @@ try {
   const invalidStructuredProvider = new YandexAIProvider({});
   invalidStructuredProvider.generateDiagnosticResult = async () => ({ recommendation: "wrong legacy shape" });
   invalidStructuredProvider.generateStructured = provider.generateStructured;
-  const fallbackRuntime = createArtemRuntime(canonical, invalidStructuredProvider);
+  const fallbackRuntime = createArtemRuntime(canonical, invalidStructuredProvider, faq);
   const fallbackCases = [cases[0], cases[5], cases[6], cases[4]];
   const fallbackSaved = [];
   const fallbackSummary = await runTester(fallbackCases.length, fallbackRuntime, {

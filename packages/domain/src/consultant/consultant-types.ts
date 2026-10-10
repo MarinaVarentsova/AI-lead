@@ -10,6 +10,7 @@ export type ConsultantIntent = "relevant_training_question" | "small_talk" | "of
 export interface ConsultantRetrievalPacket {
   matchedSections: { id: string; title: string; content: string; score: number; reason: string[] }[];
   contextSummary: string; sourceVersion: string; intent: ConsultantIntent;
+  faqMatches: import("./faq-retrieval").FaqMatch[];
 }
 export class ConsultantValidationError extends Error {
   readonly code = "CONSULTANT_VALIDATION_ERROR";

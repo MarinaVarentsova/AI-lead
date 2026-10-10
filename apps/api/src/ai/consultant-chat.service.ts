@@ -55,29 +55,37 @@ export class ConsultantChatService {
   prepare(question: string, diagnosticContext: ConsultantDiagnosticContext): ConsultantProviderInput {
     const safeQuestion = redactConsultantQuestion(question);
     const retrieval = this.resolver.resolve({ question: safeQuestion, diagnosticContext });
-    return selectConsultantInput({ question: safeQuestion, diagnosticContext: retrieval.contextSummary, matchedSections: retrieval.matchedSections });
+    const match = retrieval.faqMatches[0];
+    return selectConsultantInput({ question: safeQuestion, diagnosticContext: retrieval.contextSummary, sourceVersion: retrieval.sourceVersion,
+      matchedSections: retrieval.matchedSections, ...(match ? { faqMatch: { id: match.id, intent: match.intent,
+        policy: match.normalizedPolicy, similarity: match.similarity, answer: match.answer, kbReference: match.kbReference } } : {}) });
   }
   async generate(input: ConsultantProviderInput): Promise<ConsultantChatResponse> {
     const facts = selectConsultantInput(input);
     const markdown = this.markdown ?? await loadArtemKnowledge();
+    const faq = facts.faqMatch;
+    const faqMeta = faq ? { faqMatchUsed: true, faqMatchId: faq.id, faqIntent: faq.intent, faqPolicy: faq.policy,
+      faqSimilarity: faq.similarity, kbReference: faq.kbReference, sourceVersion: facts.sourceVersion } :
+      { faqMatchUsed: false, sourceVersion: facts.sourceVersion };
+    const respond = (response: ConsultantChatResponse): ConsultantChatResponse => ({ ...response, ...faqMeta });
     const commercialQuestion = /рассроч|кредит|отсроч|оплат|частями|график.*плат|платить.*месяц|ежемесяч|перв.*взнос|разбить.*плат|заплатить потом|перенести.*плат|досрочн.*погаш|сколько стоит|стоимость|какая цена|какие цены|цен[аыуеой]|тариф/i.test(facts.question) &&
       !/скидк|акци|индивидуальн|специальн.*цен|конкурент.*дешев|бесплатн/i.test(facts.question);
     const tariffComparisonQuestion = /чем отличаются.*тариф|разниц.*(?:тариф|базов|средн|премиум|час|документ|материал)|(?:средн|премиум|базов).*отлича|что входит.*(?:тариф|базов|средн|премиум)|какой тариф выбрать|почему тарифы|что.*в каждом тариф|сравнить.*тариф|какие тарифы|в каком тариф|тариф.*разные программ/i.test(facts.question);
     const directFactQuestion = /какой документ|что (?:я )?получу после обуч|можно (?:ли )?начать|когда (?:можно )?начать|что входит|содержан.*программ|как проходит обуч|формат обуч|обучение дистанционное|онлайн|офлайн|приезжать очно|очн(?:ые|ая|ое|ый).*?(?:занят|встреч|посещ)|другого города|другой страны|посещать институт|обучение дома|своем темпе|своём темпе|есть практика|практическ.*задани|сколько длится|продолжительность/i.test(facts.question);
     const policyMatrixQuestion = /как (?:записаться|поступить|попасть|оформить)|куда записываться|что делать дальше|скидк|промокод|акци|возврат|вернуть деньги|ближайш.*(?:старт|поток)|расписан|срок.*доступ|что такое.*(?:при[её]мк|строительн.*контрол)|что выбрать.*(?:стройэксперт|при[её]мк)|судебн.*эксперт|конкретн.*суд|(?:^|\s)сро(?:\s|[?.!,]|$)|гарант.*(?:работ|доход|заказ)|сколько.*час|чему учат/i.test(facts.question);
     const managerContactQuestion = /как со мной свяж|как связаться.*менеджер|свяжется менеджер/i.test(facts.question);
-    if (tariffComparisonQuestion || commercialQuestion || managerContactQuestion || directFactQuestion || policyMatrixQuestion) return {
+    if (tariffComparisonQuestion || commercialQuestion || managerContactQuestion || directFactQuestion || policyMatrixQuestion) return respond({
       message: consultantFallback(facts, markdown), isAI: false, provider: "fallback",
       matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null,
-    };
+    });
     const unknown = facts.matchedSections.every(section => ["faq", "manager"].includes(section.id));
     const intent = classifyConsultantIntent(facts.question, !unknown);
-    if (intent === "small_talk") return { message: SMALL_TALK_REPLY, isAI: false, provider: "fallback",
-      matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null };
-    if (intent === "off_topic" || intent === "abusive_or_trolling") return {
+    if (intent === "small_talk") return respond({ message: SMALL_TALK_REPLY, isAI: false, provider: "fallback",
+      matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null });
+    if (intent === "off_topic" || intent === "abusive_or_trolling") return respond({
       message: intent === "abusive_or_trolling" ? ABUSIVE_REPLY : OFF_TOPIC_REPLY,
       isAI: false, provider: "fallback", matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null,
-    };
+    });
     const genuineUnknown = intent === "genuine_unknown_program_fact" || (unknown && intent === "relevant_training_question");
     try {
       if (unknown || genuineUnknown) throw new Error("INSUFFICIENT_KNOWLEDGE");
@@ -92,14 +100,15 @@ export class ConsultantChatService {
         /скидок нет|такой скидки нет|такой акции нет|индивидуальн[^.!?]{0,40}не предусмотр|возврат[^.!?]{0,40}зависит от тарифа|доступ не бессроч|срок доступа не установлен/i.test(message)) {
         throw new DiagnosticAIError("AI_INVALID_RESULT");
       }
-      return { message: guardedMessage, isAI: true, provider: "yandex",
-        matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null };
+      return respond({ message: guardedMessage, isAI: true, provider: "yandex",
+        matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null });
     } catch (error) {
       const commercialUnknown = /возврат|доступ.*материал|срок.*доступ|навсегда|бессроч/i.test(facts.question);
       const fallbackMessage = genuineUnknown && !commercialUnknown ? unknownProgramFactReply(facts.question) : consultantFallback(facts, markdown);
-      return { message: fallbackMessage, isAI: false, provider: "fallback",
+      return respond({ message: fallbackMessage, isAI: false, provider: "fallback",
         matchedSectionIds: facts.matchedSections.map(section => section.id),
-        fallbackReason: genuineUnknown ? "INSUFFICIENT_KNOWLEDGE" : error instanceof DiagnosticAIError ? error.code : "AI_REQUEST_FAILED" };
+        fallbackReason: genuineUnknown ? "INSUFFICIENT_KNOWLEDGE" : faq ? null :
+          error instanceof DiagnosticAIError ? error.code : "AI_REQUEST_FAILED" });
     }
   }
 }

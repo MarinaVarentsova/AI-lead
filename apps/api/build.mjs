@@ -15,10 +15,7 @@ async function buildAll() {
   await rm(distDir, { recursive: true, force: true });
 
   await esbuild({
-    entryPoints: [
-      path.resolve(artifactDir, "src/index.ts"),
-      path.resolve(artifactDir, "src/app.ts"),
-    ],
+    entryPoints: [path.resolve(artifactDir, "src/index.ts"), path.resolve(artifactDir, "src/app.ts")],
     platform: "node",
     bundle: true,
     format: "esm",
@@ -30,84 +27,11 @@ async function buildAll() {
     // Examples of unbundleable packages:
     // - uses native modules and loads them dynamically (e.g. sharp)
     // - use path traversal to read files (e.g. @google-cloud/secret-manager loads sibling .proto files)
-    external: [
-      "*.node",
-      "sharp",
-      "better-sqlite3",
-      "sqlite3",
-      "canvas",
-      "bcrypt",
-      "argon2",
-      "fsevents",
-      "re2",
-      "farmhash",
-      "xxhash-addon",
-      "bufferutil",
-      "utf-8-validate",
-      "ssh2",
-      "cpu-features",
-      "dtrace-provider",
-      "isolated-vm",
-      "lightningcss",
-      "pg-native",
-      "oracledb",
-      "mongodb-client-encryption",
-      "nodemailer",
-      "handlebars",
-      "knex",
-      "typeorm",
-      "protobufjs",
-      "onnxruntime-node",
-      "@tensorflow/*",
-      "@prisma/client",
-      "@mikro-orm/*",
-      "@grpc/*",
-      "@swc/*",
-      "@aws-sdk/*",
-      "@azure/*",
-      "@opentelemetry/*",
-      "@google-cloud/*",
-      "@google/*",
-      "googleapis",
-      "firebase-admin",
-      "@parcel/watcher",
-      "@sentry/profiling-node",
-      "@tree-sitter/*",
-      "aws-sdk",
-      "classic-level",
-      "dd-trace",
-      "ffi-napi",
-      "grpc",
-      "hiredis",
-      "kerberos",
-      "leveldown",
-      "miniflare",
-      "mysql2",
-      "newrelic",
-      "odbc",
-      "piscina",
-      "realm",
-      "ref-napi",
-      "rocksdb",
-      "sass-embedded",
-      "sequelize",
-      "serialport",
-      "snappy",
-      "tinypool",
-      "usb",
-      "workerd",
-      "wrangler",
-      "zeromq",
-      "zeromq-prebuilt",
-      "playwright",
-      "puppeteer",
-      "puppeteer-core",
-      "electron",
-    ],
+    external: ["*.node", "sharp", "better-sqlite3", "sqlite3", "canvas", "bcrypt", "argon2", "fsevents", "re2", "farmhash", "xxhash-addon", "bufferutil", "utf-8-validate", "ssh2", "cpu-features", "dtrace-provider", "isolated-vm", "lightningcss", "pg-native", "oracledb", "mongodb-client-encryption", "nodemailer", "handlebars", "knex", "typeorm", "protobufjs", "onnxruntime-node", "@tensorflow/*", "@prisma/client", "@mikro-orm/*", "@grpc/*", "@swc/*", "@aws-sdk/*", "@azure/*", "@opentelemetry/*", "@google-cloud/*", "@google/*", "googleapis", "firebase-admin", "@parcel/watcher", "@sentry/profiling-node", "@tree-sitter/*", "aws-sdk", "classic-level", "dd-trace", "ffi-napi", "grpc", "hiredis", "kerberos", "leveldown", "miniflare", "mysql2", "newrelic", "odbc", "piscina", "realm", "ref-napi", "rocksdb", "sass-embedded", "sequelize", "serialport", "snappy", "tinypool", "usb", "workerd", "wrangler", "zeromq", "zeromq-prebuilt", "playwright", "puppeteer", "puppeteer-core", "electron"],
     sourcemap: "linked",
     plugins: [
       // pino relies on workers to handle logging, instead of externalizing it we use a plugin to handle it
-      esbuildPluginPino({ transports: ["pino-pretty"] })
+      esbuildPluginPino({ transports: ["pino-pretty"] }),
     ],
     // Make sure packages that are cjs only (e.g. express) but are bundled continue to work in our esm output file
     banner: {
@@ -124,10 +48,8 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
 
   const knowledgeDir = path.join(distDir, "knowledge");
   await mkdir(knowledgeDir, { recursive: true });
-  await copyFile(
-    path.resolve(artifactDir, "../../knowledge/inobr/artem_unified_knowledge_base_v4_4.md"),
-    path.join(knowledgeDir, "artem_unified_knowledge_base_v4_4.md"),
-  );
+  await copyFile(path.resolve(artifactDir, "../../knowledge/inobr/artem_unified_knowledge_base_v4_4.md"), path.join(knowledgeDir, "artem_unified_knowledge_base_v4_4.md"));
+  await copyFile(path.resolve(artifactDir, "../../knowledge/inobr/artem_client_questions_1200.csv"), path.join(knowledgeDir, "artem_client_questions_1200.csv"));
 }
 
 buildAll().catch((err) => {

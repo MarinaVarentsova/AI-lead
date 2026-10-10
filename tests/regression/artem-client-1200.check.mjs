@@ -106,11 +106,11 @@ function evaluate(row, message) {
 }
 
 try {
-  const [{ createArtemRuntime, loadArtemKnowledge }, { SOURCE_VERSION }] = await Promise.all([
+  const [{ createArtemRuntime, loadArtemKnowledge, loadArtemFaq }, { SOURCE_VERSION }] = await Promise.all([
     import(new URL("apps/api/src/ai/artem-runtime.ts", root)),
     import(new URL("packages/domain/src/diagnostic/diagnostic-types.ts", root)),
   ]);
-  const csvPath = new URL("tests/regression/artem_client_questions_1200.csv", root);
+  const csvPath = new URL("knowledge/inobr/artem_client_questions_1200.csv", root);
   const kbPath = new URL("knowledge/inobr/artem_unified_knowledge_base_v4_4.md", root);
   const canonical = readFileSync(kbPath, "utf8");
   const allRows = parseCsv(readFileSync(csvPath, "utf8"));
@@ -122,9 +122,10 @@ try {
   assert.equal(SOURCE_VERSION, "inobr-artem-v4.4");
   const provider = { generateStructured: async () => { throw new Error("REGRESSION_PROVIDER_DISABLED"); },
     generateConsultantReply: async () => { throw new Error("REGRESSION_PROVIDER_DISABLED"); } };
-  const runtime = createArtemRuntime(canonical, provider);
+  const faq = await loadArtemFaq();
+  const runtime = createArtemRuntime(canonical, provider, faq);
   assert.equal(runtime.markdown, canonical);
-  assert.match(runtime.resolver.resolve({ question: "Сколько стоит?" }).sourceVersion, /^inobr-artem-v4\.4-/);
+  assert.match(runtime.resolver.resolve({ question: "Сколько стоит?" }).sourceVersion, /^inobr-artem-v4\.4-faq1200-/);
   const answers = { current_area: "design_estimates", current_role: "engineer_designer_estimator",
     education_status: "higher", target_tasks: "defects_quality" };
   const results = [];
@@ -132,7 +133,7 @@ try {
     try {
       const facts = runtime.prepare(answers, row.question);
       const reply = await runtime.reply(facts, []);
-      results.push({ ...row, message: reply.message, verdict: evaluate(row, reply.message) });
+      results.push({ ...row, ...reply, message: reply.message, verdict: evaluate(row, reply.message) });
     } catch (error) {
       results.push({ ...row, message: error instanceof Error ? error.stack ?? error.message : String(error), verdict: "TECH_ERROR" });
     }
@@ -145,6 +146,9 @@ try {
       [key, key === "total" ? selected.length : selected.filter(row => row.verdict === key).length]))];
   }));
   const report = { total: results.length, ...counts, categories,
+    faqMatchesUsed: results.filter(row => row.faqMatchUsed).length,
+    kbOnly: results.filter(row => !row.faqMatchUsed).length,
+    managerPolicy: results.filter(row => row.faqPolicy === "MANAGER" || row.faqPolicy === "MIXED").length,
     sha256: createHash("sha256").update(canonical).digest("hex"), sourceVersion: SOURCE_VERSION,
     consultantSourceVersion: runtime.resolver.resolve({ question: "Сколько стоит?" }).sourceVersion,
     failureSamples: results.filter(row => row.verdict !== "PASS").slice(0, 20).map(({ id, category, intent, question, verdict, message }) =>

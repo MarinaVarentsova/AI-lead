@@ -44,7 +44,10 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
       phase = "load_runtime";
       const runtime = await getArtemRuntime();
       const facts = runtime.prepare(answers, message, history);
-      req.log.info({ requestId, stage: phase, provider, sectionIds: facts.matchedSections.map(s => s.id) }, "CONSULTANT_KNOWLEDGE_RESOLVED");
+      req.log.info({ requestId, stage: phase, provider, sectionIds: facts.matchedSections.map(s => s.id),
+        faqMatchUsed: Boolean(facts.faqMatch), faqMatchId: facts.faqMatch?.id, faqIntent: facts.faqMatch?.intent,
+        faqPolicy: facts.faqMatch?.policy, faqSimilarity: facts.faqMatch?.similarity,
+        kbReference: facts.faqMatch?.kbReference, sourceVersion: facts.sourceVersion }, "CONSULTANT_KNOWLEDGE_RESOLVED");
       phase = "save_user";
       const [user] = await appendDialogueLocked(tx, conversationId, [
         { id: requestId, speaker: "user", stage: "consultation", messageType: "user_question", text: message },

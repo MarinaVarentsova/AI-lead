@@ -41,6 +41,8 @@ export function selectConsultantInput(input: ConsultantProviderInput): Consultan
     ...(input.history ? { history: input.history.slice(-6).map(row => ({ role: row.role === "user" ? "user" : "assistant", message: redactConsultantQuestion(row.message) })) } : {}),
     question: redactConsultantQuestion(input.question),
     diagnosticContext: input.diagnosticContext,
+    ...(input.sourceVersion ? { sourceVersion: input.sourceVersion } : {}),
     matchedSections: input.matchedSections.slice(0, 5).map(({ id, title, content }) => ({ id, title, content })),
+    ...(input.faqMatch ? { faqMatch: input.faqMatch } : {}),
   };
 }
