@@ -60,7 +60,7 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
       const webMeta = { webResearchEligible: response.webResearchEligible, webResearchUsed: response.webResearchUsed,
         webResearchIntent: response.webResearchIntent, webResearchSourceCount: response.webResearchSourceCount,
         webResearchDomains: response.webResearchDomains, webResearchLatencyMs: response.webResearchLatencyMs,
-        webResearchFallbackReason: response.webResearchFallbackReason };
+        webResearchFallbackReason: response.webResearchFallbackReason, webResearchProvider: response.webResearchProvider };
       if (response.isAI) req.log.info({ requestId, stage: phase, provider, ...webMeta }, "CONSULTANT_AI_CALL_SUCCESS");
       else {
         req.log.warn({ requestId, stage: phase, provider, errorCode: response.fallbackReason, ...webMeta }, "CONSULTANT_AI_CALL_FAILED");

@@ -16,7 +16,7 @@ export interface ConsultantAIProvider {
 export interface ConsultantChatResponse {
   message: string;
   isAI: boolean;
-  provider: "yandex" | "fallback";
+  provider: "yandex" | "openai_web_search" | "fallback";
   matchedSectionIds: string[];
   fallbackReason: string | null;
   faqMatchUsed?: boolean; faqMatchId?: string; faqIntent?: string; faqPolicy?: string;
@@ -25,4 +25,5 @@ export interface ConsultantChatResponse {
   webResearchEligible?: boolean; webResearchUsed?: boolean; webResearchIntent?: string;
   webResearchSourceCount?: number; webResearchDomains?: string[]; webResearchLatencyMs?: number;
   webResearchFallbackReason?: string | null;
+  webResearchProvider?: "openai_web_search";
 }

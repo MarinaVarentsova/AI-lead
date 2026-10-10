@@ -5,7 +5,7 @@ import { redactConsultantQuestion, selectConsultantInput } from "./consultant-ch
 import type { ConsultantAIProvider, ConsultantChatResponse, ConsultantProviderInput } from "./consultant-chat.types";
 import { fallbackReply } from "./artem-policy";
 import { loadArtemKnowledge } from "./artem-knowledge";
-import { HttpProfessionalWebResearchService, type ProfessionalWebResearchService } from "./professional-web-research";
+import { OpenAIProfessionalWebResearchService, type ProfessionalWebResearchService } from "./professional-web-research";
 
 export function consultantFallback(input: ConsultantProviderInput, markdown: string): string {
   const program = /program=(construction_expertise|apartment_acceptance|house_acceptance|house_control|house_unspecified|acceptance_choice)/.exec(input.diagnosticContext)?.[1] as ArtemProgram | undefined;
@@ -53,7 +53,7 @@ function unknownProgramFactReply(question: string): string {
 }
 export class ConsultantChatService {
   constructor(private readonly resolver: ConsultantKnowledgeResolver, private readonly provider: ConsultantAIProvider,
-    private readonly markdown?: string, private readonly webResearch: ProfessionalWebResearchService = new HttpProfessionalWebResearchService()) {}
+    private readonly markdown?: string, private readonly webResearch: ProfessionalWebResearchService = new OpenAIProfessionalWebResearchService()) {}
   prepare(question: string, diagnosticContext: ConsultantDiagnosticContext): ConsultantProviderInput {
     const safeQuestion = redactConsultantQuestion(question);
     const retrieval = this.resolver.resolve({ question: safeQuestion, diagnosticContext });
@@ -72,12 +72,13 @@ export class ConsultantChatService {
       (!professional.kbSufficient || professional.mixedProductAndProfessional));
     let webResearchUsed = false; let webResearchSourceCount = 0; let webResearchDomains: string[] = [];
     let webResearchLatencyMs = 0; let webResearchFallbackReason: string | null = webResearchEligible ? "not_attempted" : "not_eligible";
+    const webResearchProvider = "openai_web_search" as const;
     const faqMeta = faq ? { faqMatchUsed: true, faqMatchId: faq.id, faqIntent: faq.intent, faqPolicy: faq.policy,
       faqSimilarity: faq.similarity, kbReference: faq.kbReference, sourceVersion: facts.sourceVersion } :
       { faqMatchUsed: false, sourceVersion: facts.sourceVersion };
     const respond = (response: ConsultantChatResponse): ConsultantChatResponse => ({ ...response, ...faqMeta,
       webResearchEligible, webResearchUsed, webResearchIntent: professional?.intent ?? undefined,
-      webResearchSourceCount, webResearchDomains, webResearchLatencyMs, webResearchFallbackReason });
+      webResearchSourceCount, webResearchDomains, webResearchLatencyMs, webResearchFallbackReason, webResearchProvider });
     const commercialQuestion = professional?.intent !== "professional_cost_estimation" &&
       /рассроч|кредит|отсроч|оплат|частями|график.*плат|платить.*месяц|ежемесяч|перв.*взнос|разбить.*плат|заплатить потом|перенести.*плат|досрочн.*погаш|сколько стоит|стоимость|какая цена|какие цены|цен[аыуеой]|тариф/i.test(facts.question) &&
       !/скидк|акци|индивидуальн|специальн.*цен|конкурент.*дешев|бесплатн/i.test(facts.question);
@@ -108,12 +109,17 @@ export class ConsultantChatService {
           : facts.question;
         const researched = await this.webResearch.research(researchQuery, professional.intent, professional.freshnessRequired);
         webResearchLatencyMs = researched.latencyMs; webResearchFallbackReason = researched.fallbackReason;
-        webSources = researched.sources; webResearchUsed = webSources.length > 0;
+        webSources = researched.sources; webResearchUsed = researched.webSearchCall && Boolean(researched.answer) && webSources.length > 0;
         webResearchSourceCount = webSources.length; webResearchDomains = [...new Set(webSources.map(source => source.domain))];
         if (webResearchUsed) providerFacts = { ...facts, matchedSections: [
-          ...webSources.map((source, index) => ({ id: `web-source:${index + 1}`, title: source.title,
-            content: `Источник: ${source.url}\nФактическая выдержка: ${source.snippet}` })),
+          { id: "web-answer", title: "Профессиональный web research",
+            content: `${researched.answer}\nИсточники:\n${webSources.map(source => `${source.title}: ${source.url}`).join("\n")}` },
           ...facts.matchedSections].slice(0, 5) };
+        if (webResearchUsed && !professional.mixedProductAndProfessional) {
+          const message = `${researched.answer.trim()}\n\nИсточники:\n${webSources.map(source => `— ${source.title} — ${source.url}`).join("\n")}`;
+          return respond({ message: guardInternalKnowledgeDisclosure(message), isAI: true, provider: "openai_web_search",
+            matchedSectionIds: providerFacts.matchedSections.map(section => section.id), fallbackReason: null });
+        }
       }
       let message = await this.provider.generateConsultantReply(selectConsultantInput(providerFacts));
       if (webResearchUsed) message = `${message.trim()}\n\nИсточники:\n${webSources.map(source => `— ${source.title} — ${source.url}`).join("\n")}`;

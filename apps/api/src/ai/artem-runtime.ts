@@ -7,12 +7,12 @@ import { applyConsultantFunnel, type ConsultantExchange } from "./consultant-fun
 import { diagnosticProgram, currentProgram, contactRefused } from "./artem-policy";
 import { loadArtemFaq, loadArtemKnowledge } from "./artem-knowledge";
 import { redactConsultantQuestion } from "./consultant-chat.prompt";
-import { HttpProfessionalWebResearchService, type ProfessionalWebResearchService } from "./professional-web-research";
+import { OpenAIProfessionalWebResearchService, type ProfessionalWebResearchService } from "./professional-web-research";
 export { loadArtemFaq, loadArtemKnowledge } from "./artem-knowledge";
 export const followUpCount = (history: ConsultantExchange[]) => history.filter((row) => row.role === "user").length;
 
 export function createArtemRuntime(markdown: string, provider = new YandexAIProvider(), faq: readonly FaqEntry[] = [],
-  webResearch: ProfessionalWebResearchService = new HttpProfessionalWebResearchService()) {
+  webResearch: ProfessionalWebResearchService = new OpenAIProfessionalWebResearchService()) {
   const resolver = new ConsultantKnowledgeResolver(markdown, faq);
   const consultant = new ConsultantChatService(resolver, provider, markdown, webResearch);
   return {
