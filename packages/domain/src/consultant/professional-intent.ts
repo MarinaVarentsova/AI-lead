@@ -9,7 +9,7 @@ export type ProfessionalWebIntent =
   | "professional_methodology"
   | "professional_terminology";
 
-export const PROFESSIONAL_WEB_POLICY_VERSION = "web1" as const;
+export const PROFESSIONAL_WEB_POLICY_VERSION = "yandexweb1" as const;
 
 export interface ProfessionalIntentResult {
   intent: ProfessionalWebIntent | null;

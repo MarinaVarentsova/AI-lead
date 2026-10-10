@@ -79,7 +79,7 @@ try {
   };
   const runtime = createArtemRuntime(canonical, provider, faq);
   assert.equal(runtime.faq, faq, "prod/tester must share the same FAQ collection");
-  assert.match(runtime.resolver.sourceVersion, /^inobr-artem-v4\.5-faq1200-web1-/);
+  assert.match(runtime.resolver.sourceVersion, /^inobr-artem-v4\.5-faq1200-yandexweb1-/);
   const schemaCodes = Object.fromEntries(DIAGNOSTIC_SCHEMA.map(question =>
     [question.field, new Set(question.options.map(option => option.code))]));
   for (const persona of generatePersonas(10, () => 0.42)) {

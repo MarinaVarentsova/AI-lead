@@ -200,7 +200,7 @@ try {
       assert.equal(state.writes.length, 1, "Save user before generation");
       captured = input;
       assert.ok(["diagnosticContext", "history", "matchedSections", "question", "sourceVersion"].every((key) => Object.hasOwn(input, key)));
-      assert.match(input.sourceVersion, /^inobr-artem-v4\.5-faq1200-web1-/);
+      assert.match(input.sourceVersion, /^inobr-artem-v4\.5-faq1200-yandexweb1-/);
       if (input.faqMatch) {
         assert.match(input.faqMatch.id, /^FAQ-/);
         assert.ok(["KB", "MANAGER", "MIXED"].includes(input.faqMatch.policy));

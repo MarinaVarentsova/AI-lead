@@ -125,7 +125,7 @@ try {
   const faq = await loadArtemFaq();
   const runtime = createArtemRuntime(canonical, provider, faq);
   assert.equal(runtime.markdown, canonical);
-  assert.match(runtime.resolver.resolve({ question: "Сколько стоит?" }).sourceVersion, /^inobr-artem-v4\.5-faq1200-web1-/);
+  assert.match(runtime.resolver.resolve({ question: "Сколько стоит?" }).sourceVersion, /^inobr-artem-v4\.5-faq1200-yandexweb1-/);
   const answers = { current_area: "design_estimates", current_role: "engineer_designer_estimator",
     education_status: "higher", target_tasks: "defects_quality" };
   const results = [];

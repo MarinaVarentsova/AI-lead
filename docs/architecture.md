@@ -62,7 +62,8 @@ pnpm run build
 ```
 
 Сборка не требует подключения к БД или AI. Для запуска API требуются DATABASE_URL и PORT;
-для legacy AI-запросов — OPENAI_API_KEY. KNOWLEDGE_BASE_SOURCE=file остаётся рабочим режимом.
+для AI-запросов — Yandex AI credentials, а для professional web fallback — доступ к Yandex Search API.
+KNOWLEDGE_BASE_SOURCE=file остаётся рабочим режимом.
 Пример окружения — `.env.example`; переменные необходимо передать процессу запуска.
 
 ```sh

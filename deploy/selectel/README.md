@@ -22,8 +22,8 @@
 - Сохранять весь каталог `apps/api/dist`: сборка содержит дополнительные файлы Pino.
 - Поставлять `knowledge/inobr/artem_unified_knowledge_base_v3.md` вместе с приложением.
 - PORT и DATABASE_URL передаются через окружение; LOG_LEVEL опционален.
-- KNOWLEDGE_BASE_SOURCE=file; OPENAI_API_KEY пока нужен для существующих AI-маршрутов.
-- Переменные Yandex появятся после реализации соответствующего адаптера.
+- KNOWLEDGE_BASE_SOURCE=file; AI-маршруты используют Yandex AI credentials.
+- Professional web fallback использует Yandex Search API и роль `search-api.webSearch.user`.
 - `/api/healthz` проверяет процесс; `/api/healthz/db` — подключение к БД;
   `/api/knowledge-base/status` — наличие базы знаний.
 
