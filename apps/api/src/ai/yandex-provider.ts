@@ -9,27 +9,30 @@ import {
 } from "./diagnostic-result.types";
 
 type YandexEnvironment = Partial<Record<
-  "AI_PROVIDER" | "YANDEX_AI_BASE_URL" | "YANDEX_AI_API_KEY" |
+  "AI_PROVIDER" | "YANDEX_AI_API_KEY" |
   "YANDEX_AI_MODEL" | "AI_REQUEST_TIMEOUT_MS", string>>;
+
+const YANDEX_COMPLETION_URL = new URL("https://llm.api.cloud.yandex.net/foundationModels/v1/completion");
 
 function readConfiguration(env: YandexEnvironment) {
   const apiKey = env.YANDEX_AI_API_KEY?.trim();
   const model = env.YANDEX_AI_MODEL?.trim();
-  const baseUrl = env.YANDEX_AI_BASE_URL?.trim();
   const timeoutMs = Number(env.AI_REQUEST_TIMEOUT_MS ?? "15000");
   // The folder/project comes from the complete model URI, never a hardcoded ID.
   const folderId = model ? /^gpt:\/\/([^/]+)\/.+$/.exec(model)?.[1] : undefined;
-  if (env.AI_PROVIDER !== "yandex" || !apiKey || !baseUrl || !model || !folderId ||
+  if (env.AI_PROVIDER !== "yandex" || !apiKey || !model || !folderId ||
     !Number.isSafeInteger(timeoutMs) || timeoutMs <= 0 || timeoutMs > 2147483647) {
     throw new DiagnosticAIError("AI_CONFIGURATION_ERROR");
   }
-  let url: URL;
-  try { url = new URL(`${baseUrl.replace(/\/+$/, "")}/chat/completions`); }
-  catch { throw new DiagnosticAIError("AI_CONFIGURATION_ERROR"); }
-  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
-    throw new DiagnosticAIError("AI_CONFIGURATION_ERROR");
-  }
-  return { apiKey, model, folderId, url, timeoutMs };
+  return { apiKey, model, url: YANDEX_COMPLETION_URL, timeoutMs };
+}
+
+function completionText(payload: unknown): string | undefined {
+  const root = payload && typeof payload === "object" ? payload as Record<string, unknown> : {};
+  const result = root.result && typeof root.result === "object" ? root.result as Record<string, unknown> : root;
+  const alternative = Array.isArray(result.alternatives) ? result.alternatives[0] as Record<string, unknown> | undefined : undefined;
+  const message = alternative?.message && typeof alternative.message === "object" ? alternative.message as Record<string, unknown> : undefined;
+  return alternative?.status === "ALTERNATIVE_STATUS_FINAL" && typeof message?.text === "string" ? message.text : undefined;
 }
 
 export class YandexAIProvider implements AIProvider, ConsultantAIProvider {
@@ -43,15 +46,15 @@ export class YandexAIProvider implements AIProvider, ConsultantAIProvider {
     try {
       const response = await fetch(config.url, {
         method: "POST", redirect: "error", signal: controller.signal,
-        headers: { "Content-Type": "application/json", Authorization: `Api-Key ${config.apiKey}`, "OpenAI-Project": config.folderId },
-        body: JSON.stringify({ model: config.model, temperature: 0.1, max_tokens: 3000,
-          response_format: { type: "json_object" }, messages: [{ role: "system", content: system }, { role: "user", content: JSON.stringify(input) }] }),
+        headers: { "Content-Type": "application/json", Authorization: `Api-Key ${config.apiKey}` },
+        body: JSON.stringify({ modelUri: config.model,
+          completionOptions: { stream: false, temperature: 0.1, maxTokens: "3000" }, jsonObject: true,
+          messages: [{ role: "system", text: system }, { role: "user", text: JSON.stringify(input) }] }),
       });
       if (!response.ok) throw new DiagnosticAIError("AI_REQUEST_FAILED");
-      const payload = await response.json() as { choices?: { finish_reason?: string; message?: { content?: unknown } }[] };
-      const choice = payload.choices?.[0];
-      if (choice?.finish_reason !== "stop" || typeof choice.message?.content !== "string") throw new DiagnosticAIError("AI_INVALID_RESULT");
-      return JSON.parse(choice.message.content.trim().replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i, "$1"));
+      const content = completionText(await response.json());
+      if (!content) throw new DiagnosticAIError("AI_INVALID_RESULT");
+      return JSON.parse(content.trim().replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i, "$1"));
     } catch (error) {
       if (controller.signal.aborted) throw new DiagnosticAIError("AI_REQUEST_TIMEOUT");
       if (error instanceof DiagnosticAIError) throw error;
@@ -66,18 +69,17 @@ export class YandexAIProvider implements AIProvider, ConsultantAIProvider {
     try {
       const response = await fetch(config.url, {
         method: "POST", redirect: "error", signal: controller.signal,
-        headers: { "Content-Type": "application/json", Authorization: `Api-Key ${config.apiKey}`, "OpenAI-Project": config.folderId },
-        body: JSON.stringify({ model: config.model, temperature: 0.2, max_tokens: 1200,
-          response_format: { type: "json_object" }, messages: [
-            { role: "system", content: await artemSystemPrompt(CONSULTANT_CHAT_PROMPT) },
-            { role: "user", content: JSON.stringify(selectConsultantInput(input)) },
+        headers: { "Content-Type": "application/json", Authorization: `Api-Key ${config.apiKey}` },
+        body: JSON.stringify({ modelUri: config.model,
+          completionOptions: { stream: false, temperature: 0.2, maxTokens: "1200" }, jsonObject: true, messages: [
+            { role: "system", text: await artemSystemPrompt(CONSULTANT_CHAT_PROMPT) },
+            { role: "user", text: JSON.stringify(selectConsultantInput(input)) },
           ] }),
       });
       if (!response.ok) throw new DiagnosticAIError("AI_REQUEST_FAILED");
-      const payload = await response.json() as { choices?: { finish_reason?: string; message?: { content?: unknown } }[] } | null;
-      const choice = payload?.choices?.[0];
-      if (choice?.finish_reason !== "stop" || typeof choice.message?.content !== "string") throw new DiagnosticAIError("AI_INVALID_RESULT");
-      const content = choice.message.content.trim().replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i, "$1");
+      const generated = completionText(await response.json());
+      if (!generated) throw new DiagnosticAIError("AI_INVALID_RESULT");
+      const content = generated.trim().replace(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i, "$1");
       const result: unknown = JSON.parse(content);
       const message = result && typeof result === "object" ? (result as { message?: unknown }).message : undefined;
       if (typeof message !== "string" || !message.trim() || message.length > 6000) throw new DiagnosticAIError("AI_INVALID_RESULT");
@@ -103,27 +105,21 @@ export class YandexAIProvider implements AIProvider, ConsultantAIProvider {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Api-Key ${config.apiKey}`,
-          "OpenAI-Project": config.folderId,
         },
         body: JSON.stringify({
-          model: config.model,
+          modelUri: config.model,
+          completionOptions: { stream: false, temperature: 0.2, maxTokens: "2000" },
+          jsonObject: true,
           messages: [
-            { role: "system", content: await artemSystemPrompt(DIAGNOSTIC_RESULT_SYSTEM_PROMPT) },
-            { role: "user", content: JSON.stringify(facts) },
+            { role: "system", text: await artemSystemPrompt(DIAGNOSTIC_RESULT_SYSTEM_PROMPT) },
+            { role: "user", text: JSON.stringify(facts) },
           ],
-          temperature: 0.2,
-          max_tokens: 2000,
-          response_format: { type: "json_object" },
         }),
       });
       if (!response.ok) throw new DiagnosticAIError("AI_REQUEST_FAILED");
-      const payload: unknown = await response.json();
-      const choice = (payload as { choices?: { message?: { content?: unknown }; finish_reason?: unknown }[] } | null)
-        ?.choices?.[0];
-      if (choice?.finish_reason !== "stop" || typeof choice.message?.content !== "string") {
-        throw new DiagnosticAIError("AI_INVALID_RESULT");
-      }
-      return parseDiagnosticResult(choice.message.content, facts);
+      const content = completionText(await response.json());
+      if (!content) throw new DiagnosticAIError("AI_INVALID_RESULT");
+      return parseDiagnosticResult(content, facts);
     } catch (error) {
       if (controller.signal.aborted) throw new DiagnosticAIError("AI_REQUEST_TIMEOUT");
       if (error instanceof DiagnosticAIError) throw error;

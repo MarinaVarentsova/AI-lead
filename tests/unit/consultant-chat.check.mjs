@@ -24,10 +24,9 @@ globalThis.fetch = async () => {
   fetchCalls++;
   throw new Error("Network disabled for consultant checks");
 };
-const envNames = ["AI_PROVIDER", "YANDEX_AI_BASE_URL", "YANDEX_AI_API_KEY", "YANDEX_AI_MODEL"];
+const envNames = ["AI_PROVIDER", "YANDEX_AI_API_KEY", "YANDEX_AI_MODEL"];
 const savedEnv = Object.fromEntries(envNames.map((key) => [key, process.env[key]]));
 process.env.AI_PROVIDER = "yandex";
-process.env.YANDEX_AI_BASE_URL = "https://ai.api.cloud.yandex.net/v1";
 delete process.env.YANDEX_AI_API_KEY;
 delete process.env.YANDEX_AI_MODEL;
 
@@ -1020,25 +1019,21 @@ try {
   assert.throws(() => nextIteration({ status: "running", iterationNumber: 1 }));
   console.log("PASS: tester retry, TECH_ERROR isolation, quality averages, grounded run assessment, evidence validation, Codex task, max 5 iterations, no production writes.");
   // Inspect the actual Yandex request with fake configuration and an in-memory fetch.
-  let outbound;
-  globalThis.fetch = async (_url, options) => {
+  let outbound; let outboundUrl;
+  globalThis.fetch = async (url, options) => {
+    outboundUrl = String(url);
     outbound = JSON.parse(options.body);
     return Response.json({
-      choices: [
-        {
-          finish_reason: "stop",
-          message: {
-            content: JSON.stringify({
+      result: { alternatives: [{
+          status: "ALTERNATIVE_STATUS_FINAL",
+          message: { text: JSON.stringify({
               message: "Проверочный ответ консультанта.",
-            }),
-          },
-        },
-      ],
+            }) },
+        }] },
     });
   };
   const provider = new YandexAIProvider({
     AI_PROVIDER: "yandex",
-    YANDEX_AI_BASE_URL: "https://example.invalid/v1",
     YANDEX_AI_API_KEY: "test-only",
     YANDEX_AI_MODEL: "gpt://test/model/latest",
   });
@@ -1051,6 +1046,9 @@ try {
   });
   assert.ok(!JSON.stringify(outbound).includes("PRIVATE_"));
   assert.ok(!JSON.stringify(outbound).includes("@private_user"));
+  assert.equal(outboundUrl, "https://llm.api.cloud.yandex.net/foundationModels/v1/completion");
+  assert.equal(outbound.modelUri, "gpt://test/model/latest");
+  assert.equal(outbound.jsonObject, true);
   assert.equal(outbound.messages.length, 2);
   console.log(`PASS: ${checks} consultant route cases; mocked provider payload; zero real network calls.`);
   for (const example of examples.slice(0, 3)) console.log(JSON.stringify(example));

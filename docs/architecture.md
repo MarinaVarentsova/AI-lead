@@ -32,24 +32,12 @@ UUID-модели и справочники code/name сохранены. Уда
 старой таблицы `diagnostic_sessions`. Никакие команды изменения БД не выполнялись.
 Старый `supabase-schema.sql` не используется и удалён.
 
-## Legacy-модули: следующий этап
+## AI runtime
 
-Следующие модули остаются активными на прежних относительных путях внутри `apps/api/src`:
-
-- `routes/diagnose.ts`;
-- `routes/qualify.ts`;
-- `services/OpenAIService.ts`;
-- `services/KnowledgeBaseService.ts`.
-
-Их размещение и контракты сохранены для минимального изменения существующего поведения.
-В KnowledgeBaseService изменён только путь загрузки Markdown: `knowledge/inobr`.
-Содержание Markdown не изменялось; имя v1 сохранено, хотя внутренняя версия — 2.0.
-
-Yandex AI Studio, Knowledge Resolver и PostgreSQL Selectel пока не подключены.
-Текущий AI-провайдер — OpenAI; текущее подключение БД по-прежнему определяется DATABASE_URL.
-Существующие fallback, квалификация, scoring, сохранение контактов и их известные
-ограничения намеренно не исправлялись в рамках переноса структуры.
-Backend продолжает возвращать legacy debug-поля; frontend их больше не отображает.
+Диагностика, консультация и evaluator используют Yandex AI Studio. Профессиональный
+web fallback обращается к Yandex Search API, нормализует ограниченный набор результатов
+и передаёт фактические фрагменты в существующую Yandex LLM для синтеза ответа.
+Product/commercial intents остаются в контуре FAQ1200 и canonical KB.
 
 ## Локальные проверки
 

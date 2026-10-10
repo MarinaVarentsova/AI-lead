@@ -1,4 +1,4 @@
-- [OpenAI via native fetch](openai-native-fetch.md) — openai npm package fails to install in this environment; use Node 24 built-in fetch to call the Chat Completions API directly.
+- Yandex integrations use Node 24 built-in fetch and project-owned provider adapters.
 - [Zod in api-server routes](zod-api-server.md) — zod is NOT a direct dependency of @workspace/api-server; existing routes import schemas from @workspace/api-zod. New routes must use manual validation or add zod explicitly.
 - [DB schema push](db-schema-push.md) — drizzle-kit push --force does NOT bypass TTY column-rename prompt; drop all AI tables first (reset:ai-tables script), then push to get clean CREATE with no conflicts.
 - [pnpm install timeouts](pnpm-install-timeouts.md) — pnpm install and pnpm add both time out or fail silently in this environment for large packages. Add to package.json manually then run pnpm install at root, or use psql/native approaches to avoid large dependencies.

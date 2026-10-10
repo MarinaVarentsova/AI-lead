@@ -58,5 +58,5 @@ DIAGNOSTIC_AI_CALL_SUCCESS → DIAGNOSTIC_RESULT_SAVED → DIAGNOSTIC_RESULT_FIN
 Fallback replaces AI_CALL_SUCCESS with DIAGNOSTIC_AI_CALL_FAILED followed by
 DIAGNOSTIC_FALLBACK_USED. Every early exit logs DIAGNOSTIC_RESULT_FINISH.
 Logs must not contain request bodies, raw answers, generated text, secrets or
-underlying provider/database exception messages. No OpenAIService, knowledge-base
+underlying provider/database exception messages. No provider implementation, knowledge-base
 Markdown loading, contacts/leads access or qualify invocation occurs.
