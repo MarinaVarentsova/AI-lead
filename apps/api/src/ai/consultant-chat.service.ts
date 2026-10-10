@@ -14,13 +14,41 @@ export function consultantFallback(input: ConsultantProviderInput, markdown: str
 const SMALL_TALK_REPLY = "Спасибо, всё хорошо. Продолжим по обучению — что хотите уточнить?";
 const OFF_TOPIC_REPLY = "Похоже, мы ушли от темы обучения. Я здесь, чтобы помочь выбрать подходящую программу. Сформулируйте вопрос в этом контексте — буду рад проконсультировать.";
 const ABUSIVE_REPLY = "Давайте вернёмся к теме обучения. Я помогу выбрать подходящую программу и разобраться в условиях.";
+const MANAGER_REFERRAL = "Для точного ответа по этому вопросу лучше связаться с менеджером — он подскажет актуальные условия. Воспользуйтесь кнопкой «Связаться с менеджером».";
+
+const INTERNAL_KNOWLEDGE_DISCLOSURE = /(?:в|по)\s+(?:(?:моей|нашей|доступной\s+мне)\s+)?(?:баз[аеы](?:\s+знаний)?|источник(?:ах|е|и)?|знаниях)[^.!?]{0,140}(?:нет|отсутств|не\s+(?:указан\w*|зафиксирован\w*|подтвержд[её]н\w*|описан\w*|найден\w*|могу\s+подтвердить))|у\s+меня\s+нет[^.!?]{0,80}(?:в\s+)?источник|я\s+не\s+наш[её]л[^.!?]{0,80}(?:в\s+)?баз/iu;
+
+/** Last-mile production guard: internal KB gaps may remain in logs/evaluator, never in the user reply. */
+export function guardInternalKnowledgeDisclosure(message: string): string {
+  let disclosed = false;
+  const kept: string[] = [];
+  for (const rawSentence of message.trim().match(/[^.!?\n]+[.!?]?/gu) ?? []) {
+    const match = INTERNAL_KNOWLEDGE_DISCLOSURE.exec(rawSentence);
+    INTERNAL_KNOWLEDGE_DISCLOSURE.lastIndex = 0;
+    if (!match) {
+      kept.push(rawSentence.trim());
+      continue;
+    }
+    disclosed = true;
+    const knownPrefix = rawSentence.slice(0, match.index)
+      .replace(/[,;:\s]*(?:но|а|однако)?\s*$/iu, "").trim();
+    if (knownPrefix && /\d|₽|выда[её]т|проходит|включает|содержит|стоит|стоимость/iu.test(knownPrefix)) {
+      kept.push(/[.!?]$/u.test(knownPrefix) ? knownPrefix : knownPrefix + ".");
+    }
+  }
+  const cleaned = kept.join(" ").replace(/\s{2,}/g, " ").trim();
+  if (!disclosed) return message.trim();
+  if (/менеджер/iu.test(cleaned)) return cleaned;
+  return [cleaned, MANAGER_REFERRAL].filter(Boolean).join(" ");
+}
+
 function unknownProgramFactReply(question: string): string {
   const q = question.toLowerCase();
   const parameter = /лиценз/.test(q) ? "номер и реквизиты лицензии" : /договор/.test(q) ? "условия договора" :
     /возврат/.test(q) ? "условия возврата" : /доступ/.test(q) ? "срок доступа к материалам" :
       /иностран|признан.*диплом/.test(q) ? "признание конкретного диплома" :
         /суд/.test(q) ? "требования конкретного суда" : /работодател/.test(q) ? "требования конкретного работодателя" : "запрошенный параметр программы";
-  return `Подтверждённых данных про ${parameter} сейчас нет. Для более подробной информации лучше обратиться к менеджеру. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».`;
+  return `Для точного ответа про ${parameter} лучше связаться с менеджером — он подскажет актуальные условия. Воспользуйтесь кнопкой «Связаться с менеджером».`;
 }
 export class ConsultantChatService {
   constructor(private readonly resolver: ConsultantKnowledgeResolver, private readonly provider: ConsultantAIProvider, private readonly markdown?: string) {}
@@ -54,16 +82,17 @@ export class ConsultantChatService {
     try {
       if (unknown || genuineUnknown) throw new Error("INSUFFICIENT_KNOWLEDGE");
       const message = await this.provider.generateConsultantReply(selectConsultantInput(facts));
-      if (typeof message !== "string" || !message.trim() || message.length > 6000 ||
-        /в базе знаний|Пользователь имеет|рекомендация должна|no_professional_education|recommendedTrack|diagnosticContext/i.test(message) ||
-        /(?:оставьте|напишите|пришлите|укажите|сообщите)[^.!?]{0,50}(?:телефон|номер|email|e-mail|telegram|телеграм|whatsapp|ватсап|контакт)|как с вами связаться/i.test(message)) throw new DiagnosticAIError("AI_INVALID_RESULT");
+      if (typeof message !== "string" || !message.trim() || message.length > 6000) throw new DiagnosticAIError("AI_INVALID_RESULT");
+      const guardedMessage = guardInternalKnowledgeDisclosure(message);
+      if (/Пользователь имеет|рекомендация должна|no_professional_education|recommendedTrack|diagnosticContext/i.test(guardedMessage) ||
+        /(?:оставьте|напишите|пришлите|укажите|сообщите)[^.!?]{0,50}(?:телефон|номер|email|e-mail|telegram|телеграм|whatsapp|ватсап|контакт)|как с вами связаться/i.test(guardedMessage)) throw new DiagnosticAIError("AI_INVALID_RESULT");
       if (facts.diagnosticContext.includes("no_professional_education") &&
         /(?:рекомендую|вам подходит|можете поступить)[^.!?]{0,60}Стройэксперт/i.test(message)) throw new DiagnosticAIError("AI_INVALID_RESULT");
       if (/скидк|акци|индивидуальн.*цен|возврат|срок.*доступ|бессроч|перв.*взнос|беспроцент/i.test(facts.question) &&
         /скидок нет|такой скидки нет|такой акции нет|индивидуальн[^.!?]{0,40}не предусмотр|возврат[^.!?]{0,40}зависит от тарифа|доступ не бессроч|срок доступа не установлен/i.test(message)) {
         throw new DiagnosticAIError("AI_INVALID_RESULT");
       }
-      return { message: message.trim(), isAI: true, provider: "yandex",
+      return { message: guardedMessage, isAI: true, provider: "yandex",
         matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null };
     } catch (error) {
       const commercialUnknown = /возврат|доступ.*материал|срок.*доступ|навсегда|бессроч/i.test(facts.question);

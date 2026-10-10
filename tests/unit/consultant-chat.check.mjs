@@ -298,24 +298,56 @@ try {
   const abusiveTariffs = await run({ message: "Что за хрень с тарифами, нормально объяснить можешь?" });
   for (const amount of ["14 900", "33 000", "56 000", "99 000"]) assert.ok(abusiveTariffs.message.includes(amount));
   const individualPrice = await run({ message: "Конкуренты дешевле — сделаете индивидуальную цену?" });
-  assert.match(individualPrice.message, /Индивидуальная цена.*не подтверждена/i);
-  assert.doesNotMatch(individualPrice.message, /индивидуальные цены не предусмотрены/i);
   assert.match(individualPrice.message, /14 900.*33 000.*56 000.*99 000/i);
+  assert.match(individualPrice.message, /менеджер/i);
+  assert.doesNotMatch(individualPrice.message, /(?:в|по) (?:моей )?баз/i);
+  assert.doesNotMatch(individualPrice.message, /индивидуальные цены не предусмотрены/i);
   const discount = await run({ message: "Если оплачу сегодня, дадите скидку?" });
-  assert.match(discount.message, /нет подтверждённой информации.*скидк/i);
+  assert.match(discount.message, /скидк.*менеджер/i);
+  assert.doesNotMatch(discount.message, /(?:в|по) (?:моей )?баз|источник/i);
   assert.doesNotMatch(discount.message, /скидок нет|такой скидки нет/i);
   const freeProgram = await run({ message: "Добавите вторую программу бесплатно?" });
-  assert.match(freeProgram.message, /нет подтверждённой информации.*акци/i);
+  assert.match(freeProgram.message, /акци.*менеджер/i);
+  assert.doesNotMatch(freeProgram.message, /(?:в|по) (?:моей )?баз|источник/i);
   assert.doesNotMatch(freeProgram.message, /такой акции нет/i);
   const installments = await run({ message: "Рассрочка точно беспроцентная и без первого взноса?" });
   assert.equal(installments.message, "Условия оплаты, рассрочки, кредита или отсрочки лучше уточнить у менеджера. Я могу помочь с этим — воспользуйтесь кнопкой «Связаться с менеджером».");
   assert.doesNotMatch(installments.message, /\d|телефон|email|telegram|whatsapp|задайте/i);
   const refund = await run({ message: "Если передумаю, гарантированно вернёте всю сумму?" });
-  assert.match(refund.message, /условия возврата.*не описаны.*полный возврат подтвердить не могу/i);
+  assert.match(refund.message, /условия возврата.*менеджер/i);
+  assert.doesNotMatch(refund.message, /(?:в|по) (?:моей )?баз|источник/i);
   assert.doesNotMatch(refund.message, /возврата нет|зависит от тарифа/i);
   const access = await run({ message: "На какой срок навсегда останется доступ к материалам?" });
-  assert.match(access.message, /срок доступа.*не зафиксирован.*бессрочный доступ подтвердить не могу/i);
+  assert.match(access.message, /срок доступа.*менеджер/i);
+  assert.doesNotMatch(access.message, /(?:в|по) (?:моей )?баз|источник/i);
   assert.doesNotMatch(access.message, /доступ не бессрочный|срок доступа не установлен/i);
+
+  // KB v4.4 A–K: unknown conditions never expose the internal KB; known facts still answer first.
+  for (const message of ["Есть скидка?", "Есть промокод или акция?", "Можно оформить кредит?",
+    "Можно отсрочить оплату?", "На сколько месяцев дают рассрочку?"]) {
+    const reply = await run({ message });
+    assert.match(reply.message, /менеджер/i, message);
+    assert.doesNotMatch(reply.message, /в моей базе|в базе не|по базе|источник/i, message);
+  }
+  const mixedCommercial = await run({ message: "Сколько стоит Стройэксперт и есть ли сейчас скидка?" });
+  assert.match(mixedCommercial.message, /14 900.*33 000.*56 000.*99 000.*скидк.*менеджер/is);
+  const knownPrice = await run({ message: "Сколько стоит Стройэксперт?" });
+  assert.match(knownPrice.message, /14 900.*33 000.*56 000.*99 000/is);
+  assert.doesNotMatch(knownPrice.message, /менеджер/i);
+  const knownTariffs = await run({ message: "Чем отличаются тарифы Стройэксперта?" });
+  assert.match(knownTariffs.message, /14 900.*33 000.*56 000.*99 000/is);
+  assert.doesNotMatch(knownTariffs.message, /менеджер/i);
+  const knownFormat = await run({ message: "Обучение проходит онлайн или офлайн?" });
+  assert.match(knownFormat.message, /дистанционно.*образовательной платформе/is);
+  assert.doesNotMatch(knownFormat.message, /менеджер/i);
+  for (const message of ["Когда ближайший старт?", "Какой срок доступа к материалам?"]) {
+    const reply = await run({ message });
+    assert.match(reply.message, /менеджер/i, message);
+    assert.doesNotMatch(reply.message, /в моей базе|в базе не|по базе|источник/i, message);
+  }
+  const guardedAI = await run({ message: "Расскажите подробнее о программе", aiReply: "Тариф стоит 33 000 ₽, но в моей базе нет информации о скидках." });
+  assert.match(guardedAI.message, /33 000 ₽.*менеджер/is);
+  assert.doesNotMatch(guardedAI.message, /в моей базе|в базе не|по базе|источник/i);
   const explicitIncomeGuarantee = await run({ message: "Можете обещать доход не меньше 100 тысяч?" });
   assert.match(explicitIncomeGuarantee.message, /не гарантирует.*доход/i);
   const appointmentGuarantee = await run({ message: "После диплома гарантированно назначат судебным экспертом?" });
@@ -434,11 +466,11 @@ try {
   try {
     const knowledgeDir = path.join(packaged, "knowledge");
     mkdirSync(knowledgeDir);
-    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_3.md", root), "utf8");
-    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v4_3.md"), markdown);
+    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_4.md", root), "utf8");
+    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v4_4.md"), markdown);
     assert.equal(await loadArtemKnowledge(pathToFileURL(path.join(packaged, "index.mjs")).href), markdown);
     assert.ok(readFileSync(new URL("apps/api/build.mjs", root), "utf8")
-      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v4_3.md")'));
+      .includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v4_4.md")'));
   } finally {
     rmSync(packaged, { recursive: true, force: true });
   }
@@ -473,7 +505,7 @@ try {
     if (evaluatorAttempts === 1 || evaluatorAttempts === 3 || evaluatorAttempts === 4 || evaluatorAttempts === 5) throw new Error("Evaluator unavailable");
     return good;
   };
-  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_3.md", root), "utf8"), fakeProvider);
+  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_4.md", root), "utf8"), fakeProvider);
   const productionBefore = persisted.length;
   const savedCases = [], progress = [];
   const summary = await runTester(2, runtime, { async saveCase(c) { savedCases.push(c); }, async progress(n) { progress.push(n); }, async finish() {} }, personas.slice(0, 2), { sleep: async () => {} });

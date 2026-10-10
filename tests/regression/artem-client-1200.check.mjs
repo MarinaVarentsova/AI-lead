@@ -55,7 +55,8 @@ function intentSatisfied(intent, rawMessage, question) {
   switch (intent) {
     case "price": return includesAll(message.replace(/\s/g, ""), ["14900", "33000", "56000", "99000"]);
     case "payment": return /оплат|рассроч/.test(message) && hasManager(message);
-    case "promo": return /нет подтвержденной информации/.test(message) && /скид|промокод/.test(message) && hasManager(message);
+    case "promo": return /скид|промокод|акци/.test(message) && hasManager(message) &&
+      !/в моей базе|в базе не|по базе|источник/.test(message);
     case "enrollment": return /запис|оформ/.test(message) && hasManager(message);
     case "education": return /спо/.test(message) && /высш/.test(message) && /любого профиля|профильн.*не обяз/.test(message);
     case "format": return /дистанц/.test(message) && /индивидуальн.*график/.test(message);
@@ -91,8 +92,9 @@ function intentSatisfied(intent, rawMessage, question) {
 
 function evaluate(row, message) {
   const normalized = normalize(message);
-  if (!intentSatisfied(row.intent, message, row.question) || hardUnsupportedNo(normalized)) return "FAIL";
-  // KB v4.3 explicitly answers that training can start now; the corpus' generic
+  if (!intentSatisfied(row.intent, message, row.question) || hardUnsupportedNo(normalized) ||
+    /в моей базе|в базе не|по базе|нет информации в источниках|не указано в базе/.test(normalized)) return "FAIL";
+  // KB v4.4 explicitly answers that training can start now; the corpus' generic
   // MANAGER label for these rows is an evaluator expectation error, not a runtime gap.
   const knownImmediateStart = row.intent === "schedule_access" && /можно.*начать.*(?:сегодня|завтра|сейчас)/i.test(row.question);
   const managerPolicy = !knownImmediateStart && (row.policy.startsWith("MANAGER") || row.policy === "MIXED");
@@ -109,7 +111,7 @@ try {
     import(new URL("packages/domain/src/diagnostic/diagnostic-types.ts", root)),
   ]);
   const csvPath = new URL("tests/regression/artem_client_questions_1200.csv", root);
-  const kbPath = new URL("knowledge/inobr/artem_unified_knowledge_base_v4_3.md", root);
+  const kbPath = new URL("knowledge/inobr/artem_unified_knowledge_base_v4_4.md", root);
   const canonical = readFileSync(kbPath, "utf8");
   const allRows = parseCsv(readFileSync(csvPath, "utf8"));
   assert.equal(allRows.length, 1200);
@@ -117,12 +119,12 @@ try {
   const rows = requestedIntent ? allRows.filter(row => row.intent === requestedIntent) : allRows;
   assert.ok(rows.length, `No corpus rows for intent ${requestedIntent}`);
   assert.equal(await loadArtemKnowledge(), canonical);
-  assert.equal(SOURCE_VERSION, "inobr-artem-v4.3");
+  assert.equal(SOURCE_VERSION, "inobr-artem-v4.4");
   const provider = { generateStructured: async () => { throw new Error("REGRESSION_PROVIDER_DISABLED"); },
     generateConsultantReply: async () => { throw new Error("REGRESSION_PROVIDER_DISABLED"); } };
   const runtime = createArtemRuntime(canonical, provider);
   assert.equal(runtime.markdown, canonical);
-  assert.match(runtime.resolver.resolve({ question: "Сколько стоит?" }).sourceVersion, /^inobr-artem-v4\.3-/);
+  assert.match(runtime.resolver.resolve({ question: "Сколько стоит?" }).sourceVersion, /^inobr-artem-v4\.4-/);
   const answers = { current_area: "design_estimates", current_role: "engineer_designer_estimator",
     education_status: "higher", target_tasks: "defects_quality" };
   const results = [];

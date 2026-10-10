@@ -31,7 +31,7 @@ try {
     recommendationText: "Точная персональная рекомендация.", diagnostic: { currentArea: "Проектирование",
       currentRole: "Проектировщик", educationStatus: "Высшее", targetTasks: "Исследовать дефекты" },
     dialogSummary: "Краткое резюме без домыслов.", transcript: [{ role: "user", text: "Сколько стоит?" },
-      { role: "assistant", text: "Подтверждённая цена." }], knowledgeBaseVersion: "inobr-artem-v4.3",
+      { role: "assistant", text: "Подтверждённая цена." }], knowledgeBaseVersion: "inobr-artem-v4.4",
     createdAt: "2026-09-24T00:00:00.000Z", summarySource: "ai", utmSource: "yandex", utmMedium: "cpc",
     utmCampaign: "stroiexpert", utmContent: "hero", utmTerm: "expert", gclid: "g-first", yclid: "y-first" };
   const comment = formatGetCourseManagerComment(context);

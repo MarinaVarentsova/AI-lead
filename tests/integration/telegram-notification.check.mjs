@@ -31,7 +31,7 @@ try {
       targetTasks: "Дефекты и качество строительных работ" }, dialogSummary: "Краткое резюме без домыслов.",
     transcript: [{ role: "user", text: "Вопрос клиента " + "длинный текст ".repeat(350) },
       { role: "assistant", text: "Ответ Артёма " + "подтверждённый ответ ".repeat(350) }],
-    knowledgeBaseVersion: "inobr-artem-v4.3", createdAt: "2026-10-05T00:00:00.000Z", summarySource: "ai",
+    knowledgeBaseVersion: "inobr-artem-v4.4", createdAt: "2026-10-05T00:00:00.000Z", summarySource: "ai",
     utmSource: "yandex", utmMedium: "cpc", utmCampaign: "stroiexpert", utmContent: "hero" };
   const params = new URLSearchParams({ "formParams[full_name]": "ТЕСТ Артем_Экспертович_TG",
     "formParams[phone]": "+79807317327", "formParams[email]": "test@example.com" });

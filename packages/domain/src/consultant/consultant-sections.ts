@@ -1,7 +1,7 @@
 import type { ConsultantSection } from "./consultant-types";
-export const UNKNOWN_KNOWLEDGE = "Этот конкретный параметр требует проверки. Индивидуальные условия можно уточнить у менеджера.";
+export const UNKNOWN_KNOWLEDGE = "Для точного ответа по этому вопросу лучше связаться с менеджером — он подскажет актуальные условия.";
 export function createConsultantSections(markdown: string): readonly ConsultantSection[] {
-  if (!markdown.includes("Версия 4.3 · 19 сентября 2026 года.")) throw new Error("Artem v4.3 source required");
+  if (!markdown.includes("Версия 4.4 · 19 сентября 2026 года.")) throw new Error("Artem v4.4 source required");
   const blocks = new Map<string, string>();
   for (const block of markdown.replace(/\r\n/g, "\n").split(/(?=^## \d+\.)/m)) {
     const id = /^## (\d+)\./.exec(block)?.[1];

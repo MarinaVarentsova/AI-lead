@@ -1,6 +1,6 @@
 import { DiagnosticKnowledgeResolver, type DiagnosticAnswers } from "@workspace/domain/diagnostic";
 import { ConsultantKnowledgeResolver } from "@workspace/domain/consultant";
-import { ConsultantChatService } from "./consultant-chat.service";
+import { ConsultantChatService, guardInternalKnowledgeDisclosure } from "./consultant-chat.service";
 import { DiagnosticResultService } from "./diagnostic-result.service";
 import { YandexAIProvider } from "./yandex-provider";
 import { applyConsultantFunnel, type ConsultantExchange } from "./consultant-funnel";
@@ -45,6 +45,7 @@ export function createArtemRuntime(markdown: string, provider = new YandexAIProv
         facts.diagnosticContext.includes("Приоритет — Стройэксперт"), response.fallbackReason === "INSUFFICIENT_KNOWLEDGE");
       // No automatic third-turn CTA: a refused contact remains refused.
       if (contactRefused(facts.question, history)) response.message = applyConsultantFunnel(response.message, facts.question, history, false, false);
+      response.message = guardInternalKnowledgeDisclosure(response.message);
       return { ...response, questionsUsed: count + 1 };
     },
   };
