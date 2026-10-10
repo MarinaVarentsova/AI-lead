@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { asc, eq, max } from "drizzle-orm";
+import { and, asc, eq, max } from "drizzle-orm";
 import { db, aiDialogue, aiEvents, aiSessions } from "@workspace/db";
 import { DIAGNOSTIC_SCHEMA, DiagnosticKnowledgeResolver, diagnosticOptionLabel,
   type DiagnosticAnswers } from "@workspace/domain/diagnostic";
@@ -182,6 +182,27 @@ export async function recordEvent(sessionId: string, eventType: string, eventDat
     return event;
   } catch (error) {
     logger.error({ sessionId, stage: "event_insert", eventType, errorCode: dbErrorCode(error) }, "EVENT_INSERT_FAILED");
+    throw error;
+  }
+}
+
+export async function recordEventOnce(sessionId: string, eventType: string, eventData?: unknown) {
+  try {
+    return await db.transaction(async tx => {
+      const [session] = await tx.select({ id: aiSessions.id }).from(aiSessions)
+        .where(eq(aiSessions.id, sessionId)).for("update");
+      if (!session) throw new Error("SESSION_NOT_FOUND");
+      const [existing] = await tx.select({ id: aiEvents.id, sessionId: aiEvents.sessionId }).from(aiEvents)
+        .where(and(eq(aiEvents.sessionId, sessionId), eq(aiEvents.eventType, eventType))).limit(1);
+      if (existing) return { event: existing, created: false };
+      const [event] = await tx.insert(aiEvents).values({ sessionId, eventType, eventData: eventData ?? null })
+        .returning({ id: aiEvents.id, sessionId: aiEvents.sessionId });
+      if (!event) throw new Error("EVENT_INSERT_EMPTY");
+      return { event, created: true };
+    });
+  } catch (error) {
+    logger.error({ sessionId, stage: "event_insert_once", eventType, errorCode: dbErrorCode(error) },
+      "EVENT_INSERT_FAILED");
     throw error;
   }
 }

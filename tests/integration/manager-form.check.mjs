@@ -76,6 +76,7 @@ try {
   const getHandler = router.stack.find(layer => layer.route?.path === "/manager-form/context/:sessionId").route.stack[0].handle;
   const widgetHandler = router.stack.find(layer => layer.route?.path === "/manager-form/widget/:sessionId").route.stack[0].handle;
   const postHandler = router.stack.find(layer => layer.route?.path === "/manager-form/widget-submit/:sessionId").route.stack[0].handle;
+  const successHandler = router.stack.find(layer => layer.route?.path === "/manager-form/success/:sessionId").route.stack[0].handle;
   const contextRes = response(); await getHandler({ params: { sessionId }, log }, contextRes);
   assert.equal(contextRes.statusCode, 200); assert.match(contextRes.body.comment, /Точная рекомендация/);
   assert.match(contextRes.body.comment, /Источник обращения:\n\nUTM source: yandex/);
@@ -189,6 +190,35 @@ try {
     assert.equal(isolatedFailure.statusCode, 200); assert.equal(isolatedFailure.body, "success");
     assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_form_submit'")).rows[0].count, 2);
   }
+  const nativeSessionId = randomUUID();
+  await pg.query(`INSERT INTO ai_sessions(id,session_key,first_page_url,utm_source,utm_campaign,utm_content)
+    VALUES($1,$2,$3,$4,$5,$6)`, [nativeSessionId, "manager-form-native",
+    "https://artem.inobr-expert.ru/?utm_source=yandex&utm_campaign=stroiexpert&utm_content=hero",
+    "yandex", "stroiexpert", "hero"]);
+  for (const [index,row] of rows.entries()) await pg.query(
+    "INSERT INTO ai_dialogue(session_id,message_order,speaker,stage,message_type,text) VALUES($1,$2,$3,$4,$5,$6)",
+    [nativeSessionId,index+1,...row]);
+  telegramShouldFail = false;
+  const nativeSubmissionId = randomUUID();
+  const nativeReq = { params: { sessionId: nativeSessionId }, body: { submissionId: nativeSubmissionId,
+    contacts: { name: "ТЕСТ Артем_Экспертович_NATIVE_FIX", phone: "+79991234567",
+      email: "test-artem-native@example.com" } }, log };
+  const telegramBeforeNative = telegramBodies.length;
+  const nativeSuccess = response(); await successHandler(nativeReq, nativeSuccess);
+  assert.equal(nativeSuccess.statusCode, 201); assert.deepEqual(nativeSuccess.body,
+    { success: true, recorded: true, duplicate: false });
+  assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE session_id=$1 AND event_type='manager_form_submit'",
+    [nativeSessionId])).rows[0].count, 1);
+  assert.equal(telegramBodies.length, telegramBeforeNative + 1);
+  assert.match(telegramBodies.at(-1).text, /ТЕСТ Артем_Экспертович_NATIVE_FIX/);
+  assert.match(telegramBodies.at(-1).text, /В какой сфере вы сейчас работаете\?/);
+  const duplicateSuccess = response(); await successHandler(nativeReq, duplicateSuccess);
+  assert.equal(duplicateSuccess.statusCode, 200); assert.deepEqual(duplicateSuccess.body,
+    { success: true, recorded: false, duplicate: true });
+  assert.equal(telegramBodies.length, telegramBeforeNative + 1);
+  const invalidNative = response(); await successHandler({ ...nativeReq, body: { ...nativeReq.body,
+    submissionId: "invalid" } }, invalidNative);
+  assert.equal(invalidNative.statusCode, 400); assert.equal(telegramBodies.length, telegramBeforeNative + 1);
   const emptySessionId = randomUUID();
   await pg.query("INSERT INTO ai_sessions(id,session_key) VALUES($1,$2)", [emptySessionId, "manager-form-empty"]);
   const contextFailureRes = response();

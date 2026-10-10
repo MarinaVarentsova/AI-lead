@@ -93,12 +93,15 @@ try {
   assert.deepEqual(context.diagnostic, { currentArea: "Проектирование и сметы",
     currentRole: "Инженер, проектировщик или сметчик", educationStatus: "Высшее",
     targetTasks: "Судебные строительно-технические экспертизы" });
-  assert.deepEqual(context.transcript, [
+  assert.deepEqual(context.transcript.slice(-4), [
     { role: "user", text: "Сколько стоит обучение?" },
     { role: "assistant", text: "Есть четыре тарифа с подтверждёнными ценами." },
     { role: "user", text: "Какой документ я получу?" },
     { role: "assistant", text: "Диплом о профессиональной переподготовке." },
   ]);
+  assert.equal(context.transcript.length, 13);
+  assert.deepEqual(context.transcript[0], { role: "assistant", text: "В какой сфере вы сейчас работаете?" });
+  assert.equal(context.transcript.some(turn => turn.text.includes("Скрытая оценка")), false);
   assert.equal(context.summarySource, "ai"); assert.equal(context.knowledgeBaseVersion, "inobr-artem-v4.3");
   assert.equal(context.createdAt, "2026-09-22T10:00:00.000Z");
   assert.deepEqual({ utmSource: context.utmSource, utmMedium: context.utmMedium,
@@ -106,6 +109,7 @@ try {
     gclid: context.gclid, yclid: context.yclid }, { utmSource: "yandex", utmMedium: "cpc",
     utmCampaign: "stroiexpert", utmContent: "hero", utmTerm: "expert", gclid: "g-first", yclid: "y-first" });
   assert.equal(summaryInput.recommendationText, recommendation);
+  assert.equal(summaryInput.transcript.length, 4);
   assert.equal(JSON.stringify(summaryInput).includes("Скрытая оценка"), false);
 
   YandexAIProvider.prototype.generateStructured = async () => { throw new Error("provider unavailable"); };
@@ -118,7 +122,9 @@ try {
     "INSERT INTO ai_dialogue(session_id,message_order,speaker,stage,message_type,text) VALUES($1,$2,$3,$4,$5,$6)",
     [emptySession, index + 1, ...row]);
   const withoutFollowups = await buildManagerLeadContext(emptySession);
-  assert.deepEqual(withoutFollowups.transcript, []); assert.match(withoutFollowups.dialogSummary, /задал 0 дополнительных вопросов/);
+  assert.equal(withoutFollowups.transcript.length, 9);
+  assert.deepEqual(withoutFollowups.transcript.at(-1), { role: "assistant", text: recommendation });
+  assert.match(withoutFollowups.dialogSummary, /задал 0 дополнительных вопросов/);
 
   const auth = router.stack.find(layer => !layer.route).handle;
   const handler = router.stack.find(layer => layer.route?.path === "/internal/manager-lead-context/:sessionId").route.stack[0].handle;

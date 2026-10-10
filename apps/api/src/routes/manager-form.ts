@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
-import { findSession, recordEvent } from "../persistence/artem-repository";
+import { findSession, recordEvent, recordEventOnce } from "../persistence/artem-repository";
 import { buildManagerLeadContext, ManagerLeadContextError } from "../services/manager-lead-context";
 import { formatGetCourseManagerComment, loadGetCourseManagerWidget, serializeGetCourseWidgetBody,
   getCourseCookieHeader, localizeGetCourseCookies, MANAGER_FORM_REQUEST_ID_FIELD, submitGetCourseWidgetBody,
@@ -24,6 +24,13 @@ const requestIdFrom = (body: unknown): string => {
   const value = typeof body === "string" ? new URLSearchParams(body).get(MANAGER_FORM_REQUEST_ID_FIELD)
     : body && typeof body === "object" ? (body as Record<string, unknown>)[MANAGER_FORM_REQUEST_ID_FIELD] : undefined;
   return typeof value === "string" && UUID_RE.test(value) ? value : randomUUID();
+};
+
+const nativeContacts = (body: unknown) => {
+  const input = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  const value = (name: string, max: number) => typeof input[name] === "string" && input[name].trim().length <= max
+    ? input[name].trim() : "";
+  return { name: value("name", 200), phone: value("phone", 100), email: value("email", 320) };
 };
 
 async function contextFor(sessionId: string, trace: ManagerFormTrace = () => {}) {
@@ -79,6 +86,36 @@ router.get("/manager-form/widget/:sessionId", async (req, res): Promise<void> =>
   } catch (error) {
     req.log.error({ sessionId, stage: "manager_form_widget", errorCode: "MANAGER_FORM_WIDGET_FAILED" }, "MANAGER_FORM_FAILED");
     res.status(502).type("html").send(widgetMessageHtml(sessionId, "error"));
+  }
+});
+
+router.post("/manager-form/success/:sessionId", async (req, res): Promise<void> => {
+  const { sessionId } = req.params;
+  const submissionId = typeof req.body?.submissionId === "string" ? req.body.submissionId : "";
+  const contacts = nativeContacts(req.body?.contacts);
+  const managerFormRequestId = UUID_RE.test(submissionId) ? submissionId : randomUUID();
+  const trace = traceFor(req, sessionId, managerFormRequestId);
+  trace("manager_success_event_received", { timestamp: new Date().toISOString(), nativeSuccessConfirmed: true });
+  if (!UUID_RE.test(sessionId) || !UUID_RE.test(submissionId) || !contacts.name || !contacts.phone || !contacts.email) {
+    trace("manager_form_completed", { result: "validation_error", errorCode: "MANAGER_NATIVE_SUCCESS_INVALID" });
+    res.status(400).json({ success: false, error: "MANAGER_NATIVE_SUCCESS_INVALID" }); return;
+  }
+  try {
+    const { context } = await contextFor(sessionId, trace);
+    const metadata = { ...(sourceEventMetadata(context) ?? {}), native_submission_id: submissionId };
+    const recorded = await recordEventOnce(sessionId, "manager_form_submit", metadata);
+    trace("manager_form_submit_written", { written: recorded.created, duplicate: !recorded.created });
+    if (recorded.created) await sendTelegramManagerLead(context, contacts, process.env, fetch, trace);
+    trace("manager_form_completed", { result: "success", duplicate: !recorded.created });
+    res.status(recorded.created ? 201 : 200).json({ success: true, recorded: recorded.created,
+      duplicate: !recorded.created });
+  } catch (error) {
+    const errorCode = error instanceof Error ? error.message : "MANAGER_NATIVE_SUCCESS_FAILED";
+    trace("manager_form_completed", { result: "internal_error", errorCode });
+    req.log.error({ managerFormRequestId, sessionId, stage: "manager_native_success", errorCode },
+      "MANAGER_FORM_FAILED");
+    res.status(error instanceof ManagerLeadContextError && error.code === "SESSION_NOT_FOUND" ? 404 : 500)
+      .json({ success: false, error: "MANAGER_NATIVE_SUCCESS_FAILED" });
   }
 });
 

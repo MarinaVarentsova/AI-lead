@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { createChatScroll, createQuestionFocusGate } from "@/lib/chat-scroll";
 import { sendConsultantTurn, createConsultantRequestId, CONSULTANT_ERROR } from "@/lib/consultant-chat";
-import { managerWidgetUrl, MANAGER_CONTEXT_ERROR } from "@/lib/manager-form";
+import { mountNativeGetCourseWidget, MANAGER_CONTEXT_ERROR } from "@/lib/manager-form";
 import {
   completePersistedDiagnostic, DIAGNOSTIC_ERROR,
   type DiagnosticPayload, type DiagnoseResponse, type StructuredDiagnosticResult,
@@ -63,7 +63,6 @@ function ProgressBar({ current, total }: { current: number; total: number }) {
     </div>
   );
 }
-
 function RecommendationCard({
   result,
   onAskQuestion,
@@ -101,7 +100,6 @@ function RecommendationCard({
     </div>
   );
 }
-
 function ResultCard({ result, onAskQuestion, onGetConsultation }: {
   result: StructuredDiagnosticResult;
   onAskQuestion: () => void;
@@ -164,7 +162,7 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
   // Contact form
   const [contactPhase, setContactPhase] = useState<ContactPhase | null>(null);
   const [managerContextError, setManagerContextError] = useState(false);
-  const managerWidgetRef = useRef<HTMLIFrameElement>(null);
+  const managerWidgetRef = useRef<HTMLDivElement>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -415,17 +413,17 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
   }, [contactPhase]);
 
   useEffect(() => {
-    if (!contactPhase || !conversationId) return;
-    const onWidgetMessage = (event: MessageEvent) => {
-      if (event.source !== managerWidgetRef.current?.contentWindow || !event.data ||
-        event.data.type !== "getcourse-manager-widget" || event.data.sessionId !== conversationId) return;
-      if (event.data.status === "ready") setContactPhase("ready");
-      else if (event.data.status === "success") setContactPhase("submitted");
-      else if (event.data.status === "error") setManagerContextError(true);
-    };
-    window.addEventListener("message", onWidgetMessage);
-    return () => window.removeEventListener("message", onWidgetMessage);
-  }, [contactPhase, conversationId]);
+    if (!contactPhase || contactPhase === "submitted" || managerContextError || !conversationId || !managerWidgetRef.current) return;
+    let disposed = false;
+    let unmount = () => {};
+    void mountNativeGetCourseWidget(managerWidgetRef.current, conversationId, {
+      onReady: () => { if (!disposed) setContactPhase("ready"); },
+      onSuccess: () => { if (!disposed) setContactPhase("submitted"); },
+      onError: () => { if (!disposed) setManagerContextError(true); },
+    }).then(cleanup => { if (disposed) cleanup(); else unmount = cleanup; })
+      .catch(() => { if (!disposed) setManagerContextError(true); });
+    return () => { disposed = true; unmount(); };
+  }, [Boolean(contactPhase), conversationId, managerContextError]);
 
   // ─── Chips renderer ─────────────────────────────────────────────────────────
 
@@ -519,9 +517,8 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
         </div> : <div className="manager-form-modal__widget-shell">
           {contactPhase === "loading" && <div className="manager-form-modal__state" role="status">
             <Loader2 className="animate-spin" /> Подготавливаем форму...</div>}
-          <iframe ref={managerWidgetRef} title="Форма связи с менеджером GetCourse"
-            className={contactPhase === "ready" ? "manager-form-modal__widget" : "manager-form-modal__widget is-loading"}
-            src={managerWidgetUrl(conversationId)} />
+          <div ref={managerWidgetRef} aria-label="Форма связи с менеджером GetCourse"
+            className="manager-form-modal__widget" data-testid="native-getcourse-widget" />
         </div>}
       </motion.div>
     </div>;
@@ -855,3 +852,4 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
     </div>
   );
 }
+

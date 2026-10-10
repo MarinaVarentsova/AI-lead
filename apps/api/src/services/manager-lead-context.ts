@@ -114,18 +114,22 @@ export async function buildManagerLeadContext(sessionId: string,
   const recommendation = rows.find(row => row.stage === "recommendation" && row.messageType === "recommendation");
   if (!recommendation?.text.trim()) throw new ManagerLeadContextError("RECOMMENDATION_NOT_READY");
   const diagnostic = diagnosticData(rows, sessionId, dependencies.warn);
-  const transcript = rows.filter(row => row.stage === "consultation" &&
+  const consultationTranscript = rows.filter(row => row.stage === "consultation" &&
       (row.messageType === "user_question" || row.messageType === "artem_answer") &&
       (row.speaker === "user" || row.speaker === "artem"))
     .map(row => ({ role: row.speaker === "user" ? "user" as const : "assistant" as const, text: row.text }));
+  const transcript = rows.filter(row =>
+    (row.speaker === "user" || row.speaker === "artem") &&
+    (row.stage === "diagnostic" || row.stage === "recommendation" || row.stage === "consultation"))
+    .map(row => ({ role: row.speaker === "user" ? "user" as const : "assistant" as const, text: row.text }));
   const program = recommendedProgram(diagnostic.codes, recommendation.text);
-  const fallback = `Рекомендована программа: ${program}. Пользователь прошёл диагностику и задал ${transcript.filter(row => row.role === "user").length} дополнительных вопросов после рекомендации. Полный диалог приложен.`;
+  const fallback = `Рекомендована программа: ${program}. Пользователь прошёл диагностику и задал ${consultationTranscript.filter(row => row.role === "user").length} дополнительных вопросов после рекомендации. Полный диалог приложен.`;
   let dialogSummary = fallback;
   let summarySource: "ai" | "fallback" = "fallback";
   try {
     dialogSummary = summaryText(await dependencies.summarize(MANAGER_LEAD_SUMMARY_PROMPT, {
       diagnostic: diagnostic.labels, recommendedProgram: program,
-      recommendationText: recommendation.text, transcript,
+      recommendationText: recommendation.text, transcript: consultationTranscript,
     }));
     summarySource = "ai";
   } catch (error) {
