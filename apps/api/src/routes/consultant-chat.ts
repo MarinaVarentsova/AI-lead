@@ -57,10 +57,14 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
       req.log.info({ requestId, stage: phase, provider }, "CONSULTANT_AI_CALL_START");
       const response = await runtime.reply(facts, history);
       provider = response.provider;
-      if (response.isAI) req.log.info({ requestId, stage: phase, provider }, "CONSULTANT_AI_CALL_SUCCESS");
+      const webMeta = { webResearchEligible: response.webResearchEligible, webResearchUsed: response.webResearchUsed,
+        webResearchIntent: response.webResearchIntent, webResearchSourceCount: response.webResearchSourceCount,
+        webResearchDomains: response.webResearchDomains, webResearchLatencyMs: response.webResearchLatencyMs,
+        webResearchFallbackReason: response.webResearchFallbackReason };
+      if (response.isAI) req.log.info({ requestId, stage: phase, provider, ...webMeta }, "CONSULTANT_AI_CALL_SUCCESS");
       else {
-        req.log.warn({ requestId, stage: phase, provider, errorCode: response.fallbackReason }, "CONSULTANT_AI_CALL_FAILED");
-        req.log.info({ requestId, stage: phase, provider, errorCode: response.fallbackReason }, "CONSULTANT_FALLBACK_USED");
+        req.log.warn({ requestId, stage: phase, provider, errorCode: response.fallbackReason, ...webMeta }, "CONSULTANT_AI_CALL_FAILED");
+        req.log.info({ requestId, stage: phase, provider, errorCode: response.fallbackReason, ...webMeta }, "CONSULTANT_FALLBACK_USED");
       }
       phase = "save_assistant";
       const [assistant] = await appendDialogueLocked(tx, conversationId, [

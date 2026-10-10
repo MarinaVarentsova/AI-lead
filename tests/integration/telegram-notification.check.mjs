@@ -31,7 +31,7 @@ try {
       targetTasks: "Дефекты и качество строительных работ" }, dialogSummary: "Краткое резюме без домыслов.",
     transcript: [{ role: "user", text: "Вопрос клиента " + "длинный текст ".repeat(350) },
       { role: "assistant", text: "Ответ Артёма " + "подтверждённый ответ ".repeat(350) }],
-    knowledgeBaseVersion: "inobr-artem-v4.4", createdAt: "2026-10-05T00:00:00.000Z", summarySource: "ai",
+    knowledgeBaseVersion: "inobr-artem-v4.5", createdAt: "2026-10-05T00:00:00.000Z", summarySource: "ai",
     utmSource: "yandex", utmMedium: "cpc", utmCampaign: "stroiexpert", utmContent: "hero",
     artemEntrySource: "artem_web", artemEntryContent: "diagnostic_question_01",
     managerCtaSource: "post_diagnostic_consultation", managerCtaContent: "manager_contact_button" };

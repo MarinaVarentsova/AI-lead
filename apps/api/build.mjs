@@ -48,7 +48,7 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
 
   const knowledgeDir = path.join(distDir, "knowledge");
   await mkdir(knowledgeDir, { recursive: true });
-  await copyFile(path.resolve(artifactDir, "../../knowledge/inobr/artem_unified_knowledge_base_v4_4.md"), path.join(knowledgeDir, "artem_unified_knowledge_base_v4_4.md"));
+  await copyFile(path.resolve(artifactDir, "../../knowledge/inobr/artem_unified_knowledge_base_v4_5.md"), path.join(knowledgeDir, "artem_unified_knowledge_base_v4_5.md"));
   await copyFile(path.resolve(artifactDir, "../../knowledge/inobr/artem_client_questions_1200.csv"), path.join(knowledgeDir, "artem_client_questions_1200.csv"));
 }
 

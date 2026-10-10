@@ -1,8 +1,8 @@
 # Grounded post-diagnostic chat
 
-Source: knowledge/inobr/artem_unified_knowledge_base_v4_4.md, copied unchanged from the
+Source: knowledge/inobr/artem_unified_knowledge_base_v4_5.md, copied unchanged from the
 user's final instruction. Consultant retrieval no longer reads the legacy KB.
-Selected knowledge sections are indexed for retrieval; the complete canonical v4.4
+Selected knowledge sections are indexed for retrieval; the complete canonical v4.5
 instruction is shared by both model stages. The diagnostic/contact UI is unchanged.
 
 Local checks (existing Node and TypeScript, no added runner):

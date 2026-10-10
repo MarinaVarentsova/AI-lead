@@ -78,9 +78,9 @@ try {
   assert.match(page, /Режим: \{summary\?\.mode \?\? mode\}/);
   const route = readFileSync(new URL("apps/api/src/routes/tester.ts", root), "utf8");
   assert.match(route, /parent\.summary[\s\S]*?mode/);
-  assert.match(route, /previousCases\.map\(row => row\.persona as Persona\)/);
-  assert.match(route, /summary: \{ mode, modeDescription:[\s\S]*?generatorSource/);
-  assert.match(route, /errorDetail, attempts, artemResponseSaved/);
+  assert.match(route, /previousCases\.map\(\(?row\)? => row\.persona as Persona\)/);
+  assert.match(route, /summary:\s*\{[\s\S]*?mode,[\s\S]*?modeDescription:[\s\S]*?generatorSource/);
+  assert.match(route, /errorDetail,[\s\S]{0,120}attempts,[\s\S]{0,120}artemResponseSaved/);
   assert.ok(!route.includes("aiSessions") && !route.includes("aiDialogue") && !route.includes("aiEvents"));
   console.log("PASS: 5 stress modes, distinct prompts/fallbacks, evaluator calibration, UI request/display and JSONB continuation metadata.");
 } finally { hooks.deregister(); }

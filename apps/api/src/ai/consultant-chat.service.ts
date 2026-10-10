@@ -5,6 +5,7 @@ import { redactConsultantQuestion, selectConsultantInput } from "./consultant-ch
 import type { ConsultantAIProvider, ConsultantChatResponse, ConsultantProviderInput } from "./consultant-chat.types";
 import { fallbackReply } from "./artem-policy";
 import { loadArtemKnowledge } from "./artem-knowledge";
+import { HttpProfessionalWebResearchService, type ProfessionalWebResearchService } from "./professional-web-research";
 
 export function consultantFallback(input: ConsultantProviderInput, markdown: string): string {
   const program = /program=(construction_expertise|apartment_acceptance|house_acceptance|house_control|house_unspecified|acceptance_choice)/.exec(input.diagnosticContext)?.[1] as ArtemProgram | undefined;
@@ -51,24 +52,34 @@ function unknownProgramFactReply(question: string): string {
   return `Для точного ответа про ${parameter} лучше связаться с менеджером — он подскажет актуальные условия. Воспользуйтесь кнопкой «Связаться с менеджером».`;
 }
 export class ConsultantChatService {
-  constructor(private readonly resolver: ConsultantKnowledgeResolver, private readonly provider: ConsultantAIProvider, private readonly markdown?: string) {}
+  constructor(private readonly resolver: ConsultantKnowledgeResolver, private readonly provider: ConsultantAIProvider,
+    private readonly markdown?: string, private readonly webResearch: ProfessionalWebResearchService = new HttpProfessionalWebResearchService()) {}
   prepare(question: string, diagnosticContext: ConsultantDiagnosticContext): ConsultantProviderInput {
     const safeQuestion = redactConsultantQuestion(question);
     const retrieval = this.resolver.resolve({ question: safeQuestion, diagnosticContext });
     const match = retrieval.faqMatches[0];
     return selectConsultantInput({ question: safeQuestion, diagnosticContext: retrieval.contextSummary, sourceVersion: retrieval.sourceVersion,
-      matchedSections: retrieval.matchedSections, ...(match ? { faqMatch: { id: match.id, intent: match.intent,
+      matchedSections: retrieval.matchedSections, professional: retrieval.professional,
+      ...(match ? { faqMatch: { id: match.id, intent: match.intent,
         policy: match.normalizedPolicy, similarity: match.similarity, answer: match.answer, kbReference: match.kbReference } } : {}) });
   }
   async generate(input: ConsultantProviderInput): Promise<ConsultantChatResponse> {
     const facts = selectConsultantInput(input);
     const markdown = this.markdown ?? await loadArtemKnowledge();
     const faq = facts.faqMatch;
+    const professional = facts.professional;
+    const webResearchEligible = Boolean(professional?.professionalWebEligible &&
+      (!professional.kbSufficient || professional.mixedProductAndProfessional));
+    let webResearchUsed = false; let webResearchSourceCount = 0; let webResearchDomains: string[] = [];
+    let webResearchLatencyMs = 0; let webResearchFallbackReason: string | null = webResearchEligible ? "not_attempted" : "not_eligible";
     const faqMeta = faq ? { faqMatchUsed: true, faqMatchId: faq.id, faqIntent: faq.intent, faqPolicy: faq.policy,
       faqSimilarity: faq.similarity, kbReference: faq.kbReference, sourceVersion: facts.sourceVersion } :
       { faqMatchUsed: false, sourceVersion: facts.sourceVersion };
-    const respond = (response: ConsultantChatResponse): ConsultantChatResponse => ({ ...response, ...faqMeta });
-    const commercialQuestion = /рассроч|кредит|отсроч|оплат|частями|график.*плат|платить.*месяц|ежемесяч|перв.*взнос|разбить.*плат|заплатить потом|перенести.*плат|досрочн.*погаш|сколько стоит|стоимость|какая цена|какие цены|цен[аыуеой]|тариф/i.test(facts.question) &&
+    const respond = (response: ConsultantChatResponse): ConsultantChatResponse => ({ ...response, ...faqMeta,
+      webResearchEligible, webResearchUsed, webResearchIntent: professional?.intent ?? undefined,
+      webResearchSourceCount, webResearchDomains, webResearchLatencyMs, webResearchFallbackReason });
+    const commercialQuestion = professional?.intent !== "professional_cost_estimation" &&
+      /рассроч|кредит|отсроч|оплат|частями|график.*плат|платить.*месяц|ежемесяч|перв.*взнос|разбить.*плат|заплатить потом|перенести.*плат|досрочн.*погаш|сколько стоит|стоимость|какая цена|какие цены|цен[аыуеой]|тариф/i.test(facts.question) &&
       !/скидк|акци|индивидуальн|специальн.*цен|конкурент.*дешев|бесплатн/i.test(facts.question);
     const tariffComparisonQuestion = /чем отличаются.*тариф|разниц.*(?:тариф|базов|средн|премиум|час|документ|материал)|(?:средн|премиум|базов).*отлича|что входит.*(?:тариф|базов|средн|премиум)|какой тариф выбрать|почему тарифы|что.*в каждом тариф|сравнить.*тариф|какие тарифы|в каком тариф|тариф.*разные программ/i.test(facts.question);
     const directFactQuestion = /какой документ|что (?:я )?получу после обуч|можно (?:ли )?начать|когда (?:можно )?начать|что входит|содержан.*программ|как проходит обуч|формат обуч|обучение дистанционное|онлайн|офлайн|приезжать очно|очн(?:ые|ая|ое|ый).*?(?:занят|встреч|посещ)|другого города|другой страны|посещать институт|обучение дома|своем темпе|своём темпе|есть практика|практическ.*задани|сколько длится|продолжительность/i.test(facts.question);
@@ -79,7 +90,7 @@ export class ConsultantChatService {
       matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null,
     });
     const unknown = facts.matchedSections.every(section => ["faq", "manager"].includes(section.id));
-    const intent = classifyConsultantIntent(facts.question, !unknown);
+    const intent = webResearchEligible ? "relevant_training_question" : classifyConsultantIntent(facts.question, !unknown);
     if (intent === "small_talk") return respond({ message: SMALL_TALK_REPLY, isAI: false, provider: "fallback",
       matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null });
     if (intent === "off_topic" || intent === "abusive_or_trolling") return respond({
@@ -88,8 +99,24 @@ export class ConsultantChatService {
     });
     const genuineUnknown = intent === "genuine_unknown_program_fact" || (unknown && intent === "relevant_training_question");
     try {
-      if (unknown || genuineUnknown) throw new Error("INSUFFICIENT_KNOWLEDGE");
-      const message = await this.provider.generateConsultantReply(selectConsultantInput(facts));
+      if ((unknown || genuineUnknown) && !webResearchEligible) throw new Error("INSUFFICIENT_KNOWLEDGE");
+      let providerFacts = facts;
+      let webSources: Awaited<ReturnType<ProfessionalWebResearchService["research"]>>["sources"] = [];
+      if (webResearchEligible && professional?.intent) {
+        const researchQuery = professional.mixedProductAndProfessional
+          ? facts.question.split(/(?:и вообще|а почему|при этом)/iu).at(-1)?.trim() || facts.question
+          : facts.question;
+        const researched = await this.webResearch.research(researchQuery, professional.intent, professional.freshnessRequired);
+        webResearchLatencyMs = researched.latencyMs; webResearchFallbackReason = researched.fallbackReason;
+        webSources = researched.sources; webResearchUsed = webSources.length > 0;
+        webResearchSourceCount = webSources.length; webResearchDomains = [...new Set(webSources.map(source => source.domain))];
+        if (webResearchUsed) providerFacts = { ...facts, matchedSections: [
+          ...webSources.map((source, index) => ({ id: `web-source:${index + 1}`, title: source.title,
+            content: `Источник: ${source.url}\nФактическая выдержка: ${source.snippet}` })),
+          ...facts.matchedSections].slice(0, 5) };
+      }
+      let message = await this.provider.generateConsultantReply(selectConsultantInput(providerFacts));
+      if (webResearchUsed) message = `${message.trim()}\n\nИсточники:\n${webSources.map(source => `— ${source.title} — ${source.url}`).join("\n")}`;
       if (typeof message !== "string" || !message.trim() || message.length > 6000) throw new DiagnosticAIError("AI_INVALID_RESULT");
       const guardedMessage = guardInternalKnowledgeDisclosure(message);
       if (/Пользователь имеет|рекомендация должна|no_professional_education|recommendedTrack|diagnosticContext/i.test(guardedMessage) ||
@@ -101,7 +128,7 @@ export class ConsultantChatService {
         throw new DiagnosticAIError("AI_INVALID_RESULT");
       }
       return respond({ message: guardedMessage, isAI: true, provider: "yandex",
-        matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null });
+        matchedSectionIds: providerFacts.matchedSections.map(section => section.id), fallbackReason: null });
     } catch (error) {
       const commercialUnknown = /возврат|доступ.*материал|срок.*доступ|навсегда|бессроч/i.test(facts.question);
       const fallbackMessage = genuineUnknown && !commercialUnknown ? unknownProgramFactReply(facts.question) : consultantFallback(facts, markdown);

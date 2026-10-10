@@ -94,7 +94,7 @@ function evaluate(row, message) {
   const normalized = normalize(message);
   if (!intentSatisfied(row.intent, message, row.question) || hardUnsupportedNo(normalized) ||
     /в моей базе|в базе не|по базе|нет информации в источниках|не указано в базе/.test(normalized)) return "FAIL";
-  // KB v4.4 explicitly answers that training can start now; the corpus' generic
+  // KB v4.5 explicitly answers that training can start now; the corpus' generic
   // MANAGER label for these rows is an evaluator expectation error, not a runtime gap.
   const knownImmediateStart = row.intent === "schedule_access" && /можно.*начать.*(?:сегодня|завтра|сейчас)/i.test(row.question);
   const managerPolicy = !knownImmediateStart && (row.policy.startsWith("MANAGER") || row.policy === "MIXED");
@@ -111,7 +111,7 @@ try {
     import(new URL("packages/domain/src/diagnostic/diagnostic-types.ts", root)),
   ]);
   const csvPath = new URL("knowledge/inobr/artem_client_questions_1200.csv", root);
-  const kbPath = new URL("knowledge/inobr/artem_unified_knowledge_base_v4_4.md", root);
+  const kbPath = new URL("knowledge/inobr/artem_unified_knowledge_base_v4_5.md", root);
   const canonical = readFileSync(kbPath, "utf8");
   const allRows = parseCsv(readFileSync(csvPath, "utf8"));
   assert.equal(allRows.length, 1200);
@@ -119,13 +119,13 @@ try {
   const rows = requestedIntent ? allRows.filter(row => row.intent === requestedIntent) : allRows;
   assert.ok(rows.length, `No corpus rows for intent ${requestedIntent}`);
   assert.equal(await loadArtemKnowledge(), canonical);
-  assert.equal(SOURCE_VERSION, "inobr-artem-v4.4");
+  assert.equal(SOURCE_VERSION, "inobr-artem-v4.5");
   const provider = { generateStructured: async () => { throw new Error("REGRESSION_PROVIDER_DISABLED"); },
     generateConsultantReply: async () => { throw new Error("REGRESSION_PROVIDER_DISABLED"); } };
   const faq = await loadArtemFaq();
   const runtime = createArtemRuntime(canonical, provider, faq);
   assert.equal(runtime.markdown, canonical);
-  assert.match(runtime.resolver.resolve({ question: "Сколько стоит?" }).sourceVersion, /^inobr-artem-v4\.4-faq1200-/);
+  assert.match(runtime.resolver.resolve({ question: "Сколько стоит?" }).sourceVersion, /^inobr-artem-v4\.5-faq1200-web1-/);
   const answers = { current_area: "design_estimates", current_role: "engineer_designer_estimator",
     education_status: "higher", target_tasks: "defects_quality" };
   const results = [];

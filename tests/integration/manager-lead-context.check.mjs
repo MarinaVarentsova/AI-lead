@@ -106,7 +106,7 @@ try {
   assert.equal(context.transcript.length, 13);
   assert.deepEqual(context.transcript[0], { role: "assistant", text: "В какой сфере вы сейчас работаете?" });
   assert.equal(context.transcript.some(turn => turn.text.includes("Скрытая оценка")), false);
-  assert.equal(context.summarySource, "ai"); assert.equal(context.knowledgeBaseVersion, "inobr-artem-v4.4");
+  assert.equal(context.summarySource, "ai"); assert.equal(context.knowledgeBaseVersion, "inobr-artem-v4.5");
   assert.equal(context.createdAt, "2026-09-22T10:00:00.000Z");
   assert.deepEqual({ utmSource: context.utmSource, utmMedium: context.utmMedium,
     utmCampaign: context.utmCampaign, utmContent: context.utmContent, utmTerm: context.utmTerm,

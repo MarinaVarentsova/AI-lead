@@ -11,6 +11,7 @@ export interface ConsultantRetrievalPacket {
   matchedSections: { id: string; title: string; content: string; score: number; reason: string[] }[];
   contextSummary: string; sourceVersion: string; intent: ConsultantIntent;
   faqMatches: import("./faq-retrieval").FaqMatch[];
+  professional: import("./professional-intent").ProfessionalIntentResult & { kbSufficient: boolean };
 }
 export class ConsultantValidationError extends Error {
   readonly code = "CONSULTANT_VALIDATION_ERROR";

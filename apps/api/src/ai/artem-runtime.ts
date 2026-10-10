@@ -1,5 +1,5 @@
 import { DiagnosticKnowledgeResolver, type DiagnosticAnswers } from "@workspace/domain/diagnostic";
-import { ConsultantKnowledgeResolver, type FaqEntry } from "@workspace/domain/consultant";
+import { ConsultantKnowledgeResolver, classifyProfessionalIntent, type FaqEntry } from "@workspace/domain/consultant";
 import { ConsultantChatService, guardInternalKnowledgeDisclosure } from "./consultant-chat.service";
 import { DiagnosticResultService } from "./diagnostic-result.service";
 import { YandexAIProvider } from "./yandex-provider";
@@ -7,15 +7,18 @@ import { applyConsultantFunnel, type ConsultantExchange } from "./consultant-fun
 import { diagnosticProgram, currentProgram, contactRefused } from "./artem-policy";
 import { loadArtemFaq, loadArtemKnowledge } from "./artem-knowledge";
 import { redactConsultantQuestion } from "./consultant-chat.prompt";
+import { HttpProfessionalWebResearchService, type ProfessionalWebResearchService } from "./professional-web-research";
 export { loadArtemFaq, loadArtemKnowledge } from "./artem-knowledge";
 export const followUpCount = (history: ConsultantExchange[]) => history.filter((row) => row.role === "user").length;
 
-export function createArtemRuntime(markdown: string, provider = new YandexAIProvider(), faq: readonly FaqEntry[] = []) {
+export function createArtemRuntime(markdown: string, provider = new YandexAIProvider(), faq: readonly FaqEntry[] = [],
+  webResearch: ProfessionalWebResearchService = new HttpProfessionalWebResearchService()) {
   const resolver = new ConsultantKnowledgeResolver(markdown, faq);
-  const consultant = new ConsultantChatService(resolver, provider, markdown);
+  const consultant = new ConsultantChatService(resolver, provider, markdown, webResearch);
   return {
     markdown,
     faq,
+    webResearch,
     provider,
     resolver,
     diagnostic: new DiagnosticResultService(provider),
@@ -31,7 +34,9 @@ export function createArtemRuntime(markdown: string, provider = new YandexAIProv
         }
       }
       const diagnostic = DiagnosticKnowledgeResolver.resolve(effective);
-      const program = currentProgram(diagnosticProgram(DiagnosticKnowledgeResolver.buildFactsPacket(diagnostic)), question, history);
+      const diagnosticTrack = diagnosticProgram(DiagnosticKnowledgeResolver.buildFactsPacket(diagnostic));
+      const program = classifyProfessionalIntent(question).professionalWebEligible ? diagnosticTrack :
+        currentProgram(diagnosticTrack, question, history);
       const input = consultant.prepare(question, {
         currentArea: diagnostic.answers.currentArea.code,
         currentRole: diagnostic.answers.currentRole.code,

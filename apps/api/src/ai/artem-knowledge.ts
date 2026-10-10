@@ -1,9 +1,9 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
-export const ARTEM_SOURCE = "artem_unified_knowledge_base_v4_4.md";
+export const ARTEM_SOURCE = "artem_unified_knowledge_base_v4_5.md";
 export const ARTEM_FAQ_SOURCE = "artem_client_questions_1200.csv";
-const REQUIRED_V4_4_SECTIONS = [
+const REQUIRED_V4_5_SECTIONS = [
   "## 15. Правила продолжения консультации, персональных данных и ответов по оплате",
   "## 16. Прямые ответы на follow-up после рекомендации",
   "## 17. Запись на обучение и организационный следующий шаг",
@@ -18,8 +18,8 @@ export async function loadArtemKnowledge(moduleUrl = import.meta.url): Promise<s
     new URL(`../../../../knowledge/inobr/${ARTEM_SOURCE}`, moduleUrl), path.join(root, "knowledge/inobr", ARTEM_SOURCE)]) {
     try {
       const text = await readFile(candidate, "utf8");
-      if (!text.includes("Версия 4.4 · 19 сентября 2026 года.") ||
-        !REQUIRED_V4_4_SECTIONS.every(section => text.includes(section))) throw new Error("ARTEM_KNOWLEDGE_VERSION_INVALID");
+      if (!text.includes("Версия 4.5 · 19 сентября 2026 года.") ||
+        !REQUIRED_V4_5_SECTIONS.every(section => text.includes(section))) throw new Error("ARTEM_KNOWLEDGE_VERSION_INVALID");
       return text;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;

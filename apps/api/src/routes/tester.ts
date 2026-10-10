@@ -66,7 +66,7 @@ router.post("/tester/runs", async (req, res) => {
         ...process.env,
         AI_REQUEST_TIMEOUT_MS: String(TESTER_AI_TIMEOUT_MS),
       }),
-      sharedRuntime.faq,
+      sharedRuntime.faq, sharedRuntime.webResearch,
     );
     let generatorSource: "ai" | "fallback" | "continued" = personas ? "continued" : "ai";
     // A stopped process cannot resume its in-memory worker. The three-hour bound
