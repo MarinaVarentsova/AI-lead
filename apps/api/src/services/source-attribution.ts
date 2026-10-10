@@ -6,7 +6,16 @@ export interface SourceAttribution {
   utmTerm?: string;
   gclid?: string;
   yclid?: string;
+  landingUrl?: string;
+  referrer?: string;
+  artemEntrySource?: string;
+  artemEntryContent?: string;
+  managerCtaSource?: string;
+  managerCtaContent?: string;
 }
+
+export type InternalAttribution = Pick<SourceAttribution, "referrer" | "artemEntrySource" | "artemEntryContent" |
+  "managerCtaSource" | "managerCtaContent">;
 
 export interface StoredSourceAttribution {
   firstPageUrl?: string | null;
@@ -48,6 +57,18 @@ export function sourceAttribution(stored: StoredSourceAttribution): SourceAttrib
     utmTerm: clean(stored.utmTerm) ?? fromUrl.utmTerm,
     gclid: fromUrl.gclid,
     yclid: fromUrl.yclid,
+    landingUrl: clean(stored.firstPageUrl),
+  };
+}
+
+export function internalAttribution(value: unknown): InternalAttribution {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  const data = value as Record<string, unknown>;
+  const field = (key: keyof InternalAttribution) => typeof data[key] === "string" ? clean(data[key] as string) : undefined;
+  return {
+    referrer: field("referrer"),
+    artemEntrySource: field("artemEntrySource"), artemEntryContent: field("artemEntryContent"),
+    managerCtaSource: field("managerCtaSource"), managerCtaContent: field("managerCtaContent"),
   };
 }
 
@@ -56,6 +77,15 @@ export function sourceEventMetadata(source: SourceAttribution): Record<string, s
     ...(source.utmSource ? { utm_source: source.utmSource } : {}),
     ...(source.utmCampaign ? { utm_campaign: source.utmCampaign } : {}),
     ...(source.utmContent ? { utm_content: source.utmContent } : {}),
+    ...(source.utmMedium ? { utm_medium: source.utmMedium } : {}),
+    ...(source.utmTerm ? { utm_term: source.utmTerm } : {}),
+    ...(source.gclid ? { gclid: source.gclid } : {}),
+    ...(source.yclid ? { yclid: source.yclid } : {}),
+    ...(source.referrer ? { referrer: source.referrer } : {}),
+    ...(source.artemEntrySource ? { artemEntrySource: source.artemEntrySource } : {}),
+    ...(source.artemEntryContent ? { artemEntryContent: source.artemEntryContent } : {}),
+    ...(source.managerCtaSource ? { managerCtaSource: source.managerCtaSource } : {}),
+    ...(source.managerCtaContent ? { managerCtaContent: source.managerCtaContent } : {}),
   };
   return Object.keys(metadata).length ? metadata : undefined;
 }

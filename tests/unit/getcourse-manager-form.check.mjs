@@ -33,12 +33,17 @@ try {
     dialogSummary: "Краткое резюме без домыслов.", transcript: [{ role: "user", text: "Сколько стоит?" },
       { role: "assistant", text: "Подтверждённая цена." }], knowledgeBaseVersion: "inobr-artem-v4.4",
     createdAt: "2026-09-24T00:00:00.000Z", summarySource: "ai", utmSource: "yandex", utmMedium: "cpc",
-    utmCampaign: "stroiexpert", utmContent: "hero", utmTerm: "expert", gclid: "g-first", yclid: "y-first" };
+    utmCampaign: "stroiexpert", utmContent: "hero", utmTerm: "expert", gclid: "g-first", yclid: "y-first",
+    artemEntrySource: "artem_web", artemEntryContent: "diagnostic_question_01",
+    managerCtaSource: "recommendation", managerCtaContent: "manager_contact_button" };
   const comment = formatGetCourseManagerComment(context);
   assert.match(comment, /Источник обращения:\n\nUTM source: yandex/);
   assert.match(comment, /UTM medium: cpc/); assert.match(comment, /UTM campaign: stroiexpert/);
   assert.match(comment, /UTM content: hero/); assert.match(comment, /UTM term: expert/);
   assert.match(comment, /gclid: g-first/); assert.match(comment, /yclid: y-first/);
+  assert.match(comment, /Internal Artem attribution:\n\nentry source: artem_web/);
+  assert.match(comment, /entry content: diagnostic_question_01/);
+  assert.match(comment, /manager CTA: recommendation/);
   const directComment = formatGetCourseManagerComment({ ...context, utmSource: undefined, utmMedium: undefined,
     utmCampaign: undefined, utmContent: undefined, utmTerm: undefined, gclid: undefined, yclid: undefined });
   assert.doesNotMatch(directComment, /Источник обращения:/);

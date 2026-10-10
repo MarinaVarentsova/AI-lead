@@ -1,12 +1,12 @@
-import { asc, eq } from "drizzle-orm";
-import { aiDialogue, aiSessions, db } from "@workspace/db";
+import { asc, desc, eq, and } from "drizzle-orm";
+import { aiDialogue, aiEvents, aiSessions, db } from "@workspace/db";
 import { DIAGNOSTIC_SCHEMA, DiagnosticKnowledgeResolver, SOURCE_VERSION,
   type DiagnosticAnswers, type DiagnosticField } from "@workspace/domain/diagnostic";
 import { diagnosticProgram, PROGRAM_NAMES } from "../ai/artem-policy";
 import { YandexAIProvider } from "../ai/yandex-provider";
 import { logger } from "../lib/logger";
 import type { DialogueRow } from "../persistence/artem-repository";
-import { sourceAttribution, type SourceAttribution, type StoredSourceAttribution } from "./source-attribution";
+import { internalAttribution, sourceAttribution, type SourceAttribution, type StoredSourceAttribution } from "./source-attribution";
 
 export const MANAGER_LEAD_SUMMARY_PROMPT = `Сформируй краткое описание диалога для менеджера отдела продаж.
 
@@ -42,7 +42,7 @@ export interface ManagerLeadContext extends SourceAttribution {
 
 interface LeadSession extends StoredSourceAttribution { id: string; createdAt: Date | null }
 interface ManagerLeadDependencies {
-  load(sessionId: string): Promise<{ session: LeadSession; dialogue: DialogueRow[] } | null>;
+  load(sessionId: string): Promise<{ session: LeadSession; dialogue: DialogueRow[]; managerClick?: unknown } | null>;
   summarize(prompt: string, input: unknown): Promise<unknown>;
   warn(data: Record<string, unknown>, message: string): void;
 }
@@ -59,7 +59,10 @@ const defaultDependencies: ManagerLeadDependencies = {
       messageOrder: aiDialogue.messageOrder, speaker: aiDialogue.speaker, stage: aiDialogue.stage,
       messageType: aiDialogue.messageType, text: aiDialogue.text, createdAt: aiDialogue.createdAt })
       .from(aiDialogue).where(eq(aiDialogue.sessionId, sessionId)).orderBy(asc(aiDialogue.messageOrder)) as DialogueRow[];
-    return { session, dialogue };
+    const [managerClick] = await db.select({ eventData: aiEvents.eventData }).from(aiEvents)
+      .where(and(eq(aiEvents.sessionId, sessionId), eq(aiEvents.eventType, "manager_contact_click")))
+      .orderBy(desc(aiEvents.createdAt)).limit(1);
+    return { session, dialogue, managerClick: managerClick?.eventData };
   },
   summarize: (prompt, input) => new YandexAIProvider().generateStructured(prompt, input),
   warn: (data, message) => { logger.warn(data, message); },
@@ -141,5 +144,5 @@ export async function buildManagerLeadContext(sessionId: string,
   return { sessionId, recommendedProgram: program, recommendationText: recommendation.text,
     diagnostic: diagnostic.labels, dialogSummary, transcript, knowledgeBaseVersion: SOURCE_VERSION,
     createdAt: (loaded.session.createdAt ?? recommendation.createdAt ?? new Date(0)).toISOString(), summarySource,
-    ...sourceAttribution(loaded.session) };
+    ...sourceAttribution(loaded.session), ...internalAttribution(loaded.managerClick) };
 }

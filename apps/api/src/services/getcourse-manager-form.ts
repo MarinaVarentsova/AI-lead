@@ -84,6 +84,12 @@ export function formatGetCourseManagerComment(context: ManagerLeadContext): stri
     context.gclid && `gclid: ${context.gclid}`,
     context.yclid && `yclid: ${context.yclid}`,
   ].filter((value): value is string => Boolean(value));
+  const internal = [
+    context.artemEntrySource && `entry source: ${context.artemEntrySource}`,
+    context.artemEntryContent && `entry content: ${context.artemEntryContent}`,
+    context.managerCtaSource && `manager CTA: ${context.managerCtaSource}`,
+    context.managerCtaContent && `manager CTA content: ${context.managerCtaContent}`,
+  ].filter((value): value is string => Boolean(value));
   return [
     "ИНОБР Ассистент — консультация Артёма", "", "Рекомендованная программа:", context.recommendedProgram,
     "", "Рекомендация Артёма:", context.recommendationText, "", "Диагностика:",
@@ -92,6 +98,7 @@ export function formatGetCourseManagerComment(context: ManagerLeadContext): stri
     "", "Краткое резюме:", context.dialogSummary, "", "Диалог:", transcript || "Дополнительных вопросов не было.",
     "", "Session ID:", context.sessionId, "", "Версия базы знаний:", context.knowledgeBaseVersion,
     ...(source.length ? ["", "Источник обращения:", "", ...source] : []),
+    ...(internal.length ? ["", "Internal Artem attribution:", "", ...internal] : []),
   ].join("\n");
 }
 

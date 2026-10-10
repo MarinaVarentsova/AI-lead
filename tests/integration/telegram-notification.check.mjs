@@ -32,7 +32,9 @@ try {
     transcript: [{ role: "user", text: "Вопрос клиента " + "длинный текст ".repeat(350) },
       { role: "assistant", text: "Ответ Артёма " + "подтверждённый ответ ".repeat(350) }],
     knowledgeBaseVersion: "inobr-artem-v4.4", createdAt: "2026-10-05T00:00:00.000Z", summarySource: "ai",
-    utmSource: "yandex", utmMedium: "cpc", utmCampaign: "stroiexpert", utmContent: "hero" };
+    utmSource: "yandex", utmMedium: "cpc", utmCampaign: "stroiexpert", utmContent: "hero",
+    artemEntrySource: "artem_web", artemEntryContent: "diagnostic_question_01",
+    managerCtaSource: "post_diagnostic_consultation", managerCtaContent: "manager_contact_button" };
   const params = new URLSearchParams({ "formParams[full_name]": "ТЕСТ Артем_Экспертович_TG",
     "formParams[phone]": "+79807317327", "formParams[email]": "test@example.com" });
   const contacts = managerLeadContacts(params);
@@ -45,6 +47,8 @@ try {
   assert.match(messages[0], /11111111-1111-4111-8111-111111111111/);
   const joined = messages.join("\n");
   assert.match(joined, /utm_source: yandex/); assert.match(joined, /utm_content: hero/);
+  assert.match(joined, /🔘 Точка входа:/); assert.match(joined, /artem_entry_content: diagnostic_question_01/);
+  assert.match(joined, /manager_cta_source: post_diagnostic_consultation/);
   assert.match(joined, /Вопрос клиента/); assert.match(joined, /Ответ Артёма/);
 
   const logs = []; const trace = (stage, details) => logs.push({ stage, ...details });

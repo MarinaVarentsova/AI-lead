@@ -54,10 +54,10 @@ try {
     import(new URL("apps/api/src/persistence/artem-repository.ts", root))]);
   YandexAIProvider.prototype.generateStructured = async () => ({ summary: "Проектировщику рекомендован Стройэксперт; уточнены цена и документ." });
   const sessionId = randomUUID();
-  await pg.query(`INSERT INTO ai_sessions(id,session_key,first_page_url,utm_source,utm_medium,utm_campaign,utm_content)
-    VALUES($1,$2,$3,$4,$5,$6,$7)`, [sessionId, "manager-form",
-    "https://artem.inobr-expert.ru/?utm_source=yandex&utm_medium=cpc&utm_campaign=stroiexpert&utm_content=hero&gclid=g-first",
-    "yandex", "cpc", "stroiexpert", "hero"]);
+  await pg.query(`INSERT INTO ai_sessions(id,session_key,first_page_url,utm_source,utm_medium,utm_campaign,utm_content,utm_term)
+    VALUES($1,$2,$3,$4,$5,$6,$7,$8)`, [sessionId, "manager-form",
+    "https://artem.inobr-expert.ru/?utm_source=yandex&utm_medium=cpc&utm_campaign=stroiexpert&utm_content=hero&utm_term=expert&gclid=g-first&yclid=y-first",
+    "yandex", "cpc", "stroiexpert", "hero", "expert"]);
   const rows = [
     ["artem","diagnostic","diagnostic_question","В какой сфере вы сейчас работаете?"],
     ["user","diagnostic","diagnostic_answer","Проектирование и сметы"],
@@ -103,7 +103,9 @@ try {
   const missingConsentRes = response(); await postHandler({ ...req, body: { ...formBody,
     formParams: { ...formBody.formParams, dealCustomFields: { ...formBody.formParams.dealCustomFields, 11904803: "" } } } }, missingConsentRes);
   assert.equal(missingConsentRes.statusCode, 400);
-  await recordEvent(sessionId, "manager_contact_click");
+  await recordEvent(sessionId, "manager_contact_click", { referrer: "https://inobr-expert.ru/", artemEntrySource: "artem_web",
+    artemEntryContent: "diagnostic_question_01", managerCtaSource: "recommendation",
+    managerCtaContent: "manager_contact_button" });
   let submitRes = response(); await postHandler(req, submitRes); assert.equal(submitRes.statusCode, 502);
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_form_submit'")).rows[0].count, 0);
   assert.equal(telegramBodies.length, 0);
@@ -174,16 +176,21 @@ try {
   const submittedComment = postedBody.get("formParams[dealCustomFields][22041910]");
   assert.ok(submittedComment); assert.match(submittedComment, /Сколько стоит\?/);
   assert.match(submittedComment, /Источник обращения:/); assert.match(submittedComment, /UTM content: hero/);
+  assert.match(submittedComment, /Internal Artem attribution:/);
+  assert.match(submittedComment, /manager CTA: recommendation/);
   for (const part of ["Рекомендованная программа:", "Рекомендация Артёма:", "Диагностика:",
     "Краткое резюме:", "Диалог:", "Session ID:", "Версия базы знаний:"]) assert.ok(submittedComment.includes(part));
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_contact_click'")).rows[0].count, 1);
   const submitEvent = (await pg.query("SELECT event_data FROM ai_events WHERE event_type='manager_form_submit'")).rows[0];
-  assert.deepEqual(submitEvent.event_data,
-    { utm_source: "yandex", utm_campaign: "stroiexpert", utm_content: "hero" });
+  assert.deepEqual(submitEvent.event_data, { utm_source: "yandex", utm_medium: "cpc",
+    utm_campaign: "stroiexpert", utm_content: "hero", utm_term: "expert", gclid: "g-first", yclid: "y-first",
+    referrer: "https://inobr-expert.ru/", artemEntrySource: "artem_web", artemEntryContent: "diagnostic_question_01",
+    managerCtaSource: "recommendation", managerCtaContent: "manager_contact_button" });
   assert.ok(telegramBodies.length >= 1); assert.equal(telegramBodies[0].chat_id, "-5538881072");
   const telegramText = telegramBodies.map(body => body.text).join("\n");
   assert.ok(telegramText.includes(submitName)); assert.match(telegramText, /Стройэксперт/);
   assert.match(telegramText, /Сколько стоит\?/); assert.match(telegramText, /utm_source: yandex/);
+  assert.match(telegramText, /🔘 Точка входа:/); assert.match(telegramText, /manager_cta_source: recommendation/);
   if (process.env.GETCOURSE_REAL_SUBMIT !== "1") {
     telegramShouldFail = true;
     const isolatedFailure = response(); await postHandler(req, isolatedFailure);

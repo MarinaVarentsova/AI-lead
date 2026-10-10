@@ -81,6 +81,10 @@ try {
   for (const [index, row] of rows.entries()) await pg.query(
     "INSERT INTO ai_dialogue(session_id,message_order,speaker,stage,message_type,text) VALUES($1,$2,$3,$4,$5,$6)",
     [sessionId, index + 1, ...row]);
+  await pg.query("INSERT INTO ai_events(session_id,event_type,event_data) VALUES($1,$2,$3)", [sessionId,
+    "manager_contact_click", JSON.stringify({ referrer: "https://inobr-expert.ru/", artemEntrySource: "artem_web",
+      artemEntryContent: "diagnostic_question_01", managerCtaSource: "recommendation",
+      managerCtaContent: "manager_contact_button" })]);
 
   let summaryInput;
   YandexAIProvider.prototype.generateStructured = async (prompt, input) => {
@@ -108,6 +112,13 @@ try {
     utmCampaign: context.utmCampaign, utmContent: context.utmContent, utmTerm: context.utmTerm,
     gclid: context.gclid, yclid: context.yclid }, { utmSource: "yandex", utmMedium: "cpc",
     utmCampaign: "stroiexpert", utmContent: "hero", utmTerm: "expert", gclid: "g-first", yclid: "y-first" });
+  assert.equal(context.landingUrl.includes("utm_source=yandex"), true);
+  assert.equal(context.referrer, "https://inobr-expert.ru/");
+  assert.deepEqual({ artemEntrySource: context.artemEntrySource, artemEntryContent: context.artemEntryContent,
+    managerCtaSource: context.managerCtaSource, managerCtaContent: context.managerCtaContent }, {
+    artemEntrySource: "artem_web", artemEntryContent: "diagnostic_question_01",
+    managerCtaSource: "recommendation", managerCtaContent: "manager_contact_button",
+  });
   assert.equal(summaryInput.recommendationText, recommendation);
   assert.equal(summaryInput.transcript.length, 4);
   assert.equal(JSON.stringify(summaryInput).includes("Скрытая оценка"), false);

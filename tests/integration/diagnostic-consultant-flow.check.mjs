@@ -162,14 +162,20 @@ try {
   ]);
 
   // J: the click endpoint writes the event for the supplied session without touching dialogue.
-  const event = await invoke(events, "/events", { sessionId, eventType: "manager_contact_click" });
+  const event = await invoke(events, "/events", { sessionId, eventType: "manager_contact_click", attribution: {
+    referrer: "https://inobr-expert.ru/",
+    artemEntrySource: "artem_web", artemEntryContent: "diagnostic_question_01",
+    managerCtaSource: "post_diagnostic_consultation", managerCtaContent: "manager_contact_button",
+  } });
   assert.equal(event.statusCode, 201);
   assert.equal(event.body.sessionId, sessionId);
   const eventRows = (await pg.query("SELECT * FROM ai_events WHERE session_id=$1", [sessionId])).rows;
   assert.equal(eventRows.length, 1);
   assert.equal(eventRows[0].event_type, "manager_contact_click");
-  assert.deepEqual(eventRows[0].event_data,
-    { utm_source: "yandex", utm_campaign: "stroiexpert", utm_content: "hero" });
+  assert.deepEqual(eventRows[0].event_data, { utm_source: "yandex", utm_medium: "cpc",
+    utm_campaign: "stroiexpert", utm_content: "hero", utm_term: "expert", gclid: "g-first", yclid: "y-first",
+    referrer: "https://inobr-expert.ru/", artemEntrySource: "artem_web", artemEntryContent: "diagnostic_question_01",
+    managerCtaSource: "post_diagnostic_consultation", managerCtaContent: "manager_contact_button" });
 
   // K: production runtime must not reference tables removed from the prepared database.
   const productionRoots = ["apps/api/src/routes", "apps/api/src/persistence", "apps/api/src/services"];

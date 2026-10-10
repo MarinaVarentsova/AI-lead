@@ -163,6 +163,7 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
   const [contactPhase, setContactPhase] = useState<ContactPhase | null>(null);
   const [managerContextError, setManagerContextError] = useState(false);
   const managerWidgetRef = useRef<HTMLDivElement>(null);
+  const managerClickRecording = useRef<Promise<void> | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -393,7 +394,14 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
     setContactPhase("loading");
     setManagerContextError(false);
     if (conversationId) {
-      void recordManagerContactClick(conversationId).catch((error) => {
+      managerClickRecording.current = recordManagerContactClick(conversationId, {
+        referrer: document.referrer,
+        artemEntrySource: "artem_web",
+        artemEntryContent: "diagnostic_question_01",
+        managerCtaSource: recommendationViewActive ? "recommendation" :
+          consultationViewActive ? "post_diagnostic_consultation" : "artem_chat",
+        managerCtaContent: "manager_contact_button",
+      }).catch((error) => {
         console.error("MANAGER_CONTACT_EVENT_FAILED", error);
       });
     }
@@ -416,12 +424,16 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
     if (!contactPhase || contactPhase === "submitted" || managerContextError || !conversationId || !managerWidgetRef.current) return;
     let disposed = false;
     let unmount = () => {};
-    void mountNativeGetCourseWidget(managerWidgetRef.current, conversationId, {
-      onReady: () => { if (!disposed) setContactPhase("ready"); },
-      onSuccess: () => { if (!disposed) setContactPhase("submitted"); },
-      onError: () => { if (!disposed) setManagerContextError(true); },
-    }).then(cleanup => { if (disposed) cleanup(); else unmount = cleanup; })
-      .catch(() => { if (!disposed) setManagerContextError(true); });
+    void (async () => {
+      await managerClickRecording.current;
+      if (disposed || !managerWidgetRef.current) return;
+      unmount = await mountNativeGetCourseWidget(managerWidgetRef.current, conversationId, {
+        onReady: () => { if (!disposed) setContactPhase("ready"); },
+        onSuccess: () => { if (!disposed) setContactPhase("submitted"); },
+        onError: () => { if (!disposed) setManagerContextError(true); },
+      });
+      if (disposed) unmount();
+    })().catch(() => { if (!disposed) setManagerContextError(true); });
     return () => { disposed = true; unmount(); };
   }, [Boolean(contactPhase), conversationId, managerContextError]);
 

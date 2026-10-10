@@ -26,6 +26,13 @@ const sourceLines = (context: ManagerLeadContext): string[] => [
   context.yclid && `yclid: ${context.yclid}`,
 ].filter((value): value is string => Boolean(value));
 
+const entryLines = (context: ManagerLeadContext): string[] => [
+  context.artemEntrySource && `artem_entry_source: ${context.artemEntrySource}`,
+  context.artemEntryContent && `artem_entry_content: ${context.artemEntryContent}`,
+  context.managerCtaSource && `manager_cta_source: ${context.managerCtaSource}`,
+  context.managerCtaContent && `manager_cta_content: ${context.managerCtaContent}`,
+].filter((value): value is string => Boolean(value));
+
 function splitLongText(value: string, limit = TELEGRAM_SAFE_MESSAGE_LENGTH): string[] {
   if (value.length <= limit) return [value];
   const chunks: string[] = [];
@@ -69,6 +76,7 @@ export function managerLeadContacts(params: URLSearchParams): ManagerLeadContact
 export function formatTelegramManagerLead(context: ManagerLeadContext,
   contacts: ManagerLeadContacts): string[] {
   const sources = sourceLines(context);
+  const entry = entryLines(context);
   const transcript = context.transcript.length
     ? context.transcript.map(turn => `${turn.role === "user" ? "Пользователь" : "Артём"}: ${turn.text}`).join("\n")
     : "Дополнительных вопросов не было.";
@@ -84,6 +92,7 @@ export function formatTelegramManagerLead(context: ManagerLeadContext,
     `Образование: ${context.diagnostic.educationStatus}`, `Задача: ${context.diagnostic.targetTasks}`, "",
     "📝 Кратко:", context.dialogSummary,
     ...(sources.length ? ["", "📊 Источник:", ...sources] : []),
+    ...(entry.length ? ["", "🔘 Точка входа:", ...entry] : []),
   ].join("\n");
   return packSections([identity, details, `💭 Диалог:\n${transcript}`]);
 }

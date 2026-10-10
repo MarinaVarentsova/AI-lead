@@ -102,12 +102,18 @@ try {
     assert.equal(url, "/api/events");
     assert.equal(options.method, "POST");
     assert.deepEqual(JSON.parse(options.body), {
-      sessionId: fixture.conversationId, eventType: "manager_contact_click",
+      sessionId: fixture.conversationId, eventType: "manager_contact_click", attribution: {
+        referrer: "https://inobr-expert.ru/",
+        artemEntrySource: "artem_web", artemEntryContent: "diagnostic_question_01",
+        managerCtaSource: "recommendation", managerCtaContent: "manager_contact_button",
+      },
     });
     return Response.json({ recorded: true }, { status: 201 });
   };
   assert.equal(eventCalls, 0, "rendering/importing must not record an event");
-  await recordManagerContactClick(fixture.conversationId);
+  await recordManagerContactClick(fixture.conversationId, { referrer: "https://inobr-expert.ru/", artemEntrySource: "artem_web",
+    artemEntryContent: "diagnostic_question_01", managerCtaSource: "recommendation",
+    managerCtaContent: "manager_contact_button" });
   assert.equal(eventCalls, 1, "one actual click records one event");
 
   globalThis.fetch = async (url, options) => {
@@ -171,7 +177,9 @@ try {
   assert.ok(widget.includes("Задать вопрос"));
   assert.ok(widget.includes("<ProgressBar current={4} total={4} />"));
   assert.ok(widget.includes("onClick={onGetConsultation}"));
-  assert.match(widget, /void recordManagerContactClick\(conversationId\)\.catch/);
+  assert.match(widget, /managerClickRecording\.current = recordManagerContactClick\(conversationId, \{/);
+  assert.match(widget, /await managerClickRecording\.current;[\s\S]*mountNativeGetCourseWidget/);
+  assert.ok(widget.includes('managerCtaSource: recommendationViewActive ? "recommendation"'));
   assert.ok(widget.includes('onGetConsultation={() => { void handleManagerContactClick(); }}'));
   assert.ok(widget.includes('onPostDiagnosticViewChange?.("consultation")'));
   assert.ok(widget.includes('const consultantAnswerCount = consultantMessages.filter((message) => message.role === "bot").length'));
