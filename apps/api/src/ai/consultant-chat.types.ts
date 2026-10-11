@@ -26,4 +26,8 @@ export interface ConsultantChatResponse {
   webResearchSourceCount?: number; webResearchDomains?: string[]; webResearchLatencyMs?: number;
   webResearchFallbackReason?: string | null;
   webResearchProvider?: "yandex_search_api";
+  answerSource?: "faq" | "kb" | "faq_and_kb" | "professional_web" | "mixed" | "manager" | "fallback";
+  kbSectionsUsed?: string[]; topLevelDomain?: "PRODUCT" | "PROFESSIONAL" | "MIXED" | "OTHER";
+  classifiedIntent?: string | null; webResearchConfigured?: boolean; webResearchAttempted?: boolean;
+  yandexAiConfigured?: boolean; yandexSearchConfigured?: boolean; webResearchHttpStatus?: number | null;
 }

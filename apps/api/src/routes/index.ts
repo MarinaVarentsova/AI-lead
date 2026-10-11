@@ -11,6 +11,7 @@ import consultantChatRouter from "./consultant-chat";
 import eventsRouter from "./events";
 import managerLeadContextRouter from "./manager-lead-context";
 import managerFormRouter from "./manager-form";
+import professionalWebHealthRouter from "./professional-web-health";
 
 import testerRouter from "./tester";
 
@@ -28,6 +29,7 @@ router.use(consultantChatRouter);
 router.use(eventsRouter);
 router.use(managerLeadContextRouter);
 router.use(managerFormRouter);
+router.use(professionalWebHealthRouter);
 router.use(testerRouter);
 
 export default router;

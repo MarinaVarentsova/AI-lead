@@ -273,7 +273,7 @@ try {
           captured.matchedSections.map((s) => s.id),
         );
       else assert.ok(res.body.fallbackReason === "INSUFFICIENT_KNOWLEDGE" || res.body.fallbackReason === null);
-      assert.deepEqual(events, ["CONSULTANT_CHAT_START", "CONSULTANT_CONTEXT_LOADED", "CONSULTANT_KNOWLEDGE_RESOLVED", "CONSULTANT_AI_CALL_START", ...(res.body.isAI ? ["CONSULTANT_AI_CALL_SUCCESS"] : ["CONSULTANT_AI_CALL_FAILED", "CONSULTANT_FALLBACK_USED"]), "CONSULTANT_MESSAGES_SAVED", "CONSULTANT_CHAT_FINISH"]);
+      assert.deepEqual(events, ["CONSULTANT_CHAT_START", "CONSULTANT_CONTEXT_LOADED", "CONSULTANT_KNOWLEDGE_RESOLVED", "CONSULTANT_AI_CALL_START", "CONSULTANT_SOURCE_TRACE", ...(res.body.isAI ? ["CONSULTANT_AI_CALL_SUCCESS"] : ["CONSULTANT_AI_CALL_FAILED", "CONSULTANT_FALLBACK_USED"]), "CONSULTANT_MESSAGES_SAVED", "CONSULTANT_CHAT_FINISH"]);
     } else if (status !== 500) {
       assert.deepEqual(state.writes, []);
       assert.equal(captured, undefined);

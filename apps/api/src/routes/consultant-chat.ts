@@ -60,7 +60,15 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
       const webMeta = { webResearchEligible: response.webResearchEligible, webResearchUsed: response.webResearchUsed,
         webResearchIntent: response.webResearchIntent, webResearchSourceCount: response.webResearchSourceCount,
         webResearchDomains: response.webResearchDomains, webResearchLatencyMs: response.webResearchLatencyMs,
-        webResearchFallbackReason: response.webResearchFallbackReason, webResearchProvider: response.webResearchProvider };
+        webResearchFallbackReason: response.webResearchFallbackReason, webResearchProvider: response.webResearchProvider,
+        webResearchConfigured: response.webResearchConfigured, webResearchAttempted: response.webResearchAttempted,
+        webResearchHttpStatus: response.webResearchHttpStatus, yandexAiConfigured: response.yandexAiConfigured,
+        yandexSearchConfigured: response.yandexSearchConfigured };
+      const sourceMeta = { answerSource: response.answerSource, faqMatchUsed: response.faqMatchUsed,
+        faqMatchId: response.faqMatchId, faqIntent: response.faqIntent, faqSimilarity: response.faqSimilarity,
+        kbSectionsUsed: response.kbSectionsUsed, topLevelDomain: response.topLevelDomain,
+        classifiedIntent: response.classifiedIntent, ...webMeta };
+      req.log.info({ requestId, stage: "consultant_source_trace", provider, ...sourceMeta }, "CONSULTANT_SOURCE_TRACE");
       if (response.isAI) req.log.info({ requestId, stage: phase, provider, ...webMeta }, "CONSULTANT_AI_CALL_SUCCESS");
       else {
         req.log.warn({ requestId, stage: phase, provider, errorCode: response.fallbackReason, ...webMeta }, "CONSULTANT_AI_CALL_FAILED");

@@ -1,18 +1,24 @@
 import type { ProfessionalWebIntent } from "@workspace/domain/consultant";
+import { logger } from "../lib/logger";
 
 export interface ProfessionalWebSource { title: string; url: string; snippet: string; domain: string; }
+export type WebResearchFallbackReason =
+  | "not_configured" | "kb_sufficient" | "search_timeout" | "search_401" | "search_403"
+  | "search_429" | "search_5xx" | "network_error" | "empty_results" | "source_filter_rejected"
+  | "provider_unavailable" | "other";
 export interface ProfessionalWebResearchResult {
-  sources: ProfessionalWebSource[]; latencyMs: number; fallbackReason: string | null;
-  provider: "yandex_search_api";
+  sources: ProfessionalWebSource[]; latencyMs: number; fallbackReason: WebResearchFallbackReason | null;
+  provider: "yandex_search_api"; configured: boolean; attempted: boolean; httpStatus: number | null;
+  timeout: boolean; authError: boolean; quotaError: boolean; networkError: boolean;
 }
 export interface ProfessionalWebResearchService {
   research(query: string, intent: ProfessionalWebIntent, freshnessRequired: boolean): Promise<ProfessionalWebResearchResult>;
 }
 
 type YandexSearchEnvironment = Partial<Record<
-  "YANDEX_SEARCH_API_KEY" | "YANDEX_FOLDER_ID" | "YANDEX_SEARCH_TIMEOUT_MS" |
-  "YANDEX_AI_API_KEY" | "YANDEX_AI_MODEL" | "AI_REQUEST_TIMEOUT_MS", string>>;
+  "YANDEX_SEARCH_API_KEY" | "YANDEX_FOLDER_ID" | "YANDEX_SEARCH_TIMEOUT_MS" | "AI_REQUEST_TIMEOUT_MS", string>>;
 type YandexSearchResponse = { rawData?: unknown };
+type YandexSearchAttempt = { sources: ProfessionalWebSource[]; httpStatus: number; rawResultCount: number };
 const YANDEX_SEARCH_URL = "https://searchapi.api.cloud.yandex.net/v2/web/search";
 const BLOCKED = /(?:forum|vk\.com|youtube|telegram|t\.me|dzen|otzovik|irecommend|pikabu|zen\.yandex|course|school|academy|university)/iu;
 const OFFICIAL = /(?:publication\.pravo\.gov\.ru|pravo\.gov\.ru|rosstandart\.gov\.ru|minjust\.gov\.ru|sudexpert\.ru|\.gov\.ru$|docs\.cntd\.ru$)/iu;
@@ -48,8 +54,7 @@ export function parseYandexSearchXml(xml: string): ProfessionalWebSource[] {
 }
 
 function configuration(env: YandexSearchEnvironment) {
-  const apiKey = env.YANDEX_SEARCH_API_KEY?.trim() || env.YANDEX_AI_API_KEY?.trim();
-  const folderId = env.YANDEX_FOLDER_ID?.trim() || /^gpt:\/\/([^/]+)\/.+$/.exec(env.YANDEX_AI_MODEL?.trim() ?? "")?.[1];
+  const apiKey = env.YANDEX_SEARCH_API_KEY?.trim(); const folderId = env.YANDEX_FOLDER_ID?.trim();
   if (!apiKey || !folderId) throw new Error("not_configured");
   const timeoutMs = Math.min(Math.max(Number(env.YANDEX_SEARCH_TIMEOUT_MS ?? env.AI_REQUEST_TIMEOUT_MS ?? "8000"), 1000), 60000);
   return { apiKey, folderId, timeoutMs };
@@ -57,7 +62,8 @@ function configuration(env: YandexSearchEnvironment) {
 
 export class YandexSearchProvider {
   constructor(private readonly env: YandexSearchEnvironment = process.env) {}
-  async search(query: string, freshnessRequired: boolean): Promise<ProfessionalWebSource[]> {
+  isConfigured(): boolean { try { configuration(this.env); return true; } catch { return false; } }
+  async search(query: string, freshnessRequired: boolean): Promise<YandexSearchAttempt> {
     const config = configuration(this.env); const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), config.timeoutMs);
     try {
@@ -72,30 +78,67 @@ export class YandexSearchProvider {
       const payload = await response.json() as YandexSearchResponse;
       if (typeof payload.rawData !== "string" || !payload.rawData) throw new Error("invalid_response");
       const xml = payload.rawData.trimStart().startsWith("<") ? payload.rawData : Buffer.from(payload.rawData, "base64").toString("utf8");
-      return parseYandexSearchXml(xml);
+      return { sources: parseYandexSearchXml(xml), httpStatus: response.status,
+        rawResultCount: [...xml.matchAll(/<doc(?:\s[^>]*)?>/giu)].length };
     } catch (error) { if (controller.signal.aborted) throw new Error("timeout"); throw error; }
     finally { clearTimeout(timer); }
   }
 }
 
+function failure(reason: WebResearchFallbackReason, latencyMs: number, configured: boolean, attempted: boolean,
+  httpStatus: number | null = null): ProfessionalWebResearchResult {
+  return { sources: [], latencyMs, fallbackReason: reason, provider: "yandex_search_api", configured, attempted,
+    httpStatus, timeout: reason === "search_timeout", authError: reason === "search_401" || reason === "search_403",
+    quotaError: reason === "search_429", networkError: reason === "network_error" };
+}
+function errorReason(error: unknown): { reason: WebResearchFallbackReason; status: number | null } {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "not_configured") return { reason: "not_configured", status: null };
+  if (message === "timeout") return { reason: "search_timeout", status: null };
+  const status = /^http_(\d+)$/.exec(message)?.[1];
+  if (status === "401") return { reason: "search_401", status: 401 };
+  if (status === "403") return { reason: "search_403", status: 403 };
+  if (status === "429") return { reason: "search_429", status: 429 };
+  if (status && Number(status) >= 500) return { reason: "search_5xx", status: Number(status) };
+  if (error instanceof TypeError) return { reason: "network_error", status: null };
+  if (message === "invalid_response") return { reason: "provider_unavailable", status: 200 };
+  return { reason: "other", status: status ? Number(status) : null };
+}
+
 export class YandexProfessionalWebResearchService implements ProfessionalWebResearchService {
   constructor(private readonly searchProvider = new YandexSearchProvider()) {}
-  async research(query: string, _intent: ProfessionalWebIntent, freshnessRequired: boolean): Promise<ProfessionalWebResearchResult> {
-    const started = Date.now();
+  async research(query: string, intent: ProfessionalWebIntent, freshnessRequired: boolean): Promise<ProfessionalWebResearchResult> {
+    const started = Date.now(); const configured = this.searchProvider.isConfigured();
+    const base = { webResearchProvider: "yandex_search_api", queryIntent: intent,
+      yandexAiConfigured: Boolean(process.env.YANDEX_AI_API_KEY?.trim()), yandexSearchConfigured: configured };
+    if (!configured) {
+      const result = failure("not_configured", 0, false, false);
+      logger.warn({ stage: "yandex_search_error", ...base, ...result }, "YANDEX_SEARCH_ERROR"); return result;
+    }
+    logger.info({ stage: "yandex_search_start", ...base }, "YANDEX_SEARCH_START");
     try {
-      const sources = await this.searchProvider.search(query, freshnessRequired);
-      return { sources, latencyMs: Date.now() - started, fallbackReason: sources.length ? null : "no_trusted_sources",
-        provider: "yandex_search_api" };
+      const attempt = await this.searchProvider.search(query, freshnessRequired); const latencyMs = Date.now() - started;
+      const fallbackReason = attempt.sources.length ? null : attempt.rawResultCount ? "source_filter_rejected" : "empty_results";
+      const result: ProfessionalWebResearchResult = { sources: attempt.sources, latencyMs, fallbackReason,
+        provider: "yandex_search_api", configured: true, attempted: true, httpStatus: attempt.httpStatus,
+        timeout: false, authError: false, quotaError: false, networkError: false };
+      logger.info({ stage: "yandex_search_response", ...base, httpStatus: result.httpStatus, latencyMs,
+        sourceCount: result.sources.length, domains: [...new Set(result.sources.map(source => source.domain))],
+        timeout: false, authError: false, quotaError: false, networkError: false,
+        webResearchFallbackReason: fallbackReason }, "YANDEX_SEARCH_RESPONSE");
+      return result;
     } catch (error) {
-      const reason = error instanceof Error && /^(?:not_configured|timeout|invalid_response|http_\d+)$/.test(error.message)
-        ? error.message : "unavailable";
-      return { sources: [], latencyMs: Date.now() - started, fallbackReason: reason, provider: "yandex_search_api" };
+      const latencyMs = Date.now() - started; const mapped = errorReason(error);
+      const result = failure(mapped.reason, latencyMs, true, true, mapped.status);
+      logger.warn({ stage: "yandex_search_error", ...base, httpStatus: result.httpStatus, latencyMs,
+        sourceCount: 0, domains: [], timeout: result.timeout, authError: result.authError,
+        quotaError: result.quotaError, networkError: result.networkError,
+        webResearchFallbackReason: result.fallbackReason }, "YANDEX_SEARCH_ERROR");
+      return result;
     }
   }
 }
 
 export class DisabledProfessionalWebResearchService implements ProfessionalWebResearchService {
-  async research(): Promise<ProfessionalWebResearchResult> {
-    return { sources: [], latencyMs: 0, fallbackReason: "not_configured", provider: "yandex_search_api" };
-  }
+  async research(): Promise<ProfessionalWebResearchResult> { return failure("not_configured", 0, false, false); }
 }
