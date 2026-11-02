@@ -75,7 +75,7 @@ export class ConsultantKnowledgeResolver {
     const fingerprintSource = `${PROFESSIONAL_WEB_POLICY_VERSION}\n${markdown.replace(/\r\n/g, "\n")}\n${faqEntries.map(entry =>
       [entry.id, entry.category, entry.intent, entry.policy, entry.question, entry.answer, entry.kbReference].join("|")).join("\n")}`;
     for (const char of fingerprintSource) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
-    this.sourceVersion = `inobr-artem-v4.5-faq${faqEntries.length}-${PROFESSIONAL_WEB_POLICY_VERSION}-${(hash >>> 0).toString(16)}`;
+    this.sourceVersion = `inobr-artem-v4.6-faq${faqEntries.length}-${PROFESSIONAL_WEB_POLICY_VERSION}-${(hash >>> 0).toString(16)}`;
   }
 
   resolve(input: ConsultantInput): ConsultantRetrievalPacket {

@@ -63,7 +63,10 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
         webResearchFallbackReason: response.webResearchFallbackReason, webResearchProvider: response.webResearchProvider,
         webResearchConfigured: response.webResearchConfigured, webResearchAttempted: response.webResearchAttempted,
         webResearchHttpStatus: response.webResearchHttpStatus, yandexAiConfigured: response.yandexAiConfigured,
-        yandexSearchConfigured: response.yandexSearchConfigured };
+        yandexSearchConfigured: response.yandexSearchConfigured,
+        professionalAnswerDepth: response.professionalAnswerDepth, explicitSourceRequest: response.explicitSourceRequest,
+        sourcesHiddenFromUser: response.sourcesHiddenFromUser, sourcesShownCount: response.sourcesShownCount,
+        webRawSourceCount: response.webRawSourceCount };
       const sourceMeta = { answerSource: response.answerSource, faqMatchUsed: response.faqMatchUsed,
         faqMatchId: response.faqMatchId, faqIntent: response.faqIntent, faqSimilarity: response.faqSimilarity,
         kbSectionsUsed: response.kbSectionsUsed, topLevelDomain: response.topLevelDomain,

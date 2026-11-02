@@ -23,7 +23,8 @@ const hooks = registerHooks({
 
 try {
   const { createArtemRuntime, loadArtemKnowledge, loadArtemFaq } = await import(new URL("apps/api/src/ai/artem-runtime.ts", root));
-  const { ConsultantChatService } = await import(new URL("apps/api/src/ai/consultant-chat.service.ts", root));
+  const { ConsultantChatService, isExplicitSourceRequest, professionalAnswerDepth, postProcessProfessionalAnswer } =
+    await import(new URL("apps/api/src/ai/consultant-chat.service.ts", root));
   const { classifyProfessionalIntent } = await import(new URL("packages/domain/src/consultant/professional-intent.ts", root));
   const { YandexProfessionalWebResearchService, YandexSearchProvider, parseYandexSearchXml } = await import(new URL("apps/api/src/ai/professional-web-research.ts", root));
   const faq = await loadArtemFaq(); const markdown = await loadArtemKnowledge();
@@ -69,7 +70,14 @@ try {
     assert.equal(reply.answerSource, "professional_web", question); assert.equal(reply.topLevelDomain, "PROFESSIONAL", question);
     assert.equal(reply.classifiedIntent, intent); assert.equal(reply.webResearchConfigured, true);
     assert.equal(reply.webResearchAttempted, true); assert.equal(reply.webResearchHttpStatus, 200);
-    assert.match(reply.message, /Источники:/); assert.match(reply.message, /publication\.pravo\.gov\.ru/);
+    if (isExplicitSourceRequest(question)) {
+      assert.match(reply.message, /Источники:/); assert.match(reply.message, /publication\.pravo\.gov\.ru/);
+      assert.equal(reply.sourcesShownCount, 1); assert.equal(reply.sourcesHiddenFromUser, false);
+    } else {
+      assert.doesNotMatch(reply.message, /Источники:|https?:\/\//iu);
+      assert.equal(reply.sourcesShownCount, 0); assert.equal(reply.sourcesHiddenFromUser, true);
+    }
+    assert.equal(reply.webRawSourceCount, 1); assert.equal(reply.professionalAnswerDepth, "concise");
     assert.equal(calls.at(-1).freshnessRequired, freshness);
     if (["Почему появляются диагональные трещины в кирпичной стене?", "Какими методами определяют прочность бетона?",
       "Какой СП сейчас применяется при обследовании строительных конструкций?"].includes(question)) {
@@ -103,6 +111,15 @@ try {
   const offTopic = await runtime.reply(runtime.prepare(answers, "Как приготовить борщ?", history), history);
   assert.equal(calls.length, offTopicBefore); assert.equal(offTopic.webResearchEligible, false);
   assert.equal(offTopic.topLevelDomain, "OTHER");
+  assert.equal(isExplicitSourceRequest("Дай источник по прочности бетона"), true);
+  assert.equal(isExplicitSourceRequest("Почему появляются трещины?"), false);
+  assert.equal(professionalAnswerDepth("Расскажите подробнее про методы"), "detailed");
+  assert.equal(professionalAnswerDepth("Какими методами определяют прочность бетона?"), "concise");
+  const sanitized = postProcessProfessionalAnswer(
+    "Первый вывод. Второй фактор. Третий фактор. Четвёртый фактор. Пятый фактор. Шестой фактор. Уточните у менеджера.\n\nИсточники:\nhttps://yandex.ru/images/search?text=бетон",
+    { question: "Почему появляются трещины?", sources: [{ title: "Картинки", url: "https://yandex.ru/images/search?text=x" }], allowManagerReferral: false });
+  assert.doesNotMatch(sanitized.message, /https?:\/\/|Источники|картин|менеджер/iu);
+  assert.equal((sanitized.message.match(/[.!?]/g) ?? []).length, 5); assert.equal(sanitized.sourcesShownCount, 0);
   const sourceOnlyProvider = { async generateStructured() { throw new Error("disabled"); },
     async generateConsultantReply() { return "Ответ сформирован по подтверждённым материалам."; } };
   const faqOnlyService = new ConsultantChatService({}, sourceOnlyProvider, markdown, web);
@@ -132,6 +149,26 @@ try {
   const explicitMixedReply = await runtime.reply(explicitMixed, history);
   assert.equal(calls.length, mixedBefore + 1); assert.equal(explicitMixedReply.answerSource, "mixed");
   assert.doesNotMatch(calls.at(-1).query, /сколько|сто(?:ит|имость)|курс/iu);
+
+  const presentationProvider = { async generateStructured() { throw new Error("disabled"); },
+    async generateConsultantReply() {
+      return "Основной вывод. Первый фактор. Второй фактор. Третий фактор. Для конкретного вывода нужны материалы и обследование объекта. Шестое лишнее предложение. Уточните у менеджера. https://example.org/article ![Картинки](https://yandex.ru/images/search?text=трещины)";
+    } };
+  const presentationRuntime = createArtemRuntime(markdown, presentationProvider, faq, web);
+  const concise = await presentationRuntime.reply(presentationRuntime.prepare(answers, allowed[0][0], history), history);
+  assert.equal(concise.professionalAnswerDepth, "concise"); assert.equal(concise.explicitSourceRequest, false);
+  assert.equal(concise.sourcesHiddenFromUser, true); assert.equal(concise.sourcesShownCount, 0);
+  assert.doesNotMatch(concise.message, /https?:\/\/|Источники|Картинки|менеджер/iu);
+  assert.ok((concise.message.match(/[.!?]/g) ?? []).length <= 5);
+  const sourcedQuestion = "Дай источник по методам определения прочности бетона";
+  const sourced = await presentationRuntime.reply(presentationRuntime.prepare(answers, sourcedQuestion, history), history);
+  assert.equal(sourced.explicitSourceRequest, true); assert.equal(sourced.sourcesShownCount, 1);
+  assert.match(sourced.message, /Источники:\n— Официальный нормативный источник — https:\/\/publication\.pravo\.gov\.ru/);
+  assert.doesNotMatch(sourced.message, /yandex\.ru\/images|Картинки/iu);
+  const detailedQuestion = "Расскажи подробнее про методы определения прочности бетона";
+  const detailed = await presentationRuntime.reply(presentationRuntime.prepare(answers, detailedQuestion, history), history);
+  assert.equal(detailed.professionalAnswerDepth, "detailed"); assert.equal(detailed.explicitSourceRequest, false);
+  assert.ok((detailed.message.match(/[.!?]/g) ?? []).length > 5); assert.doesNotMatch(detailed.message, /https?:\/\//u);
 
   const specific = classifyProfessionalIntent("Кто виноват в трещине на моём конкретном объекте?");
   assert.equal(specific.professionalWebEligible, false);
@@ -195,12 +232,13 @@ try {
     assert.equal(disabled.fallbackReason, "not_configured"); assert.equal(disabled.attempted, false);
   } finally { globalThis.fetch = originalFetch; }
   assert.equal(parseYandexSearchXml("<response/>").length, 0);
-  assert.match(runtime.resolver.sourceVersion, /^inobr-artem-v4\.5-faq1200-yandexweb2-/);
+  assert.match(runtime.resolver.sourceVersion, /^inobr-artem-v4\.6-faq1200-yandexweb2-/);
   const routeSource = readFileSync(new URL("apps/api/src/routes/consultant-chat.ts", root), "utf8");
   for (const field of ["webResearchEligible", "webResearchUsed", "webResearchIntent", "webResearchSourceCount",
     "webResearchDomains", "webResearchLatencyMs", "webResearchFallbackReason", "webResearchProvider",
     "answerSource", "faqMatchUsed", "kbSectionsUsed", "topLevelDomain", "classifiedIntent",
-    "webResearchConfigured", "webResearchAttempted"]) assert.ok(routeSource.includes(field));
+    "webResearchConfigured", "webResearchAttempted", "professionalAnswerDepth", "explicitSourceRequest",
+    "sourcesHiddenFromUser", "sourcesShownCount", "webRawSourceCount"]) assert.ok(routeSource.includes(field));
   const { createProfessionalWebHealthHandler } = await import(new URL("apps/api/src/routes/professional-web-health.ts", root));
   let healthBody;
   const health = createProfessionalWebHealthHandler({ async research() { return { provider: "yandex_search_api",

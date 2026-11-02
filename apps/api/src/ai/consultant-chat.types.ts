@@ -30,4 +30,6 @@ export interface ConsultantChatResponse {
   kbSectionsUsed?: string[]; topLevelDomain?: "PRODUCT" | "PROFESSIONAL" | "MIXED" | "OTHER";
   classifiedIntent?: string | null; webResearchConfigured?: boolean; webResearchAttempted?: boolean;
   yandexAiConfigured?: boolean; yandexSearchConfigured?: boolean; webResearchHttpStatus?: number | null;
+  professionalAnswerDepth?: "concise" | "detailed"; explicitSourceRequest?: boolean;
+  sourcesHiddenFromUser?: boolean; sourcesShownCount?: number; webRawSourceCount?: number;
 }

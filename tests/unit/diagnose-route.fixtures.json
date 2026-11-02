@@ -17,6 +17,16 @@
     "recommendedTrack": "construction_expertise",
     "importantNote": null
   },
-  "factsPacketKeys": ["sourceVersion", "currentArea", "currentRole", "education", "targetTasks", "rawAnswers", "answerCodes", "guards", "recommendedTrackHint"],
-  "expectedSourceVersion": "inobr-artem-v4.5"
+  "factsPacketKeys": [
+    "sourceVersion",
+    "currentArea",
+    "currentRole",
+    "education",
+    "targetTasks",
+    "rawAnswers",
+    "answerCodes",
+    "guards",
+    "recommendedTrackHint"
+  ],
+  "expectedSourceVersion": "inobr-artem-v4.6"
 }

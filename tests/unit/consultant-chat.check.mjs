@@ -199,7 +199,7 @@ try {
       assert.equal(state.writes.length, 1, "Save user before generation");
       captured = input;
       assert.ok(["diagnosticContext", "history", "matchedSections", "question", "sourceVersion"].every((key) => Object.hasOwn(input, key)));
-      assert.match(input.sourceVersion, /^inobr-artem-v4\.5-faq1200-yandexweb2-/);
+      assert.match(input.sourceVersion, /^inobr-artem-v4\.6-faq1200-yandexweb2-/);
       if (input.faqMatch) {
         assert.match(input.faqMatch.id, /^FAQ-/);
         assert.ok(["KB", "MANAGER", "MIXED"].includes(input.faqMatch.policy));
@@ -498,7 +498,7 @@ try {
   assert.doesNotMatch(access.message, /(?:в|по) (?:моей )?баз|источник/i);
   assert.doesNotMatch(access.message, /доступ не бессрочный|срок доступа не установлен/i);
 
-  // KB v4.5 A–K: unknown conditions never expose the internal KB; known facts still answer first.
+  // KB v4.6 A–K: unknown conditions never expose the internal KB; known facts still answer first.
   for (const message of ["Есть скидка?", "Есть промокод или акция?", "Можно оформить кредит?", "Можно отсрочить оплату?", "На сколько месяцев дают рассрочку?"]) {
     const reply = await run({ message });
     assert.match(reply.message, /менеджер/i, message);
@@ -774,13 +774,13 @@ try {
   try {
     const knowledgeDir = path.join(packaged, "knowledge");
     mkdirSync(knowledgeDir);
-    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_5.md", root), "utf8");
+    const markdown = readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_6.md", root), "utf8");
     const faqCsv = readFileSync(new URL("knowledge/inobr/artem_client_questions_1200.csv", root), "utf8");
-    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v4_5.md"), markdown);
+    writeFileSync(path.join(knowledgeDir, "artem_unified_knowledge_base_v4_6.md"), markdown);
     writeFileSync(path.join(knowledgeDir, "artem_client_questions_1200.csv"), faqCsv);
     assert.equal(await loadArtemKnowledge(pathToFileURL(path.join(packaged, "index.mjs")).href), markdown);
     assert.equal((await loadArtemFaq(pathToFileURL(path.join(packaged, "index.mjs")).href)).length, 1200);
-    assert.ok(readFileSync(new URL("apps/api/build.mjs", root), "utf8").includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v4_5.md")'));
+    assert.ok(readFileSync(new URL("apps/api/build.mjs", root), "utf8").includes('path.join(knowledgeDir, "artem_unified_knowledge_base_v4_6.md")'));
     assert.ok(readFileSync(new URL("apps/api/build.mjs", root), "utf8").includes('path.join(knowledgeDir, "artem_client_questions_1200.csv")'));
   } finally {
     rmSync(packaged, { recursive: true, force: true });
@@ -860,7 +860,7 @@ try {
     if (evaluatorAttempts === 1 || evaluatorAttempts === 3 || evaluatorAttempts === 4 || evaluatorAttempts === 5) throw new Error("Evaluator unavailable");
     return good;
   };
-  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_5.md", root), "utf8"), fakeProvider);
+  const runtime = createArtemRuntime(readFileSync(new URL("knowledge/inobr/artem_unified_knowledge_base_v4_6.md", root), "utf8"), fakeProvider);
   const productionBefore = persisted.length;
   const savedCases = [],
     progress = [];

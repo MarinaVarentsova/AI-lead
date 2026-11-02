@@ -18,6 +18,36 @@ const ABUSIVE_REPLY = "Давайте вернёмся к теме обучен�
 const MANAGER_REFERRAL = "Для точного ответа по этому вопросу лучше связаться с менеджером — он подскажет актуальные условия. Воспользуйтесь кнопкой «Связаться с менеджером».";
 const FRESHNESS_UNAVAILABLE_REPLY = "Для точного ответа о действующей редакции СП требуется проверить официальный источник. Без такой проверки не буду называть конкретный норматив как актуальный.";
 const PROFESSIONAL_SOURCE_UNAVAILABLE_REPLY = "Без проверки профессиональных источников не буду утверждать точный предметный ответ. Могу помочь по подтверждённым условиям обучения или вернуться к этому профессиональному вопросу после проверки источника.";
+const SOURCE_REQUEST = /(?:какой|какие)\s+(?:сп|гост)|дай(?:те)?\s+(?:источник|ссылк|норматив)|покажи(?:те)?\s+норматив|где\s+это\s+написано|на\s+что\s+(?:вы\s+)?ссыла|(?:^|\s)источник(?:и|ов|а)?(?:\s|[?.!,]|$)|(?:^|\s)норматив(?:ы|ов|а)?(?:\s|[?.!,]|$)/iu;
+const DETAILED_REQUEST = /подробн|по\s+шагам|разбер(?:и|ите).*подроб|перечисл(?:и|ите).*метод|(?:да(?:й|йте)|какие).*нормативы|расширенн.*ответ/iu;
+const IMAGE_LINK = /!?\[[^\]]*\]\((?:https?:\/\/)?[^)]*(?:yandex\.(?:ru|com)\/images|images?\.|\/images?\/|картин)[^)]*\)/giu;
+const IMAGE_URL = /https?:\/\/\S*(?:yandex\.(?:ru|com)\/images|images?\.|\/images?\/|image-search|картин)\S*/giu;
+
+export const isExplicitSourceRequest = (question: string): boolean => SOURCE_REQUEST.test(question);
+export const professionalAnswerDepth = (question: string): "concise" | "detailed" =>
+  DETAILED_REQUEST.test(question) ? "detailed" : "concise";
+
+export function postProcessProfessionalAnswer(message: string, options: {
+  question: string; sources: { title: string; url: string }[]; allowManagerReferral: boolean;
+}) {
+  const explicitSourceRequest = isExplicitSourceRequest(options.question);
+  const depth = professionalAnswerDepth(options.question);
+  let clean = message.replace(IMAGE_LINK, "").replace(IMAGE_URL, "")
+    .replace(/(?:^|\n)\s*(?:Источники|Sources)\s*:[\s\S]*$/iu, "")
+    .replace(/https?:\/\/\S+/giu, "").replace(/\s+([,.;!?])/gu, "$1").replace(/[ \t]{2,}/g, " ").trim();
+  if (!options.allowManagerReferral) clean = (clean.match(/[^.!?\n]+[.!?]?/gu) ?? [clean])
+    .filter(sentence => !/менеджер|связаться с менеджером/iu.test(sentence)).join(" ").trim();
+  if (!clean) clean = "Для конкретного вывода нужны материалы и обследование объекта.";
+  if (depth === "concise") clean = (clean.match(/[^.!?\n]+[.!?]?/gu) ?? [clean]).slice(0, 5).join(" ").trim();
+  const safeSources = explicitSourceRequest ? options.sources.filter(source => {
+    try { const url = new URL(source.url); return url.protocol === "https:" && !/(?:images?|картин)/iu.test(url.hostname + url.pathname); }
+    catch { return false; }
+  }).slice(0, 3) : [];
+  if (safeSources.length) clean = `${clean}\n\nИсточники:\n${safeSources.map(source => `— ${source.title} — ${source.url}`).join("\n")}`;
+  return { message: clean, professionalAnswerDepth: depth, explicitSourceRequest,
+    sourcesHiddenFromUser: options.sources.length > safeSources.length, sourcesShownCount: safeSources.length,
+    webRawSourceCount: options.sources.length };
+}
 
 const INTERNAL_KNOWLEDGE_DISCLOSURE = /(?:в|по)\s+(?:(?:моей|нашей|доступной\s+мне)\s+)?(?:баз[аеы](?:\s+знаний)?|источник(?:ах|е|и)?|знаниях)[^.!?]{0,140}(?:нет|отсутств|не\s+(?:указан\w*|зафиксирован\w*|подтвержд[её]н\w*|описан\w*|найден\w*|могу\s+подтвердить))|у\s+меня\s+нет[^.!?]{0,80}(?:в\s+)?источник|я\s+не\s+наш[её]л[^.!?]{0,80}(?:в\s+)?баз/iu;
 
@@ -76,6 +106,7 @@ export class ConsultantChatService {
     let webResearchLatencyMs = 0; let webResearchFallbackReason: string | null =
       webResearchEligible && !shouldAttemptWebResearch ? "kb_sufficient" : null;
     let webResearchAttempted = false; let webResearchHttpStatus: number | null = null;
+    let webSources: Awaited<ReturnType<ProfessionalWebResearchService["research"]>>["sources"] = [];
     let webResearchConfigured = Boolean(process.env.YANDEX_SEARCH_API_KEY?.trim() && process.env.YANDEX_FOLDER_ID?.trim());
     const webResearchProvider = "yandex_search_api" as const;
     const yandexAiConfigured = Boolean(process.env.YANDEX_AI_API_KEY?.trim());
@@ -88,10 +119,13 @@ export class ConsultantChatService {
       faqSimilarity: faq.similarity, kbReference: faq.kbReference, sourceVersion: facts.sourceVersion } :
       { faqMatchUsed: false, sourceVersion: facts.sourceVersion };
     const respond = (response: ConsultantChatResponse): ConsultantChatResponse => {
+      const presentation = professional?.intent ? postProcessProfessionalAnswer(response.message, {
+        question: facts.question, sources: webSources, allowManagerReferral: Boolean(professional.mixedProductAndProfessional),
+      }) : null;
       const answerSource = response.answerSource ?? (webResearchUsed ? (professional?.mixedProductAndProfessional ? "mixed" : "professional_web") :
         faq?.policy === "MANAGER" ? "manager" : faq && kbSectionsUsed.length ? "faq_and_kb" : faq ? "faq" :
           kbSectionsUsed.length ? "kb" : response.fallbackReason === "INSUFFICIENT_KNOWLEDGE" ? "manager" : "fallback");
-      return ({ ...response, ...faqMeta, answerSource, kbSectionsUsed, topLevelDomain,
+      return ({ ...response, ...(presentation ? { ...presentation, message: presentation.message } : {}), ...faqMeta, answerSource, kbSectionsUsed, topLevelDomain,
       classifiedIntent: professional?.intent ?? null,
       webResearchEligible, webResearchUsed, webResearchIntent: professional?.intent ?? undefined,
       webResearchSourceCount, webResearchDomains, webResearchLatencyMs, webResearchFallbackReason, webResearchProvider,
@@ -122,7 +156,6 @@ export class ConsultantChatService {
     try {
       if ((unknown || genuineUnknown) && !shouldAttemptWebResearch) throw new Error("INSUFFICIENT_KNOWLEDGE");
       let providerFacts = facts;
-      let webSources: Awaited<ReturnType<ProfessionalWebResearchService["research"]>>["sources"] = [];
       if (shouldAttemptWebResearch && professional?.intent) {
         const researchQuery = professional.professionalQuery ?? facts.question;
         const researched = await this.webResearch.research(researchQuery, professional.intent, professional.freshnessRequired);
@@ -149,7 +182,6 @@ export class ConsultantChatService {
         }
       }
       let message = await this.provider.generateConsultantReply(selectConsultantInput(providerFacts));
-      if (webResearchUsed) message = `${message.trim()}\n\nИсточники:\n${webSources.map(source => `— ${source.title} — ${source.url}`).join("\n")}`;
       if (typeof message !== "string" || !message.trim() || message.length > 6000) throw new DiagnosticAIError("AI_INVALID_RESULT");
       const guardedMessage = guardInternalKnowledgeDisclosure(message);
       if (/Пользователь имеет|рекомендация должна|no_professional_education|recommendedTrack|diagnosticContext/i.test(guardedMessage) ||
