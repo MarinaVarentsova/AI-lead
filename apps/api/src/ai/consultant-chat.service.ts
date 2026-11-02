@@ -18,19 +18,23 @@ const ABUSIVE_REPLY = "Давайте вернёмся к теме обучен�
 const MANAGER_REFERRAL = "Для точного ответа по этому вопросу лучше связаться с менеджером — он подскажет актуальные условия. Воспользуйтесь кнопкой «Связаться с менеджером».";
 const FRESHNESS_UNAVAILABLE_REPLY = "Для точного ответа о действующей редакции СП требуется проверить официальный источник. Без такой проверки не буду называть конкретный норматив как актуальный.";
 const PROFESSIONAL_SOURCE_UNAVAILABLE_REPLY = "Без проверки профессиональных источников не буду утверждать точный предметный ответ. Могу помочь по подтверждённым условиям обучения или вернуться к этому профессиональному вопросу после проверки источника.";
-const SOURCE_REQUEST = /(?:какой|какие)\s+(?:сп|гост)|дай(?:те)?\s+(?:источник|ссылк|норматив)|покажи(?:те)?\s+норматив|где\s+это\s+написано|на\s+что\s+(?:вы\s+)?ссыла|(?:^|\s)источник(?:и|ов|а)?(?:\s|[?.!,]|$)|(?:^|\s)норматив(?:ы|ов|а)?(?:\s|[?.!,]|$)/iu;
-const DETAILED_REQUEST = /подробн|по\s+шагам|разбер(?:и|ите).*подроб|перечисл(?:и|ите).*метод|(?:да(?:й|йте)|какие).*нормативы|расширенн.*ответ/iu;
+const SOURCE_LINK_REQUEST = /дай(?:те)?\s+(?:источник|ссылк)|пришли(?:те)?\s+(?:источник|ссылк)|покажи(?:те)?\s+(?:документ|источник|ссылк)|где\s+это\s+написано|на\s+что\s+(?:вы\s+)?ссыла|можно\s+(?:ли\s+)?ссылк|ссылк[ау]\s+на\s+(?:сп|гост|документ)/iu;
+const NORMATIVE_REFERENCE_REQUEST = /(?:какой|какие|по\s+какому)\s+(?:действующ(?:ий|ие)\s+)?(?:сп|гост|норматив)|(?:сп|гост|норматив)[^.!?]{0,60}(?:применя|регулиру|действу)|по\s+какому\s+нормативу/iu;
+const DETAILED_REQUEST = /подробн|по\s+шагам|разбер(?:и|ите).*подроб|перечисл(?:и|ите).*метод|расширенн.*ответ/iu;
 const IMAGE_LINK = /!?\[[^\]]*\]\((?:https?:\/\/)?[^)]*(?:yandex\.(?:ru|com)\/images|images?\.|\/images?\/|картин)[^)]*\)/giu;
 const IMAGE_URL = /https?:\/\/\S*(?:yandex\.(?:ru|com)\/images|images?\.|\/images?\/|image-search|картин)\S*/giu;
 
-export const isExplicitSourceRequest = (question: string): boolean => SOURCE_REQUEST.test(question);
+export const isExplicitSourceLinkRequest = (question: string): boolean => SOURCE_LINK_REQUEST.test(question);
+export const isExplicitSourceRequest = isExplicitSourceLinkRequest;
+export const isNormativeReferenceRequest = (question: string): boolean => NORMATIVE_REFERENCE_REQUEST.test(question);
 export const professionalAnswerDepth = (question: string): "concise" | "detailed" =>
   DETAILED_REQUEST.test(question) ? "detailed" : "concise";
 
 export function postProcessProfessionalAnswer(message: string, options: {
   question: string; sources: { title: string; url: string }[]; allowManagerReferral: boolean;
 }) {
-  const explicitSourceRequest = isExplicitSourceRequest(options.question);
+  const explicitSourceLinkRequest = isExplicitSourceLinkRequest(options.question);
+  const normativeReferenceRequest = isNormativeReferenceRequest(options.question);
   const depth = professionalAnswerDepth(options.question);
   let clean = message.replace(IMAGE_LINK, "").replace(IMAGE_URL, "")
     .replace(/(?:^|\n)\s*(?:Источники|Sources)\s*:[\s\S]*$/iu, "")
@@ -39,12 +43,13 @@ export function postProcessProfessionalAnswer(message: string, options: {
     .filter(sentence => !/менеджер|связаться с менеджером/iu.test(sentence)).join(" ").trim();
   if (!clean) clean = "Для конкретного вывода нужны материалы и обследование объекта.";
   if (depth === "concise") clean = (clean.match(/[^.!?\n]+[.!?]?/gu) ?? [clean]).slice(0, 5).join(" ").trim();
-  const safeSources = explicitSourceRequest ? options.sources.filter(source => {
+  const safeSources = explicitSourceLinkRequest ? options.sources.filter(source => {
     try { const url = new URL(source.url); return url.protocol === "https:" && !/(?:images?|картин)/iu.test(url.hostname + url.pathname); }
     catch { return false; }
   }).slice(0, 3) : [];
   if (safeSources.length) clean = `${clean}\n\nИсточники:\n${safeSources.map(source => `— ${source.title} — ${source.url}`).join("\n")}`;
-  return { message: clean, professionalAnswerDepth: depth, explicitSourceRequest,
+  return { message: clean, professionalAnswerDepth: depth, explicitSourceRequest: explicitSourceLinkRequest,
+    explicitSourceLinkRequest, normativeReferenceRequest,
     sourcesHiddenFromUser: options.sources.length > safeSources.length, sourcesShownCount: safeSources.length,
     webRawSourceCount: options.sources.length };
 }
@@ -126,7 +131,7 @@ export class ConsultantChatService {
         faq?.policy === "MANAGER" ? "manager" : faq && kbSectionsUsed.length ? "faq_and_kb" : faq ? "faq" :
           kbSectionsUsed.length ? "kb" : response.fallbackReason === "INSUFFICIENT_KNOWLEDGE" ? "manager" : "fallback");
       return ({ ...response, ...(presentation ? { ...presentation, message: presentation.message } : {}), ...faqMeta, answerSource, kbSectionsUsed, topLevelDomain,
-      classifiedIntent: professional?.intent ?? null,
+      classifiedIntent: professional?.intent ?? faq?.intent ?? null,
       webResearchEligible, webResearchUsed, webResearchIntent: professional?.intent ?? undefined,
       webResearchSourceCount, webResearchDomains, webResearchLatencyMs, webResearchFallbackReason, webResearchProvider,
       webResearchConfigured, webResearchAttempted, webResearchHttpStatus, yandexAiConfigured, yandexSearchConfigured });
@@ -135,12 +140,13 @@ export class ConsultantChatService {
       /рассроч|кредит|отсроч|оплат|частями|график.*плат|платить.*месяц|ежемесяч|перв.*взнос|разбить.*плат|заплатить потом|перенести.*плат|досрочн.*погаш|сколько стоит|стоимость|какая цена|какие цены|цен[аыуеой]|тариф/i.test(facts.question) &&
       !/скидк|акци|индивидуальн|специальн.*цен|конкурент.*дешев|бесплатн/i.test(facts.question);
     const tariffComparisonQuestion = /чем отличаются.*тариф|разниц.*(?:тариф|базов|средн|премиум|час|документ|материал)|(?:средн|премиум|базов).*отлича|что входит.*(?:тариф|базов|средн|премиум)|какой тариф выбрать|почему тарифы|что.*в каждом тариф|сравнить.*тариф|какие тарифы|в каком тариф|тариф.*разные программ/i.test(facts.question);
-    const directFactQuestion = /какой документ|что (?:я )?получу после обуч|можно (?:ли )?начать|когда (?:можно )?начать|что входит|содержан.*программ|как проходит обуч|формат обуч|обучение дистанционное|онлайн|офлайн|приезжать очно|очн(?:ые|ая|ое|ый).*?(?:занят|встреч|посещ)|другого города|другой страны|посещать институт|обучение дома|своем темпе|своём темпе|есть практика|практическ.*задани|сколько длится|продолжительность/i.test(facts.question);
+    const directFactQuestion = /какой документ|что (?:я )?получу после обуч|можно (?:ли )?начать|когда (?:можно )?начать|что входит|содержан.*программ|как проходит (?:обуч|учеб)|как устроен.*(?:обуч|учеб)|как (?:я )?(?:буду )?учиться|формат обуч|обучение дистанционное|онлайн|офлайн|приезжать очно|очн(?:ые|ая|ое|ый).*?(?:занят|встреч|посещ)|другого города|другой страны|посещать институт|обучение дома|своем темпе|своём темпе|есть практика|практическ.*задани|сколько длится|продолжительность/i.test(facts.question);
     const policyMatrixQuestion = /как (?:записаться|поступить|попасть|оформить)|куда записываться|что делать дальше|скидк|промокод|акци|возврат|вернуть деньги|ближайш.*(?:старт|поток)|расписан|срок.*доступ|что такое.*(?:при[её]мк|строительн.*контрол)|что выбрать.*(?:стройэксперт|при[её]мк)|судебн.*эксперт|конкретн.*суд|(?:^|\s)сро(?:\s|[?.!,]|$)|гарант.*(?:работ|доход|заказ)|сколько.*час|чему учат/i.test(facts.question);
     const managerContactQuestion = /как со мной свяж|как связаться.*менеджер|свяжется менеджер/i.test(facts.question);
     if (!professional?.mixedProductAndProfessional &&
       (tariffComparisonQuestion || commercialQuestion || managerContactQuestion || directFactQuestion || policyMatrixQuestion)) return respond({
-      message: consultantFallback(facts, markdown), isAI: false, provider: "fallback",
+      message: faq?.policy === "KB" && faq.intent === "format_online_offline" ? faq.answer : consultantFallback(facts, markdown),
+      isAI: false, provider: "fallback",
       matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null,
     });
     const unknown = facts.matchedSections.every(section => ["faq", "manager"].includes(section.id));

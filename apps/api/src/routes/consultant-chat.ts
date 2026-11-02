@@ -65,6 +65,8 @@ router.post("/consultant-chat", async (req, res): Promise<void> => {
         webResearchHttpStatus: response.webResearchHttpStatus, yandexAiConfigured: response.yandexAiConfigured,
         yandexSearchConfigured: response.yandexSearchConfigured,
         professionalAnswerDepth: response.professionalAnswerDepth, explicitSourceRequest: response.explicitSourceRequest,
+        normativeReferenceRequest: response.normativeReferenceRequest,
+        explicitSourceLinkRequest: response.explicitSourceLinkRequest,
         sourcesHiddenFromUser: response.sourcesHiddenFromUser, sourcesShownCount: response.sourcesShownCount,
         webRawSourceCount: response.webRawSourceCount };
       const sourceMeta = { answerSource: response.answerSource, faqMatchUsed: response.faqMatchUsed,

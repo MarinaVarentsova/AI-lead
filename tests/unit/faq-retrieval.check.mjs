@@ -43,7 +43,7 @@ try {
   const variants = [
     ["tariff_comparison", ["За что доплата между пакетами обучения", "Сопоставьте комплектации тарифов", "Почему учебные пакеты стоят по-разному", "Что добавляется в дорогих тарифах", "Разложите различия пакетов по пунктам"]],
     ["financing", ["Получится оплатить курс частями", "Есть банковский кредит на обучение", "Как устроены платежи в рассрочку", "Можно перенести оплату на потом", "Предусмотрена отсрочка платежа"]],
-    ["format_online_offline", ["Мне обязательно приезжать на занятия", "Смогу учиться полностью из дома", "Курс проходит очно или удаленно", "Нужно посещать институт лично", "Доступен дистанционный вариант"]],
+    ["format_online_offline", ["Мне обязательно приезжать на занятия", "Смогу учиться полностью из дома", "Курс проходит очно или удаленно", "Нужно посещать институт лично", "Доступен дистанционный вариант", "Как проходит обучение?", "Как проходит учеба?", "Как устроен процесс обучения?", "Как я буду учиться?", "В каком формате проходит обучение?"]],
     ["documents", ["Какую бумагу выдадут после выпуска", "Диплом появится во ФРДО", "Чем подтверждается квалификация", "Какой итоговый документ получу", "Выдается ли диплом о переподготовке"]],
     ["enrollment", ["Куда нажать чтобы оформить обучение", "Как подать заявку на курс", "Хочу записаться что делать", "Как происходит поступление", "Кто поможет оформить зачисление"]],
     ["promo", ["Есть сейчас промокод на обучение", "Можно получить скидку", "Какие акции действуют", "Предусмотрена специальная цена", "Есть льготное предложение"]],
@@ -58,7 +58,7 @@ try {
     assert.equal(facts.faqMatch?.intent, intent, question); const reply = await runtime.reply(facts, []);
     assert.equal(reply.faqMatchUsed, true); assert.notEqual(reply.fallbackReason, "INSUFFICIENT_KNOWLEDGE"); checked++;
   }
-  assert.equal(checked, 50);
+  assert.equal(checked, 55);
 
   const changed = createArtemRuntime(markdown, provider, [...faq.slice(0, -1), { ...faq.at(-1), answer: faq.at(-1).answer + " обновлено" }]);
   assert.notEqual(runtime.resolver.resolve({ question: "Сколько стоит?" }).sourceVersion,
@@ -67,5 +67,5 @@ try {
     question: "Назовите цену", answer: "Стоимость — 123 456 ₽.", kbReference: "§12" }]);
   const conflictFacts = conflicting.prepare(answers, "Назовите цену"); const conflictReply = await conflicting.reply(conflictFacts, []);
   assert.doesNotMatch(conflictReply.message, /123\s*456/);
-  console.log("PASS A-N: FAQ exact/paraphrase/threshold/reference/policy/context/conflict, shared runtime and 50 paraphrases.");
+  console.log("PASS A-N: FAQ exact/paraphrase/threshold/reference/policy/context/conflict, shared runtime and 55 paraphrases.");
 } finally { hooks.deregister(); }

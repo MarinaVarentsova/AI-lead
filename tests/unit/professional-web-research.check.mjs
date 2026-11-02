@@ -23,7 +23,8 @@ const hooks = registerHooks({
 
 try {
   const { createArtemRuntime, loadArtemKnowledge, loadArtemFaq } = await import(new URL("apps/api/src/ai/artem-runtime.ts", root));
-  const { ConsultantChatService, isExplicitSourceRequest, professionalAnswerDepth, postProcessProfessionalAnswer } =
+  const { ConsultantChatService, isExplicitSourceRequest, isExplicitSourceLinkRequest,
+    isNormativeReferenceRequest, professionalAnswerDepth, postProcessProfessionalAnswer } =
     await import(new URL("apps/api/src/ai/consultant-chat.service.ts", root));
   const { classifyProfessionalIntent } = await import(new URL("packages/domain/src/consultant/professional-intent.ts", root));
   const { YandexProfessionalWebResearchService, YandexSearchProvider, parseYandexSearchXml } = await import(new URL("apps/api/src/ai/professional-web-research.ts", root));
@@ -111,7 +112,21 @@ try {
   const offTopic = await runtime.reply(runtime.prepare(answers, "Как приготовить борщ?", history), history);
   assert.equal(calls.length, offTopicBefore); assert.equal(offTopic.webResearchEligible, false);
   assert.equal(offTopic.topLevelDomain, "OTHER");
+  for (const question of ["Как проходит обучение?", "Как я буду учиться?", "Это онлайн или надо приезжать?"]) {
+    const before = calls.length; const training = await runtime.reply(runtime.prepare(answers, question, history), history);
+    assert.equal(training.topLevelDomain, "PRODUCT", question);
+    assert.equal(training.classifiedIntent, "format_online_offline", question);
+    assert.equal(training.faqMatchUsed, true, question); assert.equal(training.webResearchEligible, false, question);
+    assert.equal(training.webResearchAttempted, false, question); assert.equal(calls.length, before, question);
+    assert.match(training.message, /дистанцион|образовательн.*платформ/iu, question);
+    assert.doesNotMatch(training.message, /менеджер|https?:\/\//iu, question);
+  }
   assert.equal(isExplicitSourceRequest("Дай источник по прочности бетона"), true);
+  assert.equal(isExplicitSourceLinkRequest("Дай ссылку на действующий СП"), true);
+  assert.equal(isExplicitSourceLinkRequest("Где это написано?"), true);
+  assert.equal(isExplicitSourceLinkRequest("Какой СП применяется при обследовании?"), false);
+  assert.equal(isNormativeReferenceRequest("Какой СП применяется при обследовании?"), true);
+  assert.equal(isNormativeReferenceRequest("Какой ГОСТ регулирует это?"), true);
   assert.equal(isExplicitSourceRequest("Почему появляются трещины?"), false);
   assert.equal(professionalAnswerDepth("Расскажите подробнее про методы"), "detailed");
   assert.equal(professionalAnswerDepth("Какими методами определяют прочность бетона?"), "concise");
@@ -129,6 +144,8 @@ try {
     professional: { intent: null, professionalWebEligible: false, webForbidden: false,
       mixedProductAndProfessional: false, freshnessRequired: false, kbSufficient: false } });
   assert.equal(faqTrace.faqMatchUsed, true); assert.equal(faqTrace.answerSource, "faq");
+  assert.equal(faqTrace.topLevelDomain, "PRODUCT"); assert.equal(faqTrace.classifiedIntent, "format_online_offline");
+  assert.equal(faqTrace.webResearchEligible, false); assert.equal(faqTrace.webResearchAttempted, false);
   const kbOnlyRuntime = createArtemRuntime(markdown, sourceOnlyProvider, [], web);
   const kbTrace = await kbOnlyRuntime.reply(kbOnlyRuntime.prepare(answers, "Что даст программа проектировщику?", history), history);
   assert.equal(kbTrace.faqMatchUsed, false); assert.equal(kbTrace.answerSource, "kb"); assert.ok(kbTrace.kbSectionsUsed.length);
@@ -160,11 +177,25 @@ try {
   assert.equal(concise.sourcesHiddenFromUser, true); assert.equal(concise.sourcesShownCount, 0);
   assert.doesNotMatch(concise.message, /https?:\/\/|Источники|Картинки|менеджер/iu);
   assert.ok((concise.message.match(/[.!?]/g) ?? []).length <= 5);
+  const normativeQuestion = "Какой СП применяется при обследовании строительных конструкций?";
+  const normative = await presentationRuntime.reply(presentationRuntime.prepare(answers, normativeQuestion, history), history);
+  assert.equal(normative.normativeReferenceRequest, true); assert.equal(normative.explicitSourceLinkRequest, false);
+  assert.equal(normative.sourcesShownCount, 0); assert.doesNotMatch(normative.message, /https?:\/\/|Источники/iu);
   const sourcedQuestion = "Дай источник по методам определения прочности бетона";
   const sourced = await presentationRuntime.reply(presentationRuntime.prepare(answers, sourcedQuestion, history), history);
   assert.equal(sourced.explicitSourceRequest, true); assert.equal(sourced.sourcesShownCount, 1);
+  assert.equal(sourced.explicitSourceLinkRequest, true);
   assert.match(sourced.message, /Источники:\n— Официальный нормативный источник — https:\/\/publication\.pravo\.gov\.ru/);
   assert.doesNotMatch(sourced.message, /yandex\.ru\/images|Картинки/iu);
+  const sourceFollowUpHistory = [
+    { role: "user", message: normativeQuestion },
+    { role: "assistant", message: "Норматив нужно проверять по актуальной редакции." },
+  ];
+  const sourceFollowUp = await presentationRuntime.reply(
+    presentationRuntime.prepare(answers, "Где это написано?", sourceFollowUpHistory), sourceFollowUpHistory);
+  assert.equal(sourceFollowUp.classifiedIntent, "professional_regulations");
+  assert.equal(sourceFollowUp.explicitSourceLinkRequest, true); assert.equal(sourceFollowUp.sourcesShownCount, 1);
+  assert.match(sourceFollowUp.message, /https:\/\/publication\.pravo\.gov\.ru/);
   const detailedQuestion = "Расскажи подробнее про методы определения прочности бетона";
   const detailed = await presentationRuntime.reply(presentationRuntime.prepare(answers, detailedQuestion, history), history);
   assert.equal(detailed.professionalAnswerDepth, "detailed"); assert.equal(detailed.explicitSourceRequest, false);
@@ -238,6 +269,7 @@ try {
     "webResearchDomains", "webResearchLatencyMs", "webResearchFallbackReason", "webResearchProvider",
     "answerSource", "faqMatchUsed", "kbSectionsUsed", "topLevelDomain", "classifiedIntent",
     "webResearchConfigured", "webResearchAttempted", "professionalAnswerDepth", "explicitSourceRequest",
+    "normativeReferenceRequest", "explicitSourceLinkRequest",
     "sourcesHiddenFromUser", "sourcesShownCount", "webRawSourceCount"]) assert.ok(routeSource.includes(field));
   const { createProfessionalWebHealthHandler } = await import(new URL("apps/api/src/routes/professional-web-health.ts", root));
   let healthBody;

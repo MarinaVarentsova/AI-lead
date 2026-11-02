@@ -31,5 +31,6 @@ export interface ConsultantChatResponse {
   classifiedIntent?: string | null; webResearchConfigured?: boolean; webResearchAttempted?: boolean;
   yandexAiConfigured?: boolean; yandexSearchConfigured?: boolean; webResearchHttpStatus?: number | null;
   professionalAnswerDepth?: "concise" | "detailed"; explicitSourceRequest?: boolean;
+  normativeReferenceRequest?: boolean; explicitSourceLinkRequest?: boolean;
   sourcesHiddenFromUser?: boolean; sourcesShownCount?: number; webRawSourceCount?: number;
 }

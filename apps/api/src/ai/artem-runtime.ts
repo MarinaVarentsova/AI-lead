@@ -1,6 +1,6 @@
 import { DiagnosticKnowledgeResolver, type DiagnosticAnswers } from "@workspace/domain/diagnostic";
 import { ConsultantKnowledgeResolver, classifyProfessionalIntent, type FaqEntry } from "@workspace/domain/consultant";
-import { ConsultantChatService, guardInternalKnowledgeDisclosure } from "./consultant-chat.service";
+import { ConsultantChatService, guardInternalKnowledgeDisclosure, isExplicitSourceLinkRequest } from "./consultant-chat.service";
 import { DiagnosticResultService } from "./diagnostic-result.service";
 import { YandexAIProvider } from "./yandex-provider";
 import { applyConsultantFunnel, type ConsultantExchange } from "./consultant-funnel";
@@ -35,7 +35,14 @@ export function createArtemRuntime(markdown: string, provider = new YandexAIProv
       }
       const diagnostic = DiagnosticKnowledgeResolver.resolve(effective);
       const diagnosticTrack = diagnosticProgram(DiagnosticKnowledgeResolver.buildFactsPacket(diagnostic));
-      const program = classifyProfessionalIntent(question).professionalWebEligible ? diagnosticTrack :
+      const currentProfessional = classifyProfessionalIntent(question);
+      const previousProfessionalQuestion = isExplicitSourceLinkRequest(question)
+        ? [...history].reverse().find(turn => turn.role === "user" && classifyProfessionalIntent(turn.message).intent)?.message
+        : undefined;
+      const contextualProfessional = previousProfessionalQuestion
+        ? { ...classifyProfessionalIntent(previousProfessionalQuestion), professionalQuery: previousProfessionalQuestion }
+        : currentProfessional;
+      const program = contextualProfessional.professionalWebEligible ? diagnosticTrack :
         currentProgram(diagnosticTrack, question, history);
       const input = consultant.prepare(question, {
         currentArea: diagnostic.answers.currentArea.code,
@@ -45,6 +52,10 @@ export function createArtemRuntime(markdown: string, provider = new YandexAIProv
         recommendedTrack: diagnostic.recommendedTrackHint ?? "not_defined",
         program,
       });
+      if (previousProfessionalQuestion) input.professional = {
+        ...contextualProfessional,
+        kbSufficient: input.professional?.kbSufficient ?? false,
+      };
       // Only redacted history and education context reach the external provider.
       input.history = history;
       input.diagnosticContext += "\nСтатус образования: " + effective.education_status;
