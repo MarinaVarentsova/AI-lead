@@ -168,7 +168,10 @@ export class ConsultantKnowledgeResolver {
       }
     }
     const known = Object.entries(diagnostic).filter(([, value]) => value !== undefined).map(([key, value]) => `${key}=${value}`).join("; ");
-    const requiredCoverage = selected.some(item => item.reason.includes("required_related_rule"));
+    const productOnlySections = new Set(["prices", "financing", "documents", "admission", "start", "guarantees",
+      "employment", "orders", "comparison", "school_restriction", "apartment_acceptance", "house_acceptance", "house_control"]);
+    const requiredCoverage = selected.some(item => item.reason.includes("required_related_rule") &&
+      (!professionalIntent.professionalWebEligible || !productOnlySections.has(item.section.id)));
     // FAQ1200 is a product/client corpus. A lexical FAQ match cannot by itself
     // claim coverage of a professional theory question.
     const kbSufficient = requiredCoverage || (!professionalIntent.professionalWebEligible &&

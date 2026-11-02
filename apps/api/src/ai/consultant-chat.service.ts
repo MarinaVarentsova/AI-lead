@@ -17,6 +17,7 @@ const OFF_TOPIC_REPLY = "Похоже, мы ушли от темы обучен�
 const ABUSIVE_REPLY = "Давайте вернёмся к теме обучения. Я помогу выбрать подходящую программу и разобраться в условиях.";
 const MANAGER_REFERRAL = "Для точного ответа по этому вопросу лучше связаться с менеджером — он подскажет актуальные условия. Воспользуйтесь кнопкой «Связаться с менеджером».";
 const FRESHNESS_UNAVAILABLE_REPLY = "Для точного ответа о действующей редакции СП требуется проверить официальный источник. Без такой проверки не буду называть конкретный норматив как актуальный.";
+const PROFESSIONAL_SOURCE_UNAVAILABLE_REPLY = "Без проверки профессиональных источников не буду утверждать точный предметный ответ. Могу помочь по подтверждённым условиям обучения или вернуться к этому профессиональному вопросу после проверки источника.";
 
 const INTERNAL_KNOWLEDGE_DISCLOSURE = /(?:в|по)\s+(?:(?:моей|нашей|доступной\s+мне)\s+)?(?:баз[аеы](?:\s+знаний)?|источник(?:ах|е|и)?|знаниях)[^.!?]{0,140}(?:нет|отсутств|не\s+(?:указан\w*|зафиксирован\w*|подтвержд[её]н\w*|описан\w*|найден\w*|могу\s+подтвердить))|у\s+меня\s+нет[^.!?]{0,80}(?:в\s+)?источник|я\s+не\s+наш[её]л[^.!?]{0,80}(?:в\s+)?баз/iu;
 
@@ -70,8 +71,7 @@ export class ConsultantChatService {
     const faq = facts.faqMatch;
     const professional = facts.professional;
     const webResearchEligible = Boolean(professional?.professionalWebEligible);
-    const shouldAttemptWebResearch = Boolean(webResearchEligible &&
-      (!professional?.kbSufficient || professional.mixedProductAndProfessional));
+    const shouldAttemptWebResearch = Boolean(webResearchEligible && !professional?.kbSufficient);
     let webResearchUsed = false; let webResearchSourceCount = 0; let webResearchDomains: string[] = [];
     let webResearchLatencyMs = 0; let webResearchFallbackReason: string | null =
       webResearchEligible && !shouldAttemptWebResearch ? "kb_sufficient" : null;
@@ -104,7 +104,8 @@ export class ConsultantChatService {
     const directFactQuestion = /какой документ|что (?:я )?получу после обуч|можно (?:ли )?начать|когда (?:можно )?начать|что входит|содержан.*программ|как проходит обуч|формат обуч|обучение дистанционное|онлайн|офлайн|приезжать очно|очн(?:ые|ая|ое|ый).*?(?:занят|встреч|посещ)|другого города|другой страны|посещать институт|обучение дома|своем темпе|своём темпе|есть практика|практическ.*задани|сколько длится|продолжительность/i.test(facts.question);
     const policyMatrixQuestion = /как (?:записаться|поступить|попасть|оформить)|куда записываться|что делать дальше|скидк|промокод|акци|возврат|вернуть деньги|ближайш.*(?:старт|поток)|расписан|срок.*доступ|что такое.*(?:при[её]мк|строительн.*контрол)|что выбрать.*(?:стройэксперт|при[её]мк)|судебн.*эксперт|конкретн.*суд|(?:^|\s)сро(?:\s|[?.!,]|$)|гарант.*(?:работ|доход|заказ)|сколько.*час|чему учат/i.test(facts.question);
     const managerContactQuestion = /как со мной свяж|как связаться.*менеджер|свяжется менеджер/i.test(facts.question);
-    if (tariffComparisonQuestion || commercialQuestion || managerContactQuestion || directFactQuestion || policyMatrixQuestion) return respond({
+    if (!professional?.mixedProductAndProfessional &&
+      (tariffComparisonQuestion || commercialQuestion || managerContactQuestion || directFactQuestion || policyMatrixQuestion)) return respond({
       message: consultantFallback(facts, markdown), isAI: false, provider: "fallback",
       matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null,
     });
@@ -123,9 +124,7 @@ export class ConsultantChatService {
       let providerFacts = facts;
       let webSources: Awaited<ReturnType<ProfessionalWebResearchService["research"]>>["sources"] = [];
       if (shouldAttemptWebResearch && professional?.intent) {
-        const researchQuery = professional.mixedProductAndProfessional
-          ? facts.question.split(/(?:и вообще|а почему|при этом)/iu).at(-1)?.trim() || facts.question
-          : facts.question;
+        const researchQuery = professional.professionalQuery ?? facts.question;
         const researched = await this.webResearch.research(researchQuery, professional.intent, professional.freshnessRequired);
         webResearchLatencyMs = researched.latencyMs; webResearchFallbackReason = researched.fallbackReason;
         webResearchAttempted = researched.attempted ?? researched.fallbackReason !== "not_configured";
@@ -142,6 +141,12 @@ export class ConsultantChatService {
           message: FRESHNESS_UNAVAILABLE_REPLY, isAI: false, provider: "fallback",
           matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null, answerSource: "fallback",
         });
+        if (!webResearchUsed) {
+          const knownProductPart = professional.mixedProductAndProfessional ? consultantFallback(facts, markdown) : "";
+          return respond({ message: [knownProductPart, PROFESSIONAL_SOURCE_UNAVAILABLE_REPLY].filter(Boolean).join("\n\n"),
+            isAI: false, provider: "fallback", matchedSectionIds: facts.matchedSections.map(section => section.id),
+            fallbackReason: null, answerSource: professional.mixedProductAndProfessional ? "mixed" : "fallback" });
+        }
       }
       let message = await this.provider.generateConsultantReply(selectConsultantInput(providerFacts));
       if (webResearchUsed) message = `${message.trim()}\n\nИсточники:\n${webSources.map(source => `— ${source.title} — ${source.url}`).join("\n")}`;

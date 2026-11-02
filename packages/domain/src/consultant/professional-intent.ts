@@ -9,7 +9,7 @@ export type ProfessionalWebIntent =
   | "professional_methodology"
   | "professional_terminology";
 
-export const PROFESSIONAL_WEB_POLICY_VERSION = "yandexweb1" as const;
+export const PROFESSIONAL_WEB_POLICY_VERSION = "yandexweb2" as const;
 
 export interface ProfessionalIntentResult {
   intent: ProfessionalWebIntent | null;
@@ -17,10 +17,12 @@ export interface ProfessionalIntentResult {
   webForbidden: boolean;
   mixedProductAndProfessional: boolean;
   freshnessRequired: boolean;
+  professionalQuery: string | null;
 }
 
-const PRODUCT = /(?:курс|программ|обучен|инобр|стройэксперт|тариф|цен|стоим|скидк|промокод|акци|рассроч|кредит|отсроч|возврат|диплом|удостоверен|сертификат|час(?:ов|а)?|поступ|запис|старт|расписан|доступ к материал|договор|getcourse|премиум|средний|базовый)/iu;
-const STRICT_COMMERCIAL = /(?:тариф|цен|стоим|скидк|промокод|акци|рассроч|кредит|отсроч|возврат|запис|старт|расписан|доступ к материал|договор|getcourse|диплом|удостоверен|сертификат|что входит в (?:курс|программ)|час(?:ов|а)? обучения)/iu;
+const PRODUCT = /(?:курс|программ|обучен|инобр|стройэксперт|тариф|цен|стоим|скидк|промокод|акци|рассроч|кредит|отсроч|возврат|диплом|удостоверен|сертификат|(?:^|\s)час(?:ов|а)?(?:\s|[?.!,]|$)|поступ|запис|старт|расписан|доступ к материал|договор|getcourse|премиум|средний|базовый)/iu;
+const STRICT_COMMERCIAL = /(?:тариф|цен|стоим|скидк|промокод|акци|рассроч|кредит|отсроч|возврат|запис|старт|расписан|доступ к материал|договор|getcourse|диплом|удостоверен|сертификат|что входит в (?:курс|программ)|(?:^|\s)час(?:ов|а)? обучения)/iu;
+const PRODUCT_CLAUSE = /курс|программ|обучен|инобр|стройэксперт|тариф|цен|стоим|скидк|промокод|акци|рассроч|кредит|оплат|возврат|расписан|дата старт|документ после|диплом|удостоверен|сертификат/iu;
 const CASE_SPECIFIC = /(?:в мо[её]м|на мо[её]м|конкретн(?:ое|ом|ого))\s+(?:дел|объект|дом|квартир|заключен)|кто виноват|точн(?:ая|ую) причин|составь заключен|дай окончательн.*вывод/iu;
 
 const INTENTS: readonly [ProfessionalWebIntent, RegExp][] = [
@@ -35,12 +37,26 @@ const INTENTS: readonly [ProfessionalWebIntent, RegExp][] = [
   ["professional_terminology", /(?:что означает|чем отличается|определение|термин|понятие).*(?:дефект|поврежден|разрушен|экспертиз|обследован)/iu],
 ];
 
+function detectedIntent(value: string): ProfessionalWebIntent | null {
+  return INTENTS.find(([, pattern]) => pattern.test(value))?.[0] ?? null;
+}
+
+/** Server-side separation: only a standalone professional clause may reach external search. */
+export function professionalWebQuery(question: string): string | null {
+  const clauses = question.trim().split(/(?:[;!?]\s*|,\s+(?=(?:и|а|но)\s)|\s+(?:и|а)\s+(?=(?:вообще\s+)?(?:как|почему|какими|какой|какая|какие|что|чем)))/iu)
+    .map(part => part.replace(/^(?:и|а|но|вообще)\s+/iu, "").trim()).filter(Boolean);
+  const professional = clauses.filter(clause => detectedIntent(clause.toLowerCase().replace(/ё/g, "е")) && !PRODUCT_CLAUSE.test(clause));
+  return professional.length ? professional.join("; ").slice(0, 400) : null;
+}
+
 export function classifyProfessionalIntent(question: string): ProfessionalIntentResult {
   const normalized = question.trim().toLowerCase().replace(/ё/g, "е");
-  const intent = INTENTS.find(([, pattern]) => pattern.test(normalized))?.[0] ?? null;
+  const intent = detectedIntent(normalized);
   const product = PRODUCT.test(normalized);
   const professional = intent !== null;
-  const mixedProductAndProfessional = product && professional && /(?:и вообще|а почему|почему|как именно|при этом)/iu.test(normalized);
+  const separatedProfessionalQuery = professionalWebQuery(question);
+  const mixedProductAndProfessional = Boolean(product && professional && separatedProfessionalQuery &&
+    separatedProfessionalQuery.toLowerCase().replace(/ё/g, "е") !== normalized);
   const webForbidden = intent !== "professional_cost_estimation" && STRICT_COMMERCIAL.test(normalized) && !mixedProductAndProfessional;
   return {
     intent,
@@ -48,5 +64,6 @@ export function classifyProfessionalIntent(question: string): ProfessionalIntent
     webForbidden,
     mixedProductAndProfessional,
     freshnessRequired: intent === "professional_regulations",
+    professionalQuery: mixedProductAndProfessional ? separatedProfessionalQuery : professional && !webForbidden ? question.trim() : null,
   };
 }

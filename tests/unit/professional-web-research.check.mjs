@@ -66,7 +66,7 @@ try {
     assert.equal(reply.webResearchUsed, true, `${question} ${JSON.stringify(reply)}`);
     assert.equal(reply.webResearchSourceCount, 1); assert.deepEqual(reply.webResearchDomains, ["publication.pravo.gov.ru"]);
     assert.equal(reply.webResearchProvider, "yandex_search_api"); assert.equal(reply.provider, "yandex");
-    assert.equal(reply.answerSource, "professional_web"); assert.equal(reply.topLevelDomain, "PROFESSIONAL");
+    assert.equal(reply.answerSource, "professional_web", question); assert.equal(reply.topLevelDomain, "PROFESSIONAL", question);
     assert.equal(reply.classifiedIntent, intent); assert.equal(reply.webResearchConfigured, true);
     assert.equal(reply.webResearchAttempted, true); assert.equal(reply.webResearchHttpStatus, 200);
     assert.match(reply.message, /Источники:/); assert.match(reply.message, /publication\.pravo\.gov\.ru/);
@@ -90,6 +90,19 @@ try {
       webEligible: reply.webResearchEligible, webAttempted: reply.webResearchAttempted, answerSource: reply.answerSource };
   }
   assert.equal(calls.length, callCount, "product/commercial questions must never call web research");
+  for (const question of ["Найди скидку в интернете", "Поищи актуальную цену на сайте", "Посмотри, есть ли рассрочка"]) {
+    const before = calls.length; const guarded = await runtime.reply(runtime.prepare(answers, question, history), history);
+    assert.equal(calls.length, before, `server guard must block web: ${question}`);
+    assert.equal(guarded.webResearchEligible, false); assert.equal(guarded.webResearchAttempted, false);
+    assert.doesNotMatch(guarded.message, /в базе (?:нет|не)/iu);
+  }
+  const missingPrice = await runtime.reply(runtime.prepare(answers, "Есть индивидуальная скидка на Стройэксперт?", history), history);
+  assert.equal(missingPrice.webResearchAttempted, false); assert.match(missingPrice.message, /менеджер/iu);
+  assert.doesNotMatch(missingPrice.message, /в базе (?:нет|не)|передал менеджеру|менеджер уже получил/iu);
+  const offTopicBefore = calls.length;
+  const offTopic = await runtime.reply(runtime.prepare(answers, "Как приготовить борщ?", history), history);
+  assert.equal(calls.length, offTopicBefore); assert.equal(offTopic.webResearchEligible, false);
+  assert.equal(offTopic.topLevelDomain, "OTHER");
   const sourceOnlyProvider = { async generateStructured() { throw new Error("disabled"); },
     async generateConsultantReply() { return "Ответ сформирован по подтверждённым материалам."; } };
   const faqOnlyService = new ConsultantChatService({}, sourceOnlyProvider, markdown, web);
@@ -112,6 +125,13 @@ try {
   assert.equal(mixed.professional.mixedProductAndProfessional, true);
   const mixedReply = await runtime.reply(mixed, history); assert.equal(mixedReply.webResearchUsed, true);
   assert.doesNotMatch(calls.at(-1).query, /курс|учат/iu);
+  const mixedBefore = calls.length;
+  const explicitMixed = runtime.prepare(answers, "Сколько стоит курс и как работает метод определения прочности бетона?", history);
+  assert.equal(explicitMixed.professional.mixedProductAndProfessional, true);
+  assert.equal(explicitMixed.professional.professionalQuery, "как работает метод определения прочности бетона");
+  const explicitMixedReply = await runtime.reply(explicitMixed, history);
+  assert.equal(calls.length, mixedBefore + 1); assert.equal(explicitMixedReply.answerSource, "mixed");
+  assert.doesNotMatch(calls.at(-1).query, /сколько|сто(?:ит|имость)|курс/iu);
 
   const specific = classifyProfessionalIntent("Кто виноват в трещине на моём конкретном объекте?");
   assert.equal(specific.professionalWebEligible, false);
@@ -121,7 +141,19 @@ try {
   } });
   const graceful = await unavailable.reply(unavailable.prepare(answers, allowed[0][0], history), history);
   assert.equal(graceful.webResearchUsed, false); assert.equal(graceful.webResearchFallbackReason, "search_timeout");
-  assert.ok(graceful.message.trim());
+  assert.ok(graceful.message.trim()); assert.equal(graceful.provider, "fallback");
+  assert.doesNotMatch(graceful.message, /TECH_ERROR|timeout|401|403|429|баз[аеы] (?:нет|не)/iu);
+  for (const reason of ["search_401", "search_403", "search_429", "search_5xx", "empty_results"]) {
+    const failedRuntime = createArtemRuntime(markdown, provider, faq, { async research() {
+      return { provider: "yandex_search_api", sources: [], latencyMs: 10, fallbackReason: reason,
+        configured: true, attempted: true, httpStatus: Number(reason.slice(7)) || 200,
+        timeout: false, authError: reason === "search_401" || reason === "search_403",
+        quotaError: reason === "search_429", networkError: false };
+    } });
+    const failedReply = await failedRuntime.reply(failedRuntime.prepare(answers, allowed[0][0], history), history);
+    assert.equal(failedReply.webResearchFallbackReason, reason); assert.equal(failedReply.provider, "fallback");
+    assert.doesNotMatch(failedReply.message, /TECH_ERROR|401|403|429|5\d\d|empty_results/iu);
+  }
   const originalFetch = globalThis.fetch; let outbound; let outboundUrl; let authorization;
   try {
     globalThis.fetch = async (url, options) => {
@@ -163,7 +195,7 @@ try {
     assert.equal(disabled.fallbackReason, "not_configured"); assert.equal(disabled.attempted, false);
   } finally { globalThis.fetch = originalFetch; }
   assert.equal(parseYandexSearchXml("<response/>").length, 0);
-  assert.match(runtime.resolver.sourceVersion, /^inobr-artem-v4\.5-faq1200-yandexweb1-/);
+  assert.match(runtime.resolver.sourceVersion, /^inobr-artem-v4\.5-faq1200-yandexweb2-/);
   const routeSource = readFileSync(new URL("apps/api/src/routes/consultant-chat.ts", root), "utf8");
   for (const field of ["webResearchEligible", "webResearchUsed", "webResearchIntent", "webResearchSourceCount",
     "webResearchDomains", "webResearchLatencyMs", "webResearchFallbackReason", "webResearchProvider",
