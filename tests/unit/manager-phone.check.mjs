@@ -7,13 +7,14 @@ const require = createRequire(new URL("package.json", root));
 const ts = require("typescript");
 const apiModule = "data:text/javascript;base64," + Buffer.from(`
   export async function apiFetch() { throw new Error("not used"); }
+  export function apiUrl(path) { return path; }
 `).toString("base64");
 const source = readFileSync(new URL("apps/web/src/lib/manager-form.ts", root), "utf8")
   .replace('"./api"', JSON.stringify(apiModule));
 const compiled = ts.transpileModule(source, { compilerOptions: {
   module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022,
 } }).outputText;
-const { isManagerPhoneValid } = await import(
+const { isManagerPhoneValid, isManagerFormOriginAllowed } = await import(
   "data:text/javascript;base64," + Buffer.from(compiled).toString("base64")
 );
 
@@ -40,5 +41,9 @@ assert.match(source, /addEventListener\("countrychange"/);
 assert.match(source, /if \(validate\(\)\) return;[\s\S]*event\.preventDefault\(\)/);
 assert.match(source, /setCustomValidity\(valid \? "" : "Введите корректный номер телефона"\)/);
 assert.match(source, /instance\.isValidNumber\(\)/);
+
+assert.equal(isManagerFormOriginAllowed("https://artem.inobr-expert.ru"), true);
+assert.equal(isManagerFormOriginAllowed("https://inobr-assistant.161.104.50.164.sslip.io"), true);
+assert.equal(isManagerFormOriginAllowed("https://attacker.example"), false);
 
 console.log("PASS A-H: RU +7 default, exact 10-digit validation, country-aware intlTelInput and submit blocking.");

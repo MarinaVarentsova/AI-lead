@@ -25,6 +25,7 @@ const hooks = registerHooks({
 try {
   const { formatGetCourseManagerComment, loadGetCourseManagerWidget, serializeGetCourseWidgetBody,
     submitGetCourseWidgetBody, localizeGetCourseCookies, getCourseCookieHeader, normalizeGetCoursePhone,
+    allowedManagerFormOrigin,
     GETCOURSE_ACTION_FIELD, GETCOURSE_CANONICAL_PHONE_FIELD, GETCOURSE_ENDPOINT, GETCOURSE_WIDGET_ENDPOINT } =
     await import(new URL("apps/api/src/services/getcourse-manager-form.ts", root));
   const context = { sessionId: "11111111-1111-4111-8111-111111111111", recommendedProgram: "Стройэксперт",
@@ -37,6 +38,10 @@ try {
     artemEntrySource: "artem_web", artemEntryContent: "diagnostic_question_01",
     managerCtaSource: "recommendation", managerCtaContent: "manager_contact_button" };
   const comment = formatGetCourseManagerComment(context);
+  assert.equal(allowedManagerFormOrigin("https://artem.inobr-expert.ru/path"), "https://artem.inobr-expert.ru");
+  assert.equal(allowedManagerFormOrigin("https://inobr-assistant.161.104.50.164.sslip.io/tester"),
+    "https://inobr-assistant.161.104.50.164.sslip.io");
+  assert.equal(allowedManagerFormOrigin("https://attacker.example"), null);
   assert.match(comment, /Источник обращения:\n\nUTM source: yandex/);
   assert.match(comment, /UTM medium: cpc/); assert.match(comment, /UTM campaign: stroiexpert/);
   assert.match(comment, /UTM content: hero/); assert.match(comment, /UTM term: expert/);
@@ -78,9 +83,16 @@ try {
   assert.match(html, /Я соглашаюсь на получение рекламных рассылок/);
   assert.match(html, /form\.addEventListener\("submit",validate,true\)/);
   assert.match(html, /event\.stopImmediatePropagation\(\)/);
+  assert.match(html, /postMessage[\s\S]*"https:\/\/artem\.inobr-expert\.ru"/);
   assert.match(html, /\[data-id="22041910"\]\{display:none!important\}/);
   assert.ok(trace.some(item => item.stage === "getcourse_widget_fetch_success" && item.formFound));
   assert.ok(trace.some(item => item.stage === "getcourse_fields_resolved" && item.dialogue22041910));
+  const testerWidget = await loadGetCourseManagerWidget({ sessionId: context.sessionId,
+    managerFormRequestId: "44444444-4444-4444-8444-444444444444",
+    sourceUrl: "https://inobr-assistant.161.104.50.164.sslip.io/tester", referrer: "" }, comment,
+  async () => new Response(widgetFixture, { headers: { "content-type": "text/html" } }));
+  assert.match(testerWidget.html,
+    /postMessage[\s\S]*"https:\/\/inobr-assistant\.161\.104\.50\.164\.sslip\.io"/);
   const fetchFailureTrace = [];
   await assert.rejects(() => loadGetCourseManagerWidget({ sessionId: context.sessionId,
     managerFormRequestId: "33333333-3333-4333-8333-333333333333", sourceUrl: "https://artem.inobr-expert.ru/", referrer: "" },
