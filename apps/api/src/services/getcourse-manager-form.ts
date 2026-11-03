@@ -11,37 +11,50 @@ export const MANAGER_FORM_ALLOWED_ORIGINS = new Set([
   "https://inobr-assistant.161.104.50.164.sslip.io",
 ]);
 export const allowedManagerFormOrigin = (value: string): string | null => {
-  try { const origin = new URL(value).origin; return MANAGER_FORM_ALLOWED_ORIGINS.has(origin) ? origin : null; }
-  catch { return null; }
+  try {
+    const origin = new URL(value).origin;
+    return MANAGER_FORM_ALLOWED_ORIGINS.has(origin) ? origin : null;
+  } catch {
+    return null;
+  }
 };
 export const GETCOURSE_ACTION_FIELD = "__artem_getcourse_action";
 export const MANAGER_FORM_REQUEST_ID_FIELD = "__artem_manager_form_request_id";
-export const GETCOURSE_CANONICAL_PHONE_FIELD = "__artem_getcourse_canonical_phone";
+export const GETCOURSE_CANONICAL_PHONE_FIELD =
+  "__artem_getcourse_canonical_phone";
 
-export type ManagerFormTrace = (stage: string, details?: Record<string, unknown>) => void;
+export type ManagerFormTrace = (
+  stage: string,
+  details?: Record<string, unknown>,
+) => void;
 
 const errorDetails = (error: unknown) => ({
   errorClass: error instanceof Error ? error.name : "UnknownError",
   errorMessage: error instanceof Error ? error.message : String(error),
 });
 
-const sanitizedPreview = (value: string) => value
-  .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[email]")
-  .replace(/\+?\d[\d\s()-]{7,}\d/g, "[phone]")
-  .replace(/([A-Za-z_-]*hash)["'=:\s]+[A-Za-z0-9._-]+/gi, "$1=[redacted]")
-  .replace(/(requestSimpleSign|token|cookie|authorization)["'=:\s]+[^\s"'<>&]+/gi, "$1=[redacted]")
-  .slice(0, 500);
+const sanitizedPreview = (value: string) =>
+  value
+    .replace(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/g, "[email]")
+    .replace(/\+?\d[\d\s()-]{7,}\d/g, "[phone]")
+    .replace(/([A-Za-z_-]*hash)["'=:\s]+[A-Za-z0-9._-]+/gi, "$1=[redacted]")
+    .replace(
+      /(requestSimpleSign|token|cookie|authorization)["'=:\s]+[^\s"'<>&]+/gi,
+      "$1=[redacted]",
+    )
+    .slice(0, 500);
 
-const visibleHtmlText = (value: string) => value
-  .replace(/<(script|style|template)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
-  .replace(/<[^>]+>/g, " ")
-  .replace(/&nbsp;|&#160;/gi, " ")
-  .replace(/&quot;|&#34;/gi, '"')
-  .replace(/&#39;|&apos;/gi, "'")
-  .replace(/&lt;/gi, "<")
-  .replace(/&gt;/gi, ">")
-  .replace(/&amp;/gi, "&")
-  .replace(/\s+/g, " ");
+const visibleHtmlText = (value: string) =>
+  value
+    .replace(/<(script|style|template)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;|&#160;/gi, " ")
+    .replace(/&quot;|&#34;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&amp;/gi, "&")
+    .replace(/\s+/g, " ");
 
 export interface GetCourseResponseAnalysis {
   successDetected: boolean;
@@ -51,11 +64,16 @@ export interface GetCourseResponseAnalysis {
   responseFormat: "json" | "html" | "text";
 }
 
-export function analyzeGetCourseResponse(response: Response, responseText: string): GetCourseResponseAnalysis {
+export function analyzeGetCourseResponse(
+  response: Response,
+  responseText: string,
+): GetCourseResponseAnalysis {
   let success: boolean | undefined;
   let formProcessed: boolean | undefined;
   let responseFormat: GetCourseResponseAnalysis["responseFormat"] =
-    /text\/html/i.test(response.headers.get("content-type") ?? "") ? "html" : "text";
+    /text\/html/i.test(response.headers.get("content-type") ?? "")
+      ? "html"
+      : "text";
   let parsedJson = false;
   let structuredErrorText = "";
   try {
@@ -67,22 +85,53 @@ export function analyzeGetCourseResponse(response: Response, responseText: strin
     parsedJson = true;
     responseFormat = "json";
     success = typeof result.success === "boolean" ? result.success : undefined;
-    formProcessed = typeof result.data?.formProcessed === "boolean" ? result.data.formProcessed : undefined;
-    structuredErrorText = [result.error, result.data?.error].filter(value => typeof value === "string").join(" ");
-  } catch { /* A native GetCourse HTML response is valid and handled below. */ }
+    formProcessed =
+      typeof result.data?.formProcessed === "boolean"
+        ? result.data.formProcessed
+        : undefined;
+    structuredErrorText = [result.error, result.data?.error]
+      .filter((value) => typeof value === "string")
+      .join(" ");
+  } catch {
+    /* A native GetCourse HTML response is valid and handled below. */
+  }
 
   // GetCourse may ship generic error strings inside scripts/templates even when the form was accepted.
   // Structured JSON flags are authoritative; for HTML only rendered text can represent validation failure.
-  const detectorText = parsedJson ? structuredErrorText : responseFormat === "html" ? visibleHtmlText(responseText) : responseText;
-  const validationError = success === false || formProcessed === false ||
-    /Не заполнено поле|Заявка не отправлена|Не получилось обработать форму/i.test(detectorText);
-  const successDetected = response.ok && !validationError && success !== false && formProcessed !== false;
-  return { successDetected, validationError, success, formProcessed, responseFormat };
+  const detectorText = parsedJson
+    ? structuredErrorText
+    : responseFormat === "html"
+      ? visibleHtmlText(responseText)
+      : responseText;
+  const validationError =
+    success === false ||
+    formProcessed === false ||
+    /Не заполнено поле|Заявка не отправлена|Не получилось обработать форму/i.test(
+      detectorText,
+    );
+  const successDetected =
+    response.ok &&
+    !validationError &&
+    success !== false &&
+    formProcessed !== false;
+  return {
+    successDetected,
+    validationError,
+    success,
+    formProcessed,
+    responseFormat,
+  };
 }
 
-export function formatGetCourseManagerComment(context: ManagerLeadContext): string {
-  const transcript = context.transcript.map(turn =>
-    `${turn.role === "user" ? "Пользователь" : "Артём"}: ${turn.text}`).join("\n");
+export function formatGetCourseManagerComment(
+  context: ManagerLeadContext,
+): string {
+  const transcript = context.transcript
+    .map(
+      (turn) =>
+        `${turn.role === "user" ? "Пользователь" : "Артём"}: ${turn.text}`,
+    )
+    .join("\n");
   const source = [
     context.utmSource && `UTM source: ${context.utmSource}`,
     context.utmMedium && `UTM medium: ${context.utmMedium}`,
@@ -96,115 +145,264 @@ export function formatGetCourseManagerComment(context: ManagerLeadContext): stri
     context.artemEntrySource && `entry source: ${context.artemEntrySource}`,
     context.artemEntryContent && `entry content: ${context.artemEntryContent}`,
     context.managerCtaSource && `manager CTA: ${context.managerCtaSource}`,
-    context.managerCtaContent && `manager CTA content: ${context.managerCtaContent}`,
+    context.managerCtaContent &&
+      `manager CTA content: ${context.managerCtaContent}`,
   ].filter((value): value is string => Boolean(value));
   return [
-    "ИНОБР Ассистент — консультация Артёма", "", "Рекомендованная программа:", context.recommendedProgram,
-    "", "Рекомендация Артёма:", context.recommendationText, "", "Диагностика:",
-    `Сфера: ${context.diagnostic.currentArea}`, `Роль: ${context.diagnostic.currentRole}`,
-    `Образование: ${context.diagnostic.educationStatus}`, `Задача: ${context.diagnostic.targetTasks}`,
-    "", "Краткое резюме:", context.dialogSummary, "", "Диалог:", transcript || "Дополнительных вопросов не было.",
-    "", "Session ID:", context.sessionId, "", "Версия базы знаний:", context.knowledgeBaseVersion,
+    "ИНОБР Ассистент — консультация Артёма",
+    "",
+    "Рекомендованная программа:",
+    context.recommendedProgram,
+    "",
+    "Рекомендация Артёма:",
+    context.recommendationText,
+    "",
+    "Диагностика:",
+    `Сфера: ${context.diagnostic.currentArea}`,
+    `Роль: ${context.diagnostic.currentRole}`,
+    `Образование: ${context.diagnostic.educationStatus}`,
+    `Задача: ${context.diagnostic.targetTasks}`,
+    "",
+    "Краткое резюме:",
+    context.dialogSummary,
+    "",
+    "Диалог:",
+    transcript || "Дополнительных вопросов не было.",
+    "",
+    "Session ID:",
+    context.sessionId,
+    "",
+    "Версия базы знаний:",
+    context.knowledgeBaseVersion,
     ...(source.length ? ["", "Источник обращения:", "", ...source] : []),
-    ...(internal.length ? ["", "Internal Artem attribution:", "", ...internal] : []),
+    ...(internal.length
+      ? ["", "Internal Artem attribution:", "", ...internal]
+      : []),
   ].join("\n");
 }
 
-const escapeTextarea = (value: string) => value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+const escapeTextarea = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 
-export interface GetCourseWidgetDocument { html: string; cookies: string[] }
+export interface GetCourseWidgetDocument {
+  html: string;
+  cookies: string[];
+}
 
-export async function loadGetCourseManagerWidget(input: { sessionId: string; managerFormRequestId: string; sourceUrl: string; referrer: string },
-  comment: string, fetcher: typeof fetch = fetch, trace: ManagerFormTrace = () => {}): Promise<GetCourseWidgetDocument> {
+export async function loadGetCourseManagerWidget(
+  input: {
+    sessionId: string;
+    managerFormRequestId: string;
+    sourceUrl: string;
+    referrer: string;
+  },
+  comment: string,
+  fetcher: typeof fetch = fetch,
+  trace: ManagerFormTrace = () => {},
+): Promise<GetCourseWidgetDocument> {
   const url = new URL(GETCOURSE_WIDGET_ENDPOINT);
   url.searchParams.set("loc", input.sourceUrl);
   url.searchParams.set("ref", input.referrer);
-  trace("getcourse_widget_fetch_start", { endpoint: `${url.origin}${url.pathname}`, timestamp: new Date().toISOString() });
+  trace("getcourse_widget_fetch_start", {
+    endpoint: `${url.origin}${url.pathname}`,
+    timestamp: new Date().toISOString(),
+  });
+  const startedAt = performance.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3_500);
   let response: Response;
-  try { response = await fetcher(url, { method: "GET", redirect: "follow" }); }
-  catch (error) {
-    trace("getcourse_widget_fetch_error", { ...errorDetails(error), network: true,
-      timeout: error instanceof Error && error.name === "AbortError" });
+  try {
+    response = await fetcher(url, {
+      method: "GET",
+      redirect: "follow",
+      signal: controller.signal,
+    });
+  } catch (error) {
+    trace("getcourse_widget_fetch_error", {
+      ...errorDetails(error),
+      network: true,
+      timeout: error instanceof Error && error.name === "AbortError",
+      latencyMs: Math.round(performance.now() - startedAt),
+    });
     throw error;
+  } finally {
+    clearTimeout(timeout);
   }
   if (!response.ok) {
-    trace("getcourse_widget_fetch_error", { upstreamStatus: response.status, network: false, timeout: false });
+    trace("getcourse_widget_fetch_error", {
+      upstreamStatus: response.status,
+      network: false,
+      timeout: false,
+      latencyMs: Math.round(performance.now() - startedAt),
+    });
     throw new Error("GETCOURSE_WIDGET_FAILED");
   }
   let html = await response.text();
-  const formTag = new RegExp(`<form\\b[^>]*data-id\\s*=\\s*["']?${GETCOURSE_BLOCK_ID}["']?[^>]*>`, "i").exec(html)?.[0];
+  const formTag = new RegExp(
+    `<form\\b[^>]*data-id\\s*=\\s*["']?${GETCOURSE_BLOCK_ID}["']?[^>]*>`,
+    "i",
+  ).exec(html)?.[0];
   const formFound = Boolean(formTag);
-  const upstreamAction = formTag ? /\baction=["']([^"']+)["']/i.exec(formTag)?.[1]?.replaceAll("&amp;", "&") : undefined;
-  trace("getcourse_widget_fetch_success", { httpStatus: response.status,
-    contentType: response.headers.get("content-type") ?? "", responseLength: html.length, formFound,
-    requestTimeFound: /window\.requestTime\s*=/.test(html), requestSimpleSignFound: /window\.requestSimpleSign\s*=/.test(html),
-    upstreamActionFound: Boolean(upstreamAction), pdpConsentFieldsFound: html.includes("formParams[dealCustomFields][11904802]") &&
-      html.includes("formParams[dealCustomFields][11904803]") });
-  for (const marker of [`field-input-${GETCOURSE_COMMENT_FIELD}`,
-    "formParams[dealCustomFields][11904802]", "formParams[dealCustomFields][11904803]",
-    "intlTelInputWithUtils.min.js", "phone-mask.js"]) {
+  const upstreamAction = formTag
+    ? /\baction=["']([^"']+)["']/i.exec(formTag)?.[1]?.replaceAll("&amp;", "&")
+    : undefined;
+  trace("getcourse_widget_fetch_success", {
+    httpStatus: response.status,
+    contentType: response.headers.get("content-type") ?? "",
+    responseLength: html.length,
+    formFound,
+    latencyMs: Math.round(performance.now() - startedAt),
+    requestTimeFound: /window\.requestTime\s*=/.test(html),
+    requestSimpleSignFound: /window\.requestSimpleSign\s*=/.test(html),
+    upstreamActionFound: Boolean(upstreamAction),
+    pdpConsentFieldsFound:
+      html.includes("formParams[dealCustomFields][11904802]") &&
+      html.includes("formParams[dealCustomFields][11904803]"),
+  });
+  for (const marker of [
+    `field-input-${GETCOURSE_COMMENT_FIELD}`,
+    "formParams[dealCustomFields][11904802]",
+    "formParams[dealCustomFields][11904803]",
+    "intlTelInputWithUtils.min.js",
+    "phone-mask.js",
+  ]) {
     if (!html.includes(marker)) throw new Error("GETCOURSE_WIDGET_INVALID");
   }
   if (!formFound) throw new Error("GETCOURSE_WIDGET_INVALID");
   if (!upstreamAction) throw new Error("GETCOURSE_WIDGET_ACTION_REQUIRED");
   const upstreamTarget = new URL(upstreamAction);
-  if (upstreamTarget.protocol !== "https:" || upstreamTarget.hostname !== "inobr.ru.com" ||
-    !["/pl/lite/block-public/process", "/pl/lite/block-public/process-html"].includes(upstreamTarget.pathname)) {
+  if (
+    upstreamTarget.protocol !== "https:" ||
+    upstreamTarget.hostname !== "inobr.ru.com" ||
+    ![
+      "/pl/lite/block-public/process",
+      "/pl/lite/block-public/process-html",
+    ].includes(upstreamTarget.pathname)
+  ) {
     throw new Error("GETCOURSE_WIDGET_ACTION_INVALID");
   }
-  const textarea = new RegExp(`(<textarea[^>]+id=["']field-input-${GETCOURSE_COMMENT_FIELD}["'][^>]*>)[\\s\\S]*?(</textarea>)`, "i");
-  if (!textarea.test(html)) throw new Error("GETCOURSE_COMMENT_FIELD_UNAVAILABLE");
+  const textarea = new RegExp(
+    `(<textarea[^>]+id=["']field-input-${GETCOURSE_COMMENT_FIELD}["'][^>]*>)[\\s\\S]*?(</textarea>)`,
+    "i",
+  );
+  if (!textarea.test(html))
+    throw new Error("GETCOURSE_COMMENT_FIELD_UNAVAILABLE");
   html = html.replace(textarea, `$1${escapeTextarea(comment)}$2`);
-  html = html.replace(/<head([^>]*)>/i, `<head$1><base href="https://inobr.ru.com/">`);
-  trace("getcourse_fields_resolved", { email: html.includes("formParams[email]"), fullName: html.includes("formParams[full_name]"),
-    phone: html.includes("formParams[phone]"), consent11904802: html.includes("formParams[dealCustomFields][11904802]"),
-    consent11904803: html.includes("formParams[dealCustomFields][11904803]"), dialogue22041910: textarea.test(html),
-    helper: html.includes("__gc__internal__form__helper"), helperRef: html.includes("__gc__internal__form__helper_ref"),
-    requestTime: /window\.requestTime\s*=/.test(html), requestSimpleSign: /window\.requestSimpleSign\s*=/.test(html) });
+  html = html.replace(
+    /<head([^>]*)>/i,
+    `<head$1><base href="https://inobr.ru.com/">`,
+  );
+  trace("getcourse_fields_resolved", {
+    email: html.includes("formParams[email]"),
+    fullName: html.includes("formParams[full_name]"),
+    phone: html.includes("formParams[phone]"),
+    consent11904802: html.includes("formParams[dealCustomFields][11904802]"),
+    consent11904803: html.includes("formParams[dealCustomFields][11904803]"),
+    dialogue22041910: textarea.test(html),
+    helper: html.includes("__gc__internal__form__helper"),
+    helperRef: html.includes("__gc__internal__form__helper_ref"),
+    requestTime: /window\.requestTime\s*=/.test(html),
+    requestSimpleSign: /window\.requestSimpleSign\s*=/.test(html),
+  });
   const bridge = `<style>[data-id="${GETCOURSE_COMMENT_FIELD}"]{display:none!important}.__artem-form-error{display:none;background:#cf5b5b;color:#fff;padding:14px 16px;margin:0 0 12px;border-radius:0;font:16px/1.4 Arial,sans-serif;text-align:left}.__artem-form-error[aria-hidden="false"]{display:block}</style><script>
 window.addEventListener("load",function(){setTimeout(function(){var form=document.querySelector('form[data-id="${GETCOURSE_BLOCK_ID}"]');if(form){var action=document.createElement("input");action.type="hidden";action.name=${JSON.stringify(GETCOURSE_ACTION_FIELD)};action.value=${JSON.stringify(upstreamAction)};form.appendChild(action);var requestId=document.createElement("input");requestId.type="hidden";requestId.name=${JSON.stringify(MANAGER_FORM_REQUEST_ID_FIELD)};requestId.value=${JSON.stringify(input.managerFormRequestId)};form.appendChild(requestId);var canonicalPhone=document.createElement("input");canonicalPhone.type="hidden";canonicalPhone.name=${JSON.stringify(GETCOURSE_CANONICAL_PHONE_FIELD)};form.appendChild(canonicalPhone);var visiblePhone=form.querySelector("input.iti__tel-input");var syncPhone=function(){canonicalPhone.value=visiblePhone&&visiblePhone.value||"";};var error=document.createElement("div");error.className="__artem-form-error";error.setAttribute("role","alert");error.setAttribute("aria-live","assertive");error.setAttribute("aria-hidden","true");form.insertBefore(error,form.firstChild);var email=form.querySelector('input[name="formParams[email]"]');var fullName=form.querySelector('input[name="formParams[full_name]"]');var consentPersonal=form.querySelector('input[type="checkbox"][id^="field-input-11904802"]');var consentMarketing=form.querySelector('input[type="checkbox"][id^="field-input-11904803"]');var clearError=function(){error.textContent="";error.setAttribute("aria-hidden","true");};var showError=function(message,control){error.textContent=message;error.setAttribute("aria-hidden","false");if(control&&control.focus){control.focus();}error.scrollIntoView({block:"nearest"});};var validate=function(event){syncPhone();var phoneDigits=canonicalPhone.value.replace(/\\D/g,"");var problem=!email||!email.value.trim()?[(email&&email.placeholder)||"Введите ваш эл. адрес",email]:!fullName||!fullName.value.trim()?[(fullName&&fullName.placeholder)||"Введите ваше имя",fullName]:!visiblePhone||phoneDigits.length<8?["Введите ваш телефон",visiblePhone]:!consentPersonal||!consentPersonal.checked?["Я соглашаюсь на обработку персональных данных в соответствии с политикой конфиденциальности",consentPersonal]:!consentMarketing||!consentMarketing.checked?["Я соглашаюсь на получение рекламных рассылок, звонков и сообщений",consentMarketing]:null;if(problem){event.preventDefault();event.stopImmediatePropagation();showError("Не заполнено поле "+problem[0],problem[1]);return false;}clearError();};if(visiblePhone){visiblePhone.addEventListener("input",syncPhone);visiblePhone.addEventListener("change",syncPhone);visiblePhone.addEventListener("blur",syncPhone);}[email,fullName,visiblePhone,consentPersonal,consentMarketing].forEach(function(control){if(control){control.addEventListener("input",clearError);control.addEventListener("change",clearError);}});form.addEventListener("submit",validate,true);syncPhone();form.action=window.location.origin+${JSON.stringify(`/api/manager-form/widget-submit/${input.sessionId}`)};window.parent.postMessage({type:"getcourse-manager-widget",status:"ready",sessionId:${JSON.stringify(input.sessionId)}},${JSON.stringify(new URL(input.sourceUrl).origin)});}},0);});
 (function(){var attempts=0;var notifyReady=function(){var form=document.querySelector('form[data-id="${GETCOURSE_BLOCK_ID}"]');var context=form&&form.querySelector('[name="formParams[dealCustomFields][${GETCOURSE_COMMENT_FIELD}]"]');if(form&&context&&context.value.trim()){window.parent.postMessage({type:"getcourse-manager-widget",status:"ready",sessionId:${JSON.stringify(input.sessionId)}},${JSON.stringify(new URL(input.sourceUrl).origin)});return;}if(attempts++<120){setTimeout(notifyReady,100);}};notifyReady();})();
 </script>`;
-  const getSetCookie = (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
-  return { html: html.replace(/<\/body>/i, `${bridge}</body>`), cookies: getSetCookie?.call(response.headers) ?? [] };
+  const getSetCookie = (
+    response.headers as Headers & { getSetCookie?: () => string[] }
+  ).getSetCookie;
+  return {
+    html: html.replace(/<\/body>/i, `${bridge}</body>`),
+    cookies: getSetCookie?.call(response.headers) ?? [],
+  };
 }
 
 export function localizeGetCourseCookies(cookies: string[]): string[] {
-  return cookies.map(cookie => {
+  return cookies.map((cookie) => {
     const [pair, ...attributes] = cookie.split(";");
-    const retained = attributes.map(value => value.trim()).filter(value =>
-      !/^domain=/i.test(value) && !/^path=/i.test(value) && !/^samesite=/i.test(value) && !/^max-age=/i.test(value));
-    return [pair, "Path=/api/manager-form", "SameSite=Lax", "Max-Age=900", ...retained].join("; ");
+    const retained = attributes
+      .map((value) => value.trim())
+      .filter(
+        (value) =>
+          !/^domain=/i.test(value) &&
+          !/^path=/i.test(value) &&
+          !/^samesite=/i.test(value) &&
+          !/^max-age=/i.test(value),
+      );
+    return [
+      pair,
+      "Path=/api/manager-form",
+      "SameSite=Lax",
+      "Max-Age=900",
+      ...retained,
+    ].join("; ");
   });
 }
 
-const GETCOURSE_COOKIE_NAMES = new Set(["PHPSESSID5", "gc_counter_132222", "gc_visitor_132222", "gc_visit_132222", "dd_bdfhyr", "_csrf"]);
+const GETCOURSE_COOKIE_NAMES = new Set([
+  "PHPSESSID5",
+  "gc_counter_132222",
+  "gc_visitor_132222",
+  "gc_visit_132222",
+  "dd_bdfhyr",
+  "_csrf",
+]);
 
-export function getCourseCookieHeader(value: string | undefined): string | undefined {
+export function getCourseCookieHeader(
+  value: string | undefined,
+): string | undefined {
   if (!value) return undefined;
-  const cookies = value.split(";").map(item => item.trim()).filter(item => GETCOURSE_COOKIE_NAMES.has(item.split("=", 1)[0]));
+  const cookies = value
+    .split(";")
+    .map((item) => item.trim())
+    .filter((item) => GETCOURSE_COOKIE_NAMES.has(item.split("=", 1)[0]));
   return cookies.length ? cookies.join("; ") : undefined;
 }
 
-function appendFormValue(params: URLSearchParams, name: string, value: unknown): void {
-  if (Array.isArray(value)) { for (const item of value) appendFormValue(params, name, item); return; }
+function appendFormValue(
+  params: URLSearchParams,
+  name: string,
+  value: unknown,
+): void {
+  if (Array.isArray(value)) {
+    for (const item of value) appendFormValue(params, name, item);
+    return;
+  }
   if (value && typeof value === "object") {
-    for (const [key, child] of Object.entries(value)) appendFormValue(params, name ? `${name}[${key}]` : key, child);
+    for (const [key, child] of Object.entries(value))
+      appendFormValue(params, name ? `${name}[${key}]` : key, child);
     return;
   }
   if (typeof value === "string") params.append(name, value);
 }
 
-export function serializeGetCourseWidgetBody(body: unknown, comment: string): URLSearchParams {
-  const params = typeof body === "string" ? new URLSearchParams(body) : new URLSearchParams();
+export function serializeGetCourseWidgetBody(
+  body: unknown,
+  comment: string,
+): URLSearchParams {
+  const params =
+    typeof body === "string"
+      ? new URLSearchParams(body)
+      : new URLSearchParams();
   if (body && typeof body === "object") appendFormValue(params, "", body);
   const phoneField = "formParams[phone]";
-  const phoneCandidates = [...params.getAll(GETCOURSE_CANONICAL_PHONE_FIELD), ...params.getAll(phoneField)];
-  const phone = phoneCandidates.map(normalizeGetCoursePhone).find((value): value is string => Boolean(value));
+  const phoneCandidates = [
+    ...params.getAll(GETCOURSE_CANONICAL_PHONE_FIELD),
+    ...params.getAll(phoneField),
+  ];
+  const phone = phoneCandidates
+    .map(normalizeGetCoursePhone)
+    .find((value): value is string => Boolean(value));
   params.delete(GETCOURSE_CANONICAL_PHONE_FIELD);
   params.delete(phoneField);
   if (phone) params.set(phoneField, phone);
-  params.set(`formParams[dealCustomFields][${GETCOURSE_COMMENT_FIELD}]`, comment);
+  params.set(
+    `formParams[dealCustomFields][${GETCOURSE_COMMENT_FIELD}]`,
+    comment,
+  );
   return params;
 }
 
@@ -213,73 +411,150 @@ export function normalizeGetCoursePhone(value: string): string | undefined {
   if (!trimmed) return undefined;
   let digits = trimmed.replace(/\D/g, "");
   if (digits.length === 10 && digits.startsWith("9")) digits = `7${digits}`;
-  if (digits.length === 11 && digits.startsWith("8")) digits = `7${digits.slice(1)}`;
-  return digits.length >= 8 && digits.length <= 15 && digits[0] !== "0" ? `+${digits}` : undefined;
+  if (digits.length === 11 && digits.startsWith("8"))
+    digits = `7${digits.slice(1)}`;
+  return digits.length >= 8 && digits.length <= 15 && digits[0] !== "0"
+    ? `+${digits}`
+    : undefined;
 }
 
 export function validateGetCourseWidgetBody(params: URLSearchParams): void {
-  for (const name of ["formParams[email]", "formParams[full_name]", "formParams[phone]"]) {
-    if (!params.get(name)?.trim()) throw new Error("GETCOURSE_WIDGET_FORM_INVALID");
+  for (const name of [
+    "formParams[email]",
+    "formParams[full_name]",
+    "formParams[phone]",
+  ]) {
+    if (!params.get(name)?.trim())
+      throw new Error("GETCOURSE_WIDGET_FORM_INVALID");
   }
   for (const id of ["11904802", "11904803"]) {
-    if (params.get(`formParams[dealCustomFields][${id}]`) !== "1") throw new Error("GETCOURSE_WIDGET_CONSENT_REQUIRED");
+    if (params.get(`formParams[dealCustomFields][${id}]`) !== "1")
+      throw new Error("GETCOURSE_WIDGET_CONSENT_REQUIRED");
   }
-  if (!params.get(`formParams[dealCustomFields][${GETCOURSE_COMMENT_FIELD}]`)?.trim()) throw new Error("GETCOURSE_WIDGET_COMMENT_REQUIRED");
+  if (
+    !params
+      .get(`formParams[dealCustomFields][${GETCOURSE_COMMENT_FIELD}]`)
+      ?.trim()
+  )
+    throw new Error("GETCOURSE_WIDGET_COMMENT_REQUIRED");
 }
 
-export interface GetCourseSubmitResult { status: number; contentType: string; body: string }
+export interface GetCourseSubmitResult {
+  status: number;
+  contentType: string;
+  body: string;
+}
 
-export async function submitGetCourseWidgetBody(params: URLSearchParams, cookie: string | undefined,
-  fetcher: typeof fetch = fetch, trace: ManagerFormTrace = () => {}): Promise<GetCourseSubmitResult> {
-  const dialogue = params.get(`formParams[dealCustomFields][${GETCOURSE_COMMENT_FIELD}]`) ?? "";
-  trace("getcourse_payload_built", { emailPresent: Boolean(params.get("formParams[email]")?.trim()),
+export async function submitGetCourseWidgetBody(
+  params: URLSearchParams,
+  cookie: string | undefined,
+  fetcher: typeof fetch = fetch,
+  trace: ManagerFormTrace = () => {},
+): Promise<GetCourseSubmitResult> {
+  const dialogue =
+    params.get(`formParams[dealCustomFields][${GETCOURSE_COMMENT_FIELD}]`) ??
+    "";
+  trace("getcourse_payload_built", {
+    emailPresent: Boolean(params.get("formParams[email]")?.trim()),
     fullNamePresent: Boolean(params.get("formParams[full_name]")?.trim()),
     phonePresent: Boolean(params.get("formParams[phone]")?.trim()),
-    consent11904802Present: params.has("formParams[dealCustomFields][11904802]"),
-    consent11904802Value: params.get("formParams[dealCustomFields][11904802]") ?? "",
-    consent11904803Present: params.has("formParams[dealCustomFields][11904803]"),
-    consent11904803Value: params.get("formParams[dealCustomFields][11904803]") ?? "",
-    dialogue22041910Present: Boolean(dialogue.trim()), dialogue22041910Length: dialogue.length,
-    dialogue22041910ContainsTranscript: /(?:Пользователь|Артём):\s*\S/.test(dialogue),
-    requestTimePresent: Boolean(params.get("requestTime")), requestSimpleSignPresent: Boolean(params.get("requestSimpleSign")),
-    helperPresent: params.has("__gc__internal__form__helper"), helperRefPresent: params.has("__gc__internal__form__helper_ref"),
-    isHtmlWidgetPresent: Boolean(params.get("isHtmlWidget")) });
+    consent11904802Present: params.has(
+      "formParams[dealCustomFields][11904802]",
+    ),
+    consent11904802Value:
+      params.get("formParams[dealCustomFields][11904802]") ?? "",
+    consent11904803Present: params.has(
+      "formParams[dealCustomFields][11904803]",
+    ),
+    consent11904803Value:
+      params.get("formParams[dealCustomFields][11904803]") ?? "",
+    dialogue22041910Present: Boolean(dialogue.trim()),
+    dialogue22041910Length: dialogue.length,
+    dialogue22041910ContainsTranscript: /(?:Пользователь|Артём):\s*\S/.test(
+      dialogue,
+    ),
+    requestTimePresent: Boolean(params.get("requestTime")),
+    requestSimpleSignPresent: Boolean(params.get("requestSimpleSign")),
+    helperPresent: params.has("__gc__internal__form__helper"),
+    helperRefPresent: params.has("__gc__internal__form__helper_ref"),
+    isHtmlWidgetPresent: Boolean(params.get("isHtmlWidget")),
+  });
   validateGetCourseWidgetBody(params);
   const action = params.get(GETCOURSE_ACTION_FIELD);
   if (!action) throw new Error("GETCOURSE_WIDGET_ACTION_REQUIRED");
   let target: URL;
-  try { target = new URL(action); }
-  catch { throw new Error("GETCOURSE_WIDGET_ACTION_INVALID"); }
-  if (target.protocol !== "https:" || target.hostname !== "inobr.ru.com" ||
-    !["/pl/lite/block-public/process", "/pl/lite/block-public/process-html"].includes(target.pathname)) {
+  try {
+    target = new URL(action);
+  } catch {
+    throw new Error("GETCOURSE_WIDGET_ACTION_INVALID");
+  }
+  if (
+    target.protocol !== "https:" ||
+    target.hostname !== "inobr.ru.com" ||
+    ![
+      "/pl/lite/block-public/process",
+      "/pl/lite/block-public/process-html",
+    ].includes(target.pathname)
+  ) {
     throw new Error("GETCOURSE_WIDGET_ACTION_INVALID");
   }
   params.delete(GETCOURSE_ACTION_FIELD);
   params.delete(MANAGER_FORM_REQUEST_ID_FIELD);
   params.delete(GETCOURSE_CANONICAL_PHONE_FIELD);
-  trace("getcourse_post_start", { destinationHostname: target.hostname, destinationPath: target.pathname,
-    method: "POST", timestamp: new Date().toISOString() });
+  trace("getcourse_post_start", {
+    destinationHostname: target.hostname,
+    destinationPath: target.pathname,
+    method: "POST",
+    timestamp: new Date().toISOString(),
+  });
   let response: Response;
   try {
-    response = await fetcher(target, { method: "POST", redirect: "follow",
-      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8", ...(cookie ? { Cookie: cookie } : {}) }, body: params });
+    response = await fetcher(target, {
+      method: "POST",
+      redirect: "follow",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+        ...(cookie ? { Cookie: cookie } : {}),
+      },
+      body: params,
+    });
   } catch (error) {
-    trace("getcourse_post_error", { ...errorDetails(error), upstreamStatus: null,
-      timeout: error instanceof Error && error.name === "AbortError", network: true });
+    trace("getcourse_post_error", {
+      ...errorDetails(error),
+      upstreamStatus: null,
+      timeout: error instanceof Error && error.name === "AbortError",
+      network: true,
+    });
     throw error;
   }
   const responseText = await response.text();
   const analysis = analyzeGetCourseResponse(response, responseText);
-  trace("getcourse_post_response", { httpStatus: response.status, contentType: response.headers.get("content-type") ?? "",
-    responseLength: responseText.length, responsePreview: sanitizedPreview(responseText),
-    successDetectorResult: analysis.successDetected, validationDetectorResult: analysis.validationError,
-    formProcessedDetectionResult: analysis.formProcessed ?? null, successDetectionResult: analysis.success ?? null,
-    responseFormat: analysis.responseFormat, successDetected: analysis.successDetected,
-    validationError: analysis.validationError });
+  trace("getcourse_post_response", {
+    httpStatus: response.status,
+    contentType: response.headers.get("content-type") ?? "",
+    responseLength: responseText.length,
+    responsePreview: sanitizedPreview(responseText),
+    successDetectorResult: analysis.successDetected,
+    validationDetectorResult: analysis.validationError,
+    formProcessedDetectionResult: analysis.formProcessed ?? null,
+    successDetectionResult: analysis.success ?? null,
+    responseFormat: analysis.responseFormat,
+    successDetected: analysis.successDetected,
+    validationError: analysis.validationError,
+  });
   if (!analysis.successDetected) {
-    trace("getcourse_post_error", { errorClass: "GetCourseResponseError", errorMessage: "GETCOURSE_SUBMIT_FAILED",
-      upstreamStatus: response.status, timeout: false, network: false });
+    trace("getcourse_post_error", {
+      errorClass: "GetCourseResponseError",
+      errorMessage: "GETCOURSE_SUBMIT_FAILED",
+      upstreamStatus: response.status,
+      timeout: false,
+      network: false,
+    });
     throw new Error("GETCOURSE_SUBMIT_FAILED");
   }
-  return { status: response.status, contentType: response.headers.get("content-type") ?? "application/json", body: responseText };
+  return {
+    status: response.status,
+    contentType: response.headers.get("content-type") ?? "application/json",
+    body: responseText,
+  };
 }

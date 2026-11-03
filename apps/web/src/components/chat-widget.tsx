@@ -1,22 +1,45 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Loader2, CheckCircle2, ChevronRight, ArrowUpRight, X,
-  FileText, Users, ChartNoAxesColumnIncreasing } from "lucide-react";
 import {
-  useCreateConversation,
-} from "@workspace/api-client-react";
+  Send,
+  Loader2,
+  CheckCircle2,
+  ChevronRight,
+  ArrowUpRight,
+  X,
+  FileText,
+  Users,
+  ChartNoAxesColumnIncreasing,
+} from "lucide-react";
+import { useCreateConversation } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { createChatScroll, createQuestionFocusGate } from "@/lib/chat-scroll";
-import { sendConsultantTurn, createConsultantRequestId, CONSULTANT_ERROR } from "@/lib/consultant-chat";
-import { mountNativeGetCourseWidget, MANAGER_CONTEXT_ERROR } from "@/lib/manager-form";
 import {
-  completePersistedDiagnostic, DIAGNOSTIC_ERROR,
-  type DiagnosticPayload, type DiagnoseResponse, type StructuredDiagnosticResult,
+  sendConsultantTurn,
+  createConsultantRequestId,
+  CONSULTANT_ERROR,
+} from "@/lib/consultant-chat";
+import {
+  mountNativeGetCourseWidget,
+  MANAGER_CONTEXT_ERROR,
+} from "@/lib/manager-form";
+import {
+  completePersistedDiagnostic,
+  DIAGNOSTIC_ERROR,
+  type DiagnosticPayload,
+  type DiagnoseResponse,
+  type StructuredDiagnosticResult,
 } from "@/lib/diagnostic-result";
-import { getDiagnosticSchema, type DiagnosticSchemaQuestion } from "@/lib/diagnostic-schema";
-import { recordDiagnosticAnswer, recordDiagnosticQuestion } from "@/lib/diagnostic-dialogue";
+import {
+  getDiagnosticSchema,
+  type DiagnosticSchemaQuestion,
+} from "@/lib/diagnostic-schema";
+import {
+  recordDiagnosticAnswer,
+  recordDiagnosticQuestion,
+} from "@/lib/diagnostic-dialogue";
 import { recordManagerContactClick } from "@/lib/events";
 import { createAttributedSession } from "@/lib/session-attribution";
 
@@ -43,18 +66,31 @@ const INOBR_LOGO_SRC = "/inobr-logo.jpg";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 
-
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ProgressBar({ current, total }: { current: number; total: number }) {
   return (
-    <div className="diagnostic-question__progress" aria-label={`Шаг ${current} из ${total}`}>
-      <strong>{String(current).padStart(2, "0")} / {String(total).padStart(2, "0")}</strong>
+    <div
+      className="diagnostic-question__progress"
+      aria-label={`Шаг ${current} из ${total}`}
+    >
+      <strong>
+        {String(current).padStart(2, "0")} / {String(total).padStart(2, "0")}
+      </strong>
       <div>
         {Array.from({ length: total }, (_, index) => {
           const number = index + 1;
           return (
-            <span key={number} className={number < current ? "is-complete" : number === current ? "is-current" : undefined}>
+            <span
+              key={number}
+              className={
+                number < current
+                  ? "is-complete"
+                  : number === current
+                    ? "is-current"
+                    : undefined
+              }
+            >
               {number < current ? <CheckCircle2 aria-hidden="true" /> : null}
             </span>
           );
@@ -72,35 +108,80 @@ function RecommendationCard({
   onAskQuestion: () => void;
   onGetConsultation: () => void;
 }) {
-  const presentation = result.recommendedTrack === "construction_expertise"
-    ? { title: "Стройэксперт", duration: "260–520 академических часов" }
-    : result.recommendedTrack === "apartment_acceptance"
-      ? { title: "Приёмка квартир", duration: "Продолжительность уточнит менеджер" }
-      : { title: "Приёмка квартир и Приёмка ИЖС", duration: "Продолжительность уточнит менеджер" };
+  const presentation =
+    result.recommendedTrack === "construction_expertise"
+      ? { title: "Стройэксперт", duration: "260–520 академических часов" }
+      : result.recommendedTrack === "apartment_acceptance"
+        ? {
+            title: "Приёмка квартир",
+            duration: "Продолжительность уточнит менеджер",
+          }
+        : {
+            title: "Приёмка квартир и Приёмка ИЖС",
+            duration: "Продолжительность уточнит менеджер",
+          };
   return (
     <div className="diagnostic-recommendation__card">
-      <span className="diagnostic-recommendation__badge">Ваша рекомендация</span>
-      <h1>{presentation.title} <i>·</i> {presentation.duration}</h1>
+      <span className="diagnostic-recommendation__badge">
+        Ваша рекомендация
+      </span>
+      <h1>
+        {presentation.title} <i>·</i> {presentation.duration}
+      </h1>
       <p className="diagnostic-recommendation__text">{result.recommendation}</p>
-      <div className="diagnostic-recommendation__benefits" aria-label="Преимущества программы">
-        <div><FileText aria-hidden="true" /><span>Практические навыки<br />на реальных задачах</span></div>
-        <div><Users aria-hidden="true" /><span>Поддержка экспертов<br />на всех этапах</span></div>
-        <div><ChartNoAxesColumnIncreasing aria-hidden="true" /><span>Знания для развития<br />в выбранном направлении</span></div>
+      <div
+        className="diagnostic-recommendation__benefits"
+        aria-label="Преимущества программы"
+      >
+        <div>
+          <FileText aria-hidden="true" />
+          <span>
+            Практические навыки
+            <br />
+            на реальных задачах
+          </span>
+        </div>
+        <div>
+          <Users aria-hidden="true" />
+          <span>
+            Поддержка экспертов
+            <br />
+            на всех этапах
+          </span>
+        </div>
+        <div>
+          <ChartNoAxesColumnIncreasing aria-hidden="true" />
+          <span>
+            Знания для развития
+            <br />в выбранном направлении
+          </span>
+        </div>
       </div>
       <div className="diagnostic-recommendation__actions">
-        <Button data-testid="button-get-consultation" onClick={onGetConsultation}
-          className="diagnostic-recommendation__primary">
+        <Button
+          data-testid="button-get-consultation"
+          onClick={onGetConsultation}
+          className="diagnostic-recommendation__primary"
+        >
           Связаться с менеджером <ArrowUpRight aria-hidden="true" />
         </Button>
-        <Button data-testid="button-ask-question" variant="outline" onClick={onAskQuestion}
-          className="diagnostic-recommendation__secondary">
+        <Button
+          data-testid="button-ask-question"
+          variant="outline"
+          onClick={onAskQuestion}
+          className="diagnostic-recommendation__secondary"
+        >
           Задать вопрос
         </Button>
       </div>
     </div>
   );
 }
-function ResultCard({ result, onAskQuestion, onGetConsultation }: {
+function ResultCard({
+  result,
+  onAskQuestion,
+  onGetConsultation,
+}: {
   result: StructuredDiagnosticResult;
   onAskQuestion: () => void;
   onGetConsultation: () => void;
@@ -109,13 +190,26 @@ function ResultCard({ result, onAskQuestion, onGetConsultation }: {
     <div className="rounded-xl border border-border bg-white shadow-sm p-4 space-y-3">
       <div className="flex items-center gap-2">
         <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
-        <span className="font-semibold text-[15px] text-foreground">Ваша рекомендация</span>
+        <span className="font-semibold text-[15px] text-foreground">
+          Ваша рекомендация
+        </span>
       </div>
-      <p className="text-sm text-foreground leading-[1.6] whitespace-pre-wrap">{result.recommendation}</p>
-      <Button data-testid="button-ask-question" variant="outline" onClick={onAskQuestion}
-        className="w-full rounded-lg text-sm font-medium border-primary text-primary">Задать вопрос</Button>
-      <Button data-testid="button-get-consultation" onClick={onGetConsultation}
-        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium">
+      <p className="text-sm text-foreground leading-[1.6] whitespace-pre-wrap">
+        {result.recommendation}
+      </p>
+      <Button
+        data-testid="button-ask-question"
+        variant="outline"
+        onClick={onAskQuestion}
+        className="w-full rounded-lg text-sm font-medium border-primary text-primary"
+      >
+        Задать вопрос
+      </Button>
+      <Button
+        data-testid="button-get-consultation"
+        onClick={onGetConsultation}
+        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg text-sm font-medium"
+      >
         Связаться с менеджером <ChevronRight className="w-4 h-4 ml-1" />
       </Button>
     </div>
@@ -124,7 +218,10 @@ function ResultCard({ result, onAskQuestion, onGetConsultation }: {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }: {
+export function ChatWidget({
+  onDiagnosticCompleted,
+  onPostDiagnosticViewChange,
+}: {
   onDiagnosticCompleted?: () => void;
   onPostDiagnosticViewChange?: (view: "consultation" | "default") => void;
 }) {
@@ -136,22 +233,37 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [customInput, setCustomInput] = useState("");
   const [activeCustomQ, setActiveCustomQ] = useState<string | null>(null);
-  const [pendingAnswer, setPendingAnswer] = useState<{ code: string; raw: string } | null>(null);
-  const [reviewQuestionIndex, setReviewQuestionIndex] = useState<number | null>(null);
+  const [pendingAnswer, setPendingAnswer] = useState<{
+    code: string;
+    raw: string;
+  } | null>(null);
+  const [reviewQuestionIndex, setReviewQuestionIndex] = useState<number | null>(
+    null,
+  );
   const [sessionError, setSessionError] = useState(false);
-  const [diagnosticSchema, setDiagnosticSchema] = useState<DiagnosticSchemaQuestion[]>([]);
+  const [diagnosticSchema, setDiagnosticSchema] = useState<
+    DiagnosticSchemaQuestion[]
+  >([]);
   const [schemaLoading, setSchemaLoading] = useState(true);
 
-  const [diagnosticStatus, setDiagnosticStatus] = useState<"idle" | "loading" | "error" | "success">("idle");
-  const [diagnosticResult, setDiagnosticResult] = useState<DiagnoseResponse | null>(null);
-  const [recommendationViewActive, setRecommendationViewActive] = useState(false);
+  const [diagnosticStatus, setDiagnosticStatus] = useState<
+    "idle" | "loading" | "error" | "success"
+  >("idle");
+  const [diagnosticResult, setDiagnosticResult] =
+    useState<DiagnoseResponse | null>(null);
+  const [recommendationViewActive, setRecommendationViewActive] =
+    useState(false);
   const [consultationViewActive, setConsultationViewActive] = useState(false);
-  const [postDiagnosticState, setPostDiagnosticState] = useState<"result" | "post-diagnostic-ready">("result");
+  const [postDiagnosticState, setPostDiagnosticState] = useState<
+    "result" | "post-diagnostic-ready"
+  >("result");
   const [questionDraft, setQuestionDraft] = useState("");
   const [consultantMessages, setConsultantMessages] = useState<Message[]>([]);
   const [consultantLoading, setConsultantLoading] = useState(false);
   const [consultantError, setConsultantError] = useState(false);
-  const consultantRequest = useRef<{ question: string; id: string } | null>(null);
+  const consultantRequest = useRef<{ question: string; id: string } | null>(
+    null,
+  );
   const consultantBusy = useRef(false);
   const failedQuestion = useRef<string | null>(null);
   const diagnosticBusy = useRef(false);
@@ -174,28 +286,47 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
   const latestUserMessageRef = useRef<HTMLDivElement>(null);
   const contactFormRef = useRef<HTMLDivElement>(null);
   const limitCtaRef = useRef<HTMLDivElement>(null);
-  const scrollController = useRef<ReturnType<typeof createChatScroll> | null>(null);
+  const scrollController = useRef<ReturnType<typeof createChatScroll> | null>(
+    null,
+  );
   const questionFocusGate = useRef(createQuestionFocusGate());
-  type FocusTarget = "question" | "result" | "input" | "user" | "assistant" | "contact" | "limit";
-  const [focusRequest, setFocusRequest] = useState<{ target: FocusTarget; force: boolean } | null>(null);
-  const showNextStep = (target: FocusTarget = "question", force = true) => setFocusRequest({ target, force });
+  type FocusTarget =
+    | "question"
+    | "result"
+    | "input"
+    | "user"
+    | "assistant"
+    | "contact"
+    | "limit";
+  const [focusRequest, setFocusRequest] = useState<{
+    target: FocusTarget;
+    force: boolean;
+  } | null>(null);
+  const showNextStep = (target: FocusTarget = "question", force = true) =>
+    setFocusRequest({ target, force });
 
   const createConversation = useCreateConversation();
   const currentQIndex = step >= 2 && step <= 5 ? step - 2 : 0;
 
   const loadDiagnosticSchema = async () => {
     setSchemaLoading(true);
-    try { setDiagnosticSchema(await getDiagnosticSchema()); }
-    catch { setSessionError(true); }
-    finally { setSchemaLoading(false); }
+    try {
+      setDiagnosticSchema(await getDiagnosticSchema());
+    } catch {
+      setSessionError(true);
+    } finally {
+      setSchemaLoading(false);
+    }
   };
 
   useEffect(() => {
-    if (questionFocusGate.current.afterOptionsRender(
-      currentQIndex,
-      schemaLoading,
-      diagnosticSchema[currentQIndex]?.options.length ?? 0,
-    )) {
+    if (
+      questionFocusGate.current.afterOptionsRender(
+        currentQIndex,
+        schemaLoading,
+        diagnosticSchema[currentQIndex]?.options.length ?? 0,
+      )
+    ) {
       showNextStep("question");
     }
   }, [currentQIndex, diagnosticSchema, schemaLoading]);
@@ -203,7 +334,9 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
   // Create session on mount
   useEffect(() => {
     void loadDiagnosticSchema();
-    void createAttributedSession().then(data => setSessionId(data.sessionId)).catch(() => setSessionError(true));
+    void createAttributedSession()
+      .then((data) => setSessionId(data.sessionId))
+      .catch(() => setSessionError(true));
   }, []);
 
   const chatVisible = step > 0;
@@ -211,17 +344,33 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
     if (!scrollRef.current) return;
     const controller = createChatScroll(scrollRef.current);
     scrollController.current = controller;
-    return () => { controller.dispose(); scrollController.current = null; };
+    return () => {
+      controller.dispose();
+      scrollController.current = null;
+    };
   }, [chatVisible]);
 
   // Explicit actions and newly delivered answers focus their semantic block after render.
   useEffect(() => {
     if (!focusRequest) return;
-    const targets = { question: currentQuestionRef.current, result: diagnosticResultRef.current,
-      input: postDiagnosticInputRef.current, user: latestUserMessageRef.current,
-      assistant: latestAssistantMessageRef.current, contact: contactFormRef.current, limit: limitCtaRef.current };
-    scrollController.current?.schedule(targets[focusRequest.target], focusRequest.force,
-      focusRequest.target === "input" ? "center" : focusRequest.target === "question" ? "end" : "start");
+    const targets = {
+      question: currentQuestionRef.current,
+      result: diagnosticResultRef.current,
+      input: postDiagnosticInputRef.current,
+      user: latestUserMessageRef.current,
+      assistant: latestAssistantMessageRef.current,
+      contact: contactFormRef.current,
+      limit: limitCtaRef.current,
+    };
+    scrollController.current?.schedule(
+      targets[focusRequest.target],
+      focusRequest.force,
+      focusRequest.target === "input"
+        ? "center"
+        : focusRequest.target === "question"
+          ? "end"
+          : "start",
+    );
   }, [focusRequest]);
 
   const uid = () => Date.now().toString() + Math.random().toString(36).slice(2);
@@ -233,7 +382,12 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
   // ─── Launch screen → Q1 ────────────────────────────────────────────────────
 
   const handleStart = () => {
-    if (!sessionId || diagnosticSchema.length !== 4 || initializationStarted.current) return;
+    if (
+      !sessionId ||
+      diagnosticSchema.length !== 4 ||
+      initializationStarted.current
+    )
+      return;
     initializationStarted.current = true;
     showNextStep();
     setIsTyping(true);
@@ -241,45 +395,61 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
     createConversation.mutate(
       { data: { sessionId } },
       {
-        onSuccess: (data) => { void (async () => {
-          const convId = data.conversationId;
-          try {
-            await recordDiagnosticQuestion(convId, 1);
-            setConversationId(convId);
-            setIsTyping(false);
-            addBotMessage(diagnosticSchema[0]?.questionText ?? "");
-            setStep(2);
-            showNextStep("question", false);
-          } catch {
-            setIsTyping(false);
-            initializationStarted.current = false;
-            setSessionError(true);
-          }
-        })(); },
+        onSuccess: (data) => {
+          void (async () => {
+            const convId = data.conversationId;
+            try {
+              await recordDiagnosticQuestion(convId, 1);
+              setConversationId(convId);
+              setIsTyping(false);
+              addBotMessage(diagnosticSchema[0]?.questionText ?? "");
+              setStep(2);
+              showNextStep("question", false);
+            } catch {
+              setIsTyping(false);
+              initializationStarted.current = false;
+              setSessionError(true);
+            }
+          })();
+        },
         onError: () => {
           setIsTyping(false);
           initializationStarted.current = false;
           setSessionError(true);
         },
-      }
+      },
     );
   };
 
   useEffect(() => {
-    if (step === 0 && !sessionError && sessionId && !schemaLoading && diagnosticSchema.length === 4) handleStart();
+    if (
+      step === 0 &&
+      !sessionError &&
+      sessionId &&
+      !schemaLoading &&
+      diagnosticSchema.length === 4
+    )
+      handleStart();
   }, [step, sessionError, sessionId, schemaLoading, diagnosticSchema]);
 
   const retryInitialization = () => {
     initializationStarted.current = false;
     setSessionError(false);
     if (diagnosticSchema.length !== 4) void loadDiagnosticSchema();
-    if (!sessionId) void createAttributedSession().then(data => setSessionId(data.sessionId))
-      .catch(() => setSessionError(true));
+    if (!sessionId)
+      void createAttributedSession()
+        .then((data) => setSessionId(data.sessionId))
+        .catch(() => setSessionError(true));
   };
 
   // ─── Chip selection ─────────────────────────────────────────────────────────
 
-  const handleOptionSelect = (qIndex: number, code: string, displayName: string, isCustom: boolean) => {
+  const handleOptionSelect = (
+    qIndex: number,
+    code: string,
+    displayName: string,
+    isCustom: boolean,
+  ) => {
     if (reviewQuestionIndex !== null) return;
     setPendingAnswer({ code, raw: displayName });
     if (isCustom) {
@@ -297,9 +467,16 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
       setReviewQuestionIndex(next >= currentQIndex ? null : next);
       return;
     }
-    if (!pendingAnswer || (pendingAnswer.code === "other" && !customInput.trim())) return;
-    void submitAnswer(qIndex, pendingAnswer.code,
-      pendingAnswer.code === "other" ? customInput.trim() : pendingAnswer.raw);
+    if (
+      !pendingAnswer ||
+      (pendingAnswer.code === "other" && !customInput.trim())
+    )
+      return;
+    void submitAnswer(
+      qIndex,
+      pendingAnswer.code,
+      pendingAnswer.code === "other" ? customInput.trim() : pendingAnswer.raw,
+    );
   };
 
   const handleDiagnosticBack = (qIndex: number) => {
@@ -314,7 +491,9 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
     showNextStep("result");
     setDiagnosticStatus("loading");
     try {
-      const response = await completePersistedDiagnostic(payload.conversationId);
+      const response = await completePersistedDiagnostic(
+        payload.conversationId,
+      );
       setDiagnosticResult(response);
       setDiagnosticStatus("success");
       showNextStep("result", false);
@@ -328,19 +507,38 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
 
   const submitAnswer = async (qIndex: number, code: string, raw: string) => {
     // Synchronous guards also cover repeated clicks before React re-renders.
-    if (!conversationId || diagnosticBusy.current || qIndex !== answeredCount.current) return;
+    if (
+      !conversationId ||
+      diagnosticBusy.current ||
+      qIndex !== answeredCount.current
+    )
+      return;
     answeredCount.current++;
     const q = diagnosticSchema[qIndex];
     if (!q) return;
     setIsTyping(true);
     try {
-      await recordDiagnosticAnswer(conversationId, q.questionNumber, code, code === "other" ? raw : undefined);
+      await recordDiagnosticAnswer(
+        conversationId,
+        q.questionNumber,
+        code,
+        code === "other" ? raw : undefined,
+      );
       const next = diagnosticSchema[qIndex + 1];
-      if (next) await recordDiagnosticQuestion(conversationId, next.questionNumber);
-      const newAnswer: DiagnosticAnswer = { questionNumber: q.questionNumber, questionKey: q.field, code, raw };
+      if (next)
+        await recordDiagnosticQuestion(conversationId, next.questionNumber);
+      const newAnswer: DiagnosticAnswer = {
+        questionNumber: q.questionNumber,
+        questionKey: q.field,
+        code,
+        raw,
+      };
       const allAnswers = [...answers, newAnswer];
       setAnswers(allAnswers);
-      setMessages((prev) => [...prev, { id: uid(), role: "user", content: raw }]);
+      setMessages((prev) => [
+        ...prev,
+        { id: uid(), role: "user", content: raw },
+      ]);
       setStep(qIndex + 3);
       if (next) {
         setPendingAnswer(null);
@@ -351,10 +549,16 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
       } else {
         setRecommendationViewActive(true);
         onDiagnosticCompleted?.();
-        void generateResult({ conversationId, current_area: allAnswers[0].code,
-          ...(allAnswers[0].code === "other" ? { current_area_other_text: allAnswers[0].raw } : {}),
-          current_role: allAnswers[1].code, education_status: allAnswers[2].code,
-          target_tasks: allAnswers[3].code });
+        void generateResult({
+          conversationId,
+          current_area: allAnswers[0].code,
+          ...(allAnswers[0].code === "other"
+            ? { current_area_other_text: allAnswers[0].raw }
+            : {}),
+          current_role: allAnswers[1].code,
+          education_status: allAnswers[2].code,
+          target_tasks: allAnswers[3].code,
+        });
       }
     } catch {
       answeredCount.current--;
@@ -365,25 +569,46 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
 
   const handleConsultantSubmit = async () => {
     const question = questionDraft.trim();
-    if (consultantBusy.current || !conversationId || !question || question.length > 1000) return;
+    if (
+      consultantBusy.current ||
+      !conversationId ||
+      !question ||
+      question.length > 1000
+    )
+      return;
     showNextStep("user");
     consultantBusy.current = true;
     setConsultantLoading(true);
     setConsultantError(false);
     if (failedQuestion.current !== question) {
-      setConsultantMessages((previous) => [...previous, { id: uid(), role: "user", content: question }]);
+      setConsultantMessages((previous) => [
+        ...previous,
+        { id: uid(), role: "user", content: question },
+      ]);
     }
     failedQuestion.current = question;
     try {
-      if (consultantRequest.current?.question !== question) consultantRequest.current = { question, id: createConsultantRequestId() };
-      const reply = await sendConsultantTurn(conversationId, question, consultantRequest.current.id);
+      if (consultantRequest.current?.question !== question)
+        consultantRequest.current = {
+          question,
+          id: createConsultantRequestId(),
+        };
+      const reply = await sendConsultantTurn(
+        conversationId,
+        question,
+        consultantRequest.current.id,
+      );
       showNextStep("assistant", false);
       consultantRequest.current = null;
-      setConsultantMessages((previous) => [...previous, { id: uid(), role: "bot", content: reply.message }]);
+      setConsultantMessages((previous) => [
+        ...previous,
+        { id: uid(), role: "bot", content: reply.message },
+      ]);
       setQuestionDraft("");
       failedQuestion.current = null;
     } catch {
-      setConsultantError(true); showNextStep("input", false);
+      setConsultantError(true);
+      showNextStep("input", false);
     } finally {
       consultantBusy.current = false;
       setConsultantLoading(false);
@@ -391,50 +616,93 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
   };
 
   const handleManagerContactClick = () => {
+    console.info("MANAGER_FORM_TRACE", {
+      stage: "manager_modal_open",
+      timestamp: new Date().toISOString(),
+    });
     setContactPhase("loading");
     setManagerContextError(false);
     if (conversationId) {
-      managerClickRecording.current = recordManagerContactClick(conversationId, {
-        referrer: document.referrer,
-        artemEntrySource: "artem_web",
-        artemEntryContent: "diagnostic_question_01",
-        managerCtaSource: recommendationViewActive ? "recommendation" :
-          consultationViewActive ? "post_diagnostic_consultation" : "artem_chat",
-        managerCtaContent: "manager_contact_button",
-      }).catch((error) => {
+      managerClickRecording.current = recordManagerContactClick(
+        conversationId,
+        {
+          referrer: document.referrer,
+          artemEntrySource: "artem_web",
+          artemEntryContent: "diagnostic_question_01",
+          managerCtaSource: recommendationViewActive
+            ? "recommendation"
+            : consultationViewActive
+              ? "post_diagnostic_consultation"
+              : "artem_chat",
+          managerCtaContent: "manager_contact_button",
+        },
+      ).catch((error) => {
         console.error("MANAGER_CONTACT_EVENT_FAILED", error);
       });
     }
-    if (!conversationId) { setManagerContextError(true); return; }
+    if (!conversationId) {
+      setManagerContextError(true);
+      return;
+    }
   };
 
   const closeManagerForm = () => {
     setContactPhase(null);
-    window.location.href = "https://inobr-expert.ru/?utm_source=artem&utm_medium=assistant&utm_campaign=return_to_site&utm_content=manager_modal_close";
+    window.location.href =
+      "https://inobr-expert.ru/?utm_source=artem&utm_medium=assistant&utm_campaign=return_to_site&utm_content=manager_modal_close";
   };
 
   useEffect(() => {
     if (!contactPhase) return;
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") closeManagerForm(); };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeManagerForm();
+    };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [contactPhase]);
 
   useEffect(() => {
-    if (!contactPhase || contactPhase === "submitted" || managerContextError || !conversationId || !managerWidgetRef.current) return;
+    if (
+      !contactPhase ||
+      contactPhase === "submitted" ||
+      managerContextError ||
+      !conversationId ||
+      !managerWidgetRef.current
+    )
+      return;
     let disposed = false;
     let unmount = () => {};
     void (async () => {
-      await managerClickRecording.current;
       if (disposed || !managerWidgetRef.current) return;
-      unmount = await mountNativeGetCourseWidget(managerWidgetRef.current, conversationId, {
-        onReady: () => { if (!disposed) setContactPhase("ready"); },
-        onSuccess: () => { if (!disposed) setContactPhase("submitted"); },
-        onError: () => { if (!disposed) setManagerContextError(true); },
-      });
+      unmount = await mountNativeGetCourseWidget(
+        managerWidgetRef.current,
+        conversationId,
+        {
+          onReady: () => {
+            if (!disposed) {
+              console.info("MANAGER_FORM_TRACE", {
+                stage: "manager_form_ready",
+                timestamp: new Date().toISOString(),
+              });
+              setContactPhase("ready");
+            }
+          },
+          onSuccess: () => {
+            if (!disposed) setContactPhase("submitted");
+          },
+          onError: () => {
+            if (!disposed) setManagerContextError(true);
+          },
+        },
+      );
       if (disposed) unmount();
-    })().catch(() => { if (!disposed) setManagerContextError(true); });
-    return () => { disposed = true; unmount(); };
+    })().catch(() => {
+      if (!disposed) setManagerContextError(true);
+    });
+    return () => {
+      disposed = true;
+      unmount();
+    };
   }, [Boolean(contactPhase), conversationId, managerContextError]);
 
   // ─── Chips renderer ─────────────────────────────────────────────────────────
@@ -458,7 +726,9 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
     }
 
     const dictItems = q.options;
-    const selectedCode = reviewing ? answers[qIndex]?.code : pendingAnswer?.code;
+    const selectedCode = reviewing
+      ? answers[qIndex]?.code
+      : pendingAnswer?.code;
 
     return (
       <motion.div
@@ -472,7 +742,9 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
             <button
               key={opt.code}
               data-testid={`chip-q${q.questionNumber}-${opt.code}`}
-              onClick={() => handleOptionSelect(qIndex, opt.code, label, opt.allowsFreeText)}
+              onClick={() =>
+                handleOptionSelect(qIndex, opt.code, label, opt.allowsFreeText)
+              }
               aria-label={label}
               aria-pressed={selectedCode === opt.code}
               disabled={reviewing}
@@ -511,29 +783,67 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
 
   const renderContactSection = () => {
     if (!contactPhase) return null;
-    return <div className="manager-form-overlay" role="dialog" aria-modal="true" aria-labelledby="manager-form-title"
-      onMouseDown={(event) => { if (event.target === event.currentTarget) closeManagerForm(); }}>
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="manager-form-modal">
-        <button className="manager-form-modal__close" type="button" onClick={closeManagerForm} aria-label="Закрыть форму"><X /></button>
-        <div className="manager-form-modal__heading">
-          <span>Персональная консультация</span>
-          <h2 id="manager-form-title">Связаться с менеджером</h2>
-          <p>Оставьте контакты — специалист ИНОБР свяжется с вами.</p>
-        </div>
-        {contactPhase === "submitted" ? <div className="manager-form-modal__success" data-testid="status-completion">
-          <CheckCircle2 aria-hidden="true" /><h3>Заявка принята</h3>
-          <p>Заявка отправлена. Менеджер свяжется с вами.</p>
-          <Button onClick={closeManagerForm}>Закрыть</Button>
-        </div> : managerContextError || !conversationId ? <div className="manager-form-modal__state" role="status">
-          <p role="alert">{MANAGER_CONTEXT_ERROR}</p><Button onClick={handleManagerContactClick}>Повторить</Button>
-        </div> : <div className="manager-form-modal__widget-shell">
-          {contactPhase === "loading" && <div className="manager-form-modal__state" role="status">
-            <Loader2 className="animate-spin" /> Подготавливаем форму...</div>}
-          <div ref={managerWidgetRef} aria-label="Форма связи с менеджером GetCourse"
-            className="manager-form-modal__widget" data-testid="native-getcourse-widget" />
-        </div>}
-      </motion.div>
-    </div>;
+    return (
+      <div
+        className="manager-form-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="manager-form-title"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) closeManagerForm();
+        }}
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="manager-form-modal"
+        >
+          <button
+            className="manager-form-modal__close"
+            type="button"
+            onClick={closeManagerForm}
+            aria-label="Закрыть форму"
+          >
+            <X />
+          </button>
+          <div className="manager-form-modal__heading">
+            <span>Персональная консультация</span>
+            <h2 id="manager-form-title">Связаться с менеджером</h2>
+            <p>Оставьте контакты — специалист ИНОБР свяжется с вами.</p>
+          </div>
+          {contactPhase === "submitted" ? (
+            <div
+              className="manager-form-modal__success"
+              data-testid="status-completion"
+            >
+              <CheckCircle2 aria-hidden="true" />
+              <h3>Заявка принята</h3>
+              <p>Заявка отправлена. Менеджер свяжется с вами.</p>
+              <Button onClick={closeManagerForm}>Закрыть</Button>
+            </div>
+          ) : managerContextError || !conversationId ? (
+            <div className="manager-form-modal__state" role="status">
+              <p role="alert">{MANAGER_CONTEXT_ERROR}</p>
+              <Button onClick={handleManagerContactClick}>Повторить</Button>
+            </div>
+          ) : (
+            <div className="manager-form-modal__widget-shell">
+              {contactPhase === "loading" && (
+                <div className="manager-form-modal__state" role="status">
+                  <Loader2 className="animate-spin" /> Подготавливаем форму...
+                </div>
+              )}
+              <div
+                ref={managerWidgetRef}
+                aria-label="Форма связи с менеджером GetCourse"
+                className="manager-form-modal__widget"
+                data-testid="native-getcourse-widget"
+              />
+            </div>
+          )}
+        </motion.div>
+      </div>
+    );
   };
 
   // ─── Immediate diagnostic initialization ─────────────────────────────────────
@@ -542,7 +852,9 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
     return (
       <div className="chat-widget diagnostic-question flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
         <header className="diagnostic-launch__header consultation-chat-header px-7 flex items-center text-white shrink-0">
-          <div className="diagnostic-launch__logo"><img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" /></div>
+          <div className="diagnostic-launch__logo">
+            <img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" />
+          </div>
           <div className="diagnostic-launch__brand-copy">
             <h2 id="consultation-title">Подбор направления обучения</h2>
             <p>Стройэксперт</p>
@@ -551,12 +863,19 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
 
         <main className="diagnostic-question__body">
           <ProgressBar current={1} total={4} />
-          {sessionError ? <div className="diagnostic-recommendation__error" role="alert">
-            <p>Не удалось начать диагностику. Проверьте соединение и попробуйте снова.</p>
-            <Button onClick={retryInitialization}>Повторить</Button>
-          </div> : <div className="diagnostic-question__loading" role="status">
-            <Loader2 aria-hidden="true" /> Подготавливаем диагностику...
-          </div>}
+          {sessionError ? (
+            <div className="diagnostic-recommendation__error" role="alert">
+              <p>
+                Не удалось начать диагностику. Проверьте соединение и попробуйте
+                снова.
+              </p>
+              <Button onClick={retryInitialization}>Повторить</Button>
+            </div>
+          ) : (
+            <div className="diagnostic-question__loading" role="status">
+              <Loader2 aria-hidden="true" /> Подготавливаем диагностику...
+            </div>
+          )}
         </main>
       </div>
     );
@@ -571,13 +890,18 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
     const displayedQIndex = reviewQuestionIndex ?? currentQIndex;
     const displayedQuestion = diagnosticSchema[displayedQIndex];
     const reviewing = reviewQuestionIndex !== null;
-    const canContinue = reviewing || Boolean(pendingAnswer &&
-      (pendingAnswer.code !== "other" || customInput.trim()));
+    const canContinue =
+      reviewing ||
+      Boolean(
+        pendingAnswer && (pendingAnswer.code !== "other" || customInput.trim()),
+      );
 
     return (
       <div className="chat-widget diagnostic-question flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
         <header className="diagnostic-launch__header consultation-chat-header px-7 flex items-center text-white shrink-0">
-          <div className="diagnostic-launch__logo"><img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" /></div>
+          <div className="diagnostic-launch__logo">
+            <img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" />
+          </div>
           <div className="diagnostic-launch__brand-copy">
             <h2 id="consultation-title">Подбор направления обучения</h2>
             <p>Стройэксперт</p>
@@ -587,22 +911,39 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
         <main className="diagnostic-question__body">
           <ProgressBar current={displayedQIndex + 1} total={4} />
           {displayedQuestion && (
-            <div ref={currentQuestionRef} className="diagnostic-question__content">
+            <div
+              ref={currentQuestionRef}
+              className="diagnostic-question__content"
+            >
               <h1>{displayedQuestion.questionText}</h1>
               {renderChips(displayedQIndex, reviewing)}
             </div>
           )}
-          {isTyping && <div className="diagnostic-question__loading" role="status">
-            <Loader2 aria-hidden="true" /> Сохраняем ответ...
-          </div>}
-          <nav className="diagnostic-question__navigation" aria-label="Навигация по диагностике">
-            <Button variant="ghost" onClick={() => handleDiagnosticBack(displayedQIndex)}
-              disabled={displayedQIndex === 0 || isTyping} className="diagnostic-question__back">
+          {isTyping && (
+            <div className="diagnostic-question__loading" role="status">
+              <Loader2 aria-hidden="true" /> Сохраняем ответ...
+            </div>
+          )}
+          <nav
+            className="diagnostic-question__navigation"
+            aria-label="Навигация по диагностике"
+          >
+            <Button
+              variant="ghost"
+              onClick={() => handleDiagnosticBack(displayedQIndex)}
+              disabled={displayedQIndex === 0 || isTyping}
+              className="diagnostic-question__back"
+            >
               <ChevronRight aria-hidden="true" /> Назад
             </Button>
-            <Button onClick={() => handleDiagnosticNext(displayedQIndex)} disabled={!canContinue || isTyping}
-              className="diagnostic-question__next">
-              {displayedQIndex === 3 && !reviewing ? "Получить рекомендацию" : "Далее"}
+            <Button
+              onClick={() => handleDiagnosticNext(displayedQIndex)}
+              disabled={!canContinue || isTyping}
+              className="diagnostic-question__next"
+            >
+              {displayedQIndex === 3 && !reviewing
+                ? "Получить рекомендацию"
+                : "Далее"}
               <ArrowUpRight aria-hidden="true" />
             </Button>
           </nav>
@@ -615,32 +956,49 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
     return (
       <div className="chat-widget diagnostic-recommendation flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
         <header className="diagnostic-launch__header consultation-chat-header px-7 flex items-center text-white shrink-0">
-          <div className="diagnostic-launch__logo"><img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" /></div>
+          <div className="diagnostic-launch__logo">
+            <img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" />
+          </div>
           <div className="diagnostic-launch__brand-copy">
-            <h2 id="consultation-title">Подбор направления обучения</h2><p>Стройэксперт</p>
+            <h2 id="consultation-title">Подбор направления обучения</h2>
+            <p>Стройэксперт</p>
           </div>
         </header>
         <main className="diagnostic-recommendation__body">
           <ProgressBar current={4} total={4} />
-          {diagnosticStatus === "loading" && <div className="diagnostic-recommendation__loading" role="status">
-            <Loader2 aria-hidden="true" /> Формируем персональную рекомендацию...
-          </div>}
-          {diagnosticStatus === "error" && <div className="diagnostic-recommendation__error" role="alert">
-            <p>{DIAGNOSTIC_ERROR}</p>
-            <Button onClick={() => { if (pendingDiagnostic.current) void generateResult(pendingDiagnostic.current); }}>
-              Повторить
-            </Button>
-          </div>}
+          {diagnosticStatus === "loading" && (
+            <div className="diagnostic-recommendation__loading" role="status">
+              <Loader2 aria-hidden="true" /> Формируем персональную
+              рекомендацию...
+            </div>
+          )}
+          {diagnosticStatus === "error" && (
+            <div className="diagnostic-recommendation__error" role="alert">
+              <p>{DIAGNOSTIC_ERROR}</p>
+              <Button
+                onClick={() => {
+                  if (pendingDiagnostic.current)
+                    void generateResult(pendingDiagnostic.current);
+                }}
+              >
+                Повторить
+              </Button>
+            </div>
+          )}
           {diagnosticStatus === "success" && diagnosticResult && (
-            <RecommendationCard result={diagnosticResult.structuredResult}
+            <RecommendationCard
+              result={diagnosticResult.structuredResult}
               onAskQuestion={() => {
-                setRecommendationViewActive(false); setConsultationViewActive(true);
+                setRecommendationViewActive(false);
+                setConsultationViewActive(true);
                 onPostDiagnosticViewChange?.("consultation");
-                showNextStep("input"); setPostDiagnosticState("post-diagnostic-ready");
+                showNextStep("input");
+                setPostDiagnosticState("post-diagnostic-ready");
               }}
               onGetConsultation={() => {
                 void handleManagerContactClick();
-              }} />
+              }}
+            />
           )}
         </main>
         {renderContactSection()}
@@ -649,57 +1007,107 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
   }
 
   if (consultationViewActive) {
-    const consultantAnswerCount = consultantMessages.filter((message) => message.role === "bot").length;
+    const consultantAnswerCount = consultantMessages.filter(
+      (message) => message.role === "bot",
+    ).length;
     const questionNumber = consultantAnswerCount + 1;
 
     return (
       <div className="chat-widget diagnostic-consultation flex flex-col h-full min-h-0 min-w-0 overflow-hidden bg-background">
         <header className="diagnostic-launch__header consultation-chat-header px-7 flex items-center text-white shrink-0">
-          <div className="diagnostic-launch__logo"><img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" /></div>
+          <div className="diagnostic-launch__logo">
+            <img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" />
+          </div>
           <div className="diagnostic-launch__brand-copy">
-            <h2 id="consultation-title">Подбор направления обучения</h2><p>Стройэксперт</p>
+            <h2 id="consultation-title">Подбор направления обучения</h2>
+            <p>Стройэксперт</p>
           </div>
         </header>
         <main className="diagnostic-consultation__body">
           <div className="diagnostic-consultation__heading">
             <span>Вопрос {questionNumber}</span>
-            <h1>{consultantAnswerCount === 0 ? "Что хотите уточнить?" : "Продолжим консультацию"}</h1>
+            <h1>
+              {consultantAnswerCount === 0
+                ? "Что хотите уточнить?"
+                : "Продолжим консультацию"}
+            </h1>
           </div>
 
           <div className="diagnostic-consultation__history" aria-live="polite">
             {consultantMessages.map((message) => (
-              <article key={message.id} className={`diagnostic-consultation__message diagnostic-consultation__message--${message.role}`}>
-                <strong>{message.role === "user" ? "Ваш вопрос" : "Артём Экспертович"}</strong>
+              <article
+                key={message.id}
+                className={`diagnostic-consultation__message diagnostic-consultation__message--${message.role}`}
+              >
+                <strong>
+                  {message.role === "user" ? "Ваш вопрос" : "Артём Экспертович"}
+                </strong>
                 <p>{message.content}</p>
               </article>
             ))}
-            {consultantLoading && <div role="status" className="diagnostic-consultation__loading">
-              <Loader2 aria-hidden="true" /> Готовим ответ Артёма...
-            </div>}
+            {consultantLoading && (
+              <div role="status" className="diagnostic-consultation__loading">
+                <Loader2 aria-hidden="true" /> Готовим ответ Артёма...
+              </div>
+            )}
           </div>
 
           <div className="diagnostic-consultation__composer">
-              <Textarea ref={postDiagnosticInputRef} value={questionDraft} disabled={consultantLoading}
-                maxLength={1000} onChange={(event) => setQuestionDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-                    event.preventDefault(); void handleConsultantSubmit();
-                  }
-                }}
-                placeholder="Введите ваш вопрос" aria-label="Введите ваш вопрос" />
-              {consultantError && <p role="alert" className="diagnostic-consultation__error">{CONSULTANT_ERROR}</p>}
-              <Button onClick={() => void handleConsultantSubmit()}
-                disabled={consultantLoading || !questionDraft.trim() || !conversationId}
-                className="diagnostic-consultation__submit">
-                {consultantLoading ? <Loader2 className="animate-spin" /> : consultantError ? "Повторить" : "Задать вопрос"}
-                {!consultantLoading && <ArrowUpRight aria-hidden="true" />}
-              </Button>
+            <Textarea
+              ref={postDiagnosticInputRef}
+              value={questionDraft}
+              disabled={consultantLoading}
+              maxLength={1000}
+              onChange={(event) => setQuestionDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  event.key === "Enter" &&
+                  !event.shiftKey &&
+                  !event.nativeEvent.isComposing
+                ) {
+                  event.preventDefault();
+                  void handleConsultantSubmit();
+                }
+              }}
+              placeholder="Введите ваш вопрос"
+              aria-label="Введите ваш вопрос"
+            />
+            {consultantError && (
+              <p role="alert" className="diagnostic-consultation__error">
+                {CONSULTANT_ERROR}
+              </p>
+            )}
+            <Button
+              onClick={() => void handleConsultantSubmit()}
+              disabled={
+                consultantLoading || !questionDraft.trim() || !conversationId
+              }
+              className="diagnostic-consultation__submit"
+            >
+              {consultantLoading ? (
+                <Loader2 className="animate-spin" />
+              ) : consultantError ? (
+                "Повторить"
+              ) : (
+                "Задать вопрос"
+              )}
+              {!consultantLoading && <ArrowUpRight aria-hidden="true" />}
+            </Button>
           </div>
           {contactPhase !== "submitted" && (
-            <div className="diagnostic-consultation__complete" ref={limitCtaRef}>
-              <Button className="diagnostic-consultation__manager" onClick={() => {
-                void handleManagerContactClick();
-              }}><span className="diagnostic-consultation__manager-label">Связаться с менеджером</span>
+            <div
+              className="diagnostic-consultation__complete"
+              ref={limitCtaRef}
+            >
+              <Button
+                className="diagnostic-consultation__manager"
+                onClick={() => {
+                  void handleManagerContactClick();
+                }}
+              >
+                <span className="diagnostic-consultation__manager-label">
+                  Связаться с менеджером
+                </span>
                 <ArrowUpRight aria-hidden="true" />
               </Button>
             </div>
@@ -720,10 +1128,19 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
         style={{ minHeight: "72px" }}
       >
         <div className="h-8 w-[70px] overflow-hidden shrink-0 rounded">
-          <img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" className="h-full w-auto max-w-none" />
+          <img
+            src={INOBR_LOGO_SRC}
+            alt="Институт непрерывного образования"
+            className="h-full w-auto max-w-none"
+          />
         </div>
         <div>
-          <h2 id="consultation-title" className="font-semibold text-[15px] text-white leading-tight">Подбор направления обучения</h2>
+          <h2
+            id="consultation-title"
+            className="font-semibold text-[15px] text-white leading-tight"
+          >
+            Подбор направления обучения
+          </h2>
           <p className="text-[11px] text-white/60 flex items-center gap-1.5 mt-0.5">
             <span className="w-1.5 h-1.5 rounded-full bg-primary inline-block" />
             Онлайн
@@ -732,29 +1149,46 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
       </header>
 
       {/* Progress bar (during questions) */}
-      {isDiagnosticStep && (
-        <ProgressBar current={questionNumber} total={4} />
-      )}
+      {isDiagnosticStep && <ProgressBar current={questionNumber} total={4} />}
 
       {/* Messages */}
-      <div className="chat-dialogue min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-4 sm:py-5 bg-muted/40" ref={scrollRef} tabIndex={0} aria-label="Диалог">
+      <div
+        className="chat-dialogue min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-4 sm:py-5 bg-muted/40"
+        ref={scrollRef}
+        tabIndex={0}
+        aria-label="Диалог"
+      >
         <div className="space-y-4 pb-4">
           <AnimatePresence initial={false}>
             {messages.map((msg) => {
-              const currentQuestion = isDiagnosticStep && msg.role === "bot" && msg.id === messages.at(-1)?.id;
+              const currentQuestion =
+                isDiagnosticStep &&
+                msg.role === "bot" &&
+                msg.id === messages.at(-1)?.id;
               return (
-                <div key={msg.id} ref={currentQuestion ? currentQuestionRef : undefined}
-                  className={currentQuestion ? "chat-focus-target space-y-4" : undefined}>
+                <div
+                  key={msg.id}
+                  ref={currentQuestion ? currentQuestionRef : undefined}
+                  className={
+                    currentQuestion ? "chat-focus-target space-y-4" : undefined
+                  }
+                >
                   <motion.div
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
                     className={`chat-focus-target flex gap-2.5 max-w-[88%] ${
-                      msg.role === "user" ? "ml-auto flex-row-reverse" : "mr-auto"
+                      msg.role === "user"
+                        ? "ml-auto flex-row-reverse"
+                        : "mr-auto"
                     }`}
                   >
                     {msg.role === "bot" && (
                       <div className="w-7 h-7 overflow-hidden rounded shrink-0 mt-1">
-                        <img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" className="h-full w-auto max-w-none" />
+                        <img
+                          src={INOBR_LOGO_SRC}
+                          alt="Институт непрерывного образования"
+                          className="h-full w-auto max-w-none"
+                        />
                       </div>
                     )}
                     <div
@@ -781,7 +1215,11 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
                 className="flex gap-2.5 max-w-[80%] mr-auto items-center"
               >
                 <div className="w-7 h-7 overflow-hidden rounded shrink-0">
-                  <img src={INOBR_LOGO_SRC} alt="Институт непрерывного образования" className="h-full w-auto max-w-none" />
+                  <img
+                    src={INOBR_LOGO_SRC}
+                    alt="Институт непрерывного образования"
+                    className="h-full w-auto max-w-none"
+                  />
                 </div>
                 <div className="bg-white border border-border shadow-sm rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 bg-muted-foreground/40 rounded-full animate-bounce [animation-delay:-0.3s]" />
@@ -793,42 +1231,74 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
           </AnimatePresence>
 
           <div ref={diagnosticResultRef} className="chat-focus-target">
-          {diagnosticStatus === "loading" && (
-            <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground px-4">
-              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-              Формируем результат диагностики...
-            </div>
-          )}
-          {diagnosticStatus === "error" && (
-            <div role="alert" className="rounded-xl border border-border bg-white p-4 space-y-3">
-              <p className="text-sm">{DIAGNOSTIC_ERROR}</p>
-              <Button onClick={() => {
-                if (pendingDiagnostic.current) void generateResult(pendingDiagnostic.current);
-              }} className="rounded-lg" data-testid="button-retry-diagnostic">
-                Повторить
-              </Button>
-            </div>
-          )}
-          {diagnosticStatus === "success" && diagnosticResult && (
-            <ResultCard
-              result={diagnosticResult.structuredResult}
-              onAskQuestion={() => { showNextStep("input"); setPostDiagnosticState("post-diagnostic-ready"); }}
-              onGetConsultation={() => { void handleManagerContactClick(); }}
-            />
-          )}
+            {diagnosticStatus === "loading" && (
+              <div
+                role="status"
+                className="flex items-center gap-2 text-sm text-muted-foreground px-4"
+              >
+                <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                Формируем результат диагностики...
+              </div>
+            )}
+            {diagnosticStatus === "error" && (
+              <div
+                role="alert"
+                className="rounded-xl border border-border bg-white p-4 space-y-3"
+              >
+                <p className="text-sm">{DIAGNOSTIC_ERROR}</p>
+                <Button
+                  onClick={() => {
+                    if (pendingDiagnostic.current)
+                      void generateResult(pendingDiagnostic.current);
+                  }}
+                  className="rounded-lg"
+                  data-testid="button-retry-diagnostic"
+                >
+                  Повторить
+                </Button>
+              </div>
+            )}
+            {diagnosticStatus === "success" && diagnosticResult && (
+              <ResultCard
+                result={diagnosticResult.structuredResult}
+                onAskQuestion={() => {
+                  showNextStep("input");
+                  setPostDiagnosticState("post-diagnostic-ready");
+                }}
+                onGetConsultation={() => {
+                  void handleManagerContactClick();
+                }}
+              />
+            )}
           </div>
           {consultantMessages.map((message) => (
-            <div key={message.id} ref={message.id === consultantMessages.at(-1)?.id
-              ? message.role === "bot" ? latestAssistantMessageRef : latestUserMessageRef : undefined}
+            <div
+              key={message.id}
+              ref={
+                message.id === consultantMessages.at(-1)?.id
+                  ? message.role === "bot"
+                    ? latestAssistantMessageRef
+                    : latestUserMessageRef
+                  : undefined
+              }
               className={`chat-focus-target max-w-[88%] px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap rounded-2xl ${
-              message.role === "user" ? "ml-auto bg-primary text-primary-foreground rounded-tr-sm" : "mr-auto bg-white border border-border shadow-sm rounded-tl-sm"
-            }`}>
+                message.role === "user"
+                  ? "ml-auto bg-primary text-primary-foreground rounded-tr-sm"
+                  : "mr-auto bg-white border border-border shadow-sm rounded-tl-sm"
+              }`}
+            >
               {message.content}
             </div>
           ))}
-          {consultantLoading && <div role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="w-4 h-4 animate-spin" />Готовим ответ...
-          </div>}
+          {consultantLoading && (
+            <div
+              role="status"
+              className="flex items-center gap-2 text-sm text-muted-foreground"
+            >
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Готовим ответ...
+            </div>
+          )}
           {postDiagnosticState === "post-diagnostic-ready" && (
             <div className="rounded-xl border border-border bg-white p-4 space-y-2">
               <Textarea
@@ -837,7 +1307,11 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
                 disabled={consultantLoading}
                 maxLength={1000}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                  if (
+                    event.key === "Enter" &&
+                    !event.shiftKey &&
+                    !event.nativeEvent.isComposing
+                  ) {
                     event.preventDefault();
                     void handleConsultantSubmit();
                   }
@@ -847,21 +1321,43 @@ export function ChatWidget({ onDiagnosticCompleted, onPostDiagnosticViewChange }
                 aria-label="Что хотите уточнить?"
                 className="chat-focus-target min-h-[80px] text-sm resize-none rounded-xl"
               />
-              {consultantError && <p role="alert" className="text-sm text-destructive">{CONSULTANT_ERROR}</p>}
-              <Button onClick={() => void handleConsultantSubmit()}
-                disabled={consultantLoading || !questionDraft.trim() || !conversationId}
-                className="rounded-lg text-sm">
-                {consultantLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : consultantError ? "Повторить" : "Отправить"}
+              {consultantError && (
+                <p role="alert" className="text-sm text-destructive">
+                  {CONSULTANT_ERROR}
+                </p>
+              )}
+              <Button
+                onClick={() => void handleConsultantSubmit()}
+                disabled={
+                  consultantLoading || !questionDraft.trim() || !conversationId
+                }
+                className="rounded-lg text-sm"
+              >
+                {consultantLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : consultantError ? (
+                  "Повторить"
+                ) : (
+                  "Отправить"
+                )}
               </Button>
             </div>
           )}
 
           {/* Forms share the same viewport, so long results cannot squeeze them out. */}
-          {contactPhase && <div ref={contactFormRef} className="chat-focus-target">{renderContactSection()}</div>}
-          <div ref={bottomRef} data-testid="chat-bottom-anchor" className="h-px" aria-hidden="true" />
+          {contactPhase && (
+            <div ref={contactFormRef} className="chat-focus-target">
+              {renderContactSection()}
+            </div>
+          )}
+          <div
+            ref={bottomRef}
+            data-testid="chat-bottom-anchor"
+            className="h-px"
+            aria-hidden="true"
+          />
         </div>
       </div>
     </div>
   );
 }
-

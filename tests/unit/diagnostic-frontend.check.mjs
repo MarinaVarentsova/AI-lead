@@ -158,7 +158,7 @@ try {
   assert.deepEqual(await completePersistedDiagnostic(fixture.conversationId), visibleResponse);
   assert.deepEqual(calls, ["/api/diagnose"], "confirmed turn persistence must not be repeated before recommendation");
 
-  const widget = readFileSync(new URL("apps/web/src/components/chat-widget.tsx", root), "utf8");
+  const widget = readFileSync(new URL("apps/web/src/components/chat-widget.tsx", root), "utf8").replace(/\s+/g, " ");
   assert.ok(widget.includes("getDiagnosticSchema()"));
   assert.ok(widget.includes("const dictItems = q.options"));
   assert.ok(widget.includes("opt.allowsFreeText"));
@@ -170,30 +170,30 @@ try {
   assert.match(widget, /current_role:\s*allAnswers\[1\]\.code/);
   assert.match(widget, /education_status:\s*allAnswers\[2\]\.code/);
   assert.match(widget, /target_tasks:\s*allAnswers\[3\]\.code/);
-  assert.ok(widget.includes("completePersistedDiagnostic(payload.conversationId)"));
+  assert.match(widget, /completePersistedDiagnostic\(\s*payload\.conversationId,?\s*\)/);
   assert.ok(widget.includes('className="diagnostic-recommendation__text">{result.recommendation}</p>'));
   assert.ok(widget.includes("260–520 академических часов"));
   assert.ok(widget.includes("Связаться с менеджером"));
   assert.ok(widget.includes("Задать вопрос"));
   assert.ok(widget.includes("<ProgressBar current={4} total={4} />"));
   assert.ok(widget.includes("onClick={onGetConsultation}"));
-  assert.match(widget, /managerClickRecording\.current = recordManagerContactClick\(conversationId, \{/);
-  assert.match(widget, /await managerClickRecording\.current;[\s\S]*mountNativeGetCourseWidget/);
+  assert.match(widget, /managerClickRecording\.current\s*=\s*recordManagerContactClick\(\s*conversationId,\s*\{/);
+  assert.doesNotMatch(widget, /await managerClickRecording\.current/);
   assert.ok(widget.includes('managerCtaSource: recommendationViewActive ? "recommendation"'));
   assert.ok(widget.includes('onGetConsultation={() => { void handleManagerContactClick(); }}'));
   assert.ok(widget.includes('onPostDiagnosticViewChange?.("consultation")'));
-  assert.ok(widget.includes('const consultantAnswerCount = consultantMessages.filter((message) => message.role === "bot").length'));
+  assert.match(widget, /const consultantAnswerCount\s*=\s*consultantMessages\.filter\(\s*\(message\)\s*=>\s*message\.role\s*===\s*"bot",?\s*\)\.length/);
   assert.ok(widget.includes('const questionNumber = consultantAnswerCount + 1'));
   assert.ok(!widget.includes('consultantLimitReached'));
   assert.ok(widget.includes('Вопрос {questionNumber}'));
   assert.ok(widget.includes('className="diagnostic-consultation__history"'));
-  assert.ok(widget.includes('setConsultantMessages((previous) => [...previous, { id: uid(), role: "bot", content: reply.message }])'));
+  assert.match(widget, /setConsultantMessages[\s\S]*role:\s*"bot",\s*content:\s*reply\.message/);
   assert.ok(widget.includes('className="diagnostic-consultation__composer"'));
   assert.match(widget, /contactPhase !== "submitted"[\s\S]*diagnostic-consultation__complete/);
   assert.match(widget, /diagnostic-consultation__manager[\s\S]*handleManagerContactClick/);
   const styles = readFileSync(new URL("apps/web/src/index.css", root), "utf8");
   assert.match(styles, /\.diagnostic-consultation__manager\s*\{[\s\S]*?width:\s*100%;[\s\S]*?flex:\s*1 1 auto;[\s\S]*?justify-content:\s*center;/);
-  assert.match(widget, /diagnostic-consultation__manager-label">Связаться с менеджером<\/span>[\s\S]*?<ArrowUpRight/);
+  assert.match(widget, /diagnostic-consultation__manager-label">\s*Связаться с менеджером\s*<\/span>[\s\S]*?<ArrowUpRight/);
   for (const legacyBlock of ["result.currentArea", "result.currentRole", "result.education", "result.targetTasks"]) {
     assert.ok(!widget.includes(legacyBlock));
   }

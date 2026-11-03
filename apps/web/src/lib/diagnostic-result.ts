@@ -2,11 +2,15 @@ import { apiFetch } from "./api";
 
 export interface StructuredDiagnosticResult {
   recommendation: string;
-  recommendedTrack: "construction_expertise" | "apartment_acceptance" | "not_defined";
+  recommendedTrack:
+    | "construction_expertise"
+    | "apartment_acceptance"
+    | "not_defined";
 }
 
 export interface DiagnoseResponse {
   structuredResult: StructuredDiagnosticResult;
+  timings?: Record<string, number>;
 }
 
 export interface DiagnosticPayload {
@@ -18,15 +22,18 @@ export interface DiagnosticPayload {
   target_tasks: string;
 }
 
-export const DIAGNOSTIC_ERROR = "Не удалось сформировать результат диагностики. Попробуйте ещё раз.";
+export const DIAGNOSTIC_ERROR =
+  "Не удалось сформировать результат диагностики. Попробуйте ещё раз.";
 
 function record(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(DIAGNOSTIC_ERROR);
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new Error(DIAGNOSTIC_ERROR);
   return value as Record<string, unknown>;
 }
 
 function text(value: unknown): string {
-  if (typeof value !== "string" || !value.trim()) throw new Error(DIAGNOSTIC_ERROR);
+  if (typeof value !== "string" || !value.trim())
+    throw new Error(DIAGNOSTIC_ERROR);
   return value;
 }
 
@@ -34,20 +41,35 @@ export function parseDiagnoseResponse(value: unknown): DiagnoseResponse {
   const response = record(value);
   const result = record(response.structuredResult);
   const track = result.recommendedTrack;
-  if (track !== "construction_expertise" && track !== "apartment_acceptance" && track !== "not_defined") {
+  if (
+    track !== "construction_expertise" &&
+    track !== "apartment_acceptance" &&
+    track !== "not_defined"
+  ) {
     throw new Error(DIAGNOSTIC_ERROR);
   }
   return {
-    structuredResult: { recommendation: text(result.recommendation), recommendedTrack: track },
+    structuredResult: {
+      recommendation: text(result.recommendation),
+      recommendedTrack: track,
+    },
+    ...(response.timings && typeof response.timings === "object"
+      ? { timings: response.timings as Record<string, number> }
+      : {}),
   };
 }
 
 /** Persist answers first. A failed save must never trigger generation. */
 export async function completeDiagnostic(
   payload: DiagnosticPayload,
-  saveAnswers: (payload: DiagnosticPayload) => Promise<unknown> = async value => {
-    const response = await apiFetch("/api/diagnostic-answers", { method: "POST",
-      headers: { "Content-Type": "application/json" }, body: JSON.stringify(value) });
+  saveAnswers: (payload: DiagnosticPayload) => Promise<unknown> = async (
+    value,
+  ) => {
+    const response = await apiFetch("/api/diagnostic-answers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(value),
+    });
     if (!response.ok) throw new Error(DIAGNOSTIC_ERROR);
     return response.json();
   },
@@ -63,12 +85,20 @@ export async function completeDiagnostic(
 }
 
 /** Generate only after the turn endpoint has confirmed all four answers. */
-export async function completePersistedDiagnostic(conversationId: string): Promise<DiagnoseResponse> {
+export async function completePersistedDiagnostic(
+  conversationId: string,
+): Promise<DiagnoseResponse> {
+  const startedAt = performance.now();
   const response = await apiFetch("/api/diagnose", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ conversationId }),
   });
   if (!response.ok) throw new Error(DIAGNOSTIC_ERROR);
-  return parseDiagnoseResponse(await response.json());
+  const parsed = parseDiagnoseResponse(await response.json());
+  console.info("DIAGNOSTIC_TIMING", {
+    ...parsed.timings,
+    frontend_wait_ms: Math.round(performance.now() - startedAt),
+  });
+  return parsed;
 }
