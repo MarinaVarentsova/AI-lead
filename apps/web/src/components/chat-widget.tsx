@@ -22,7 +22,7 @@ import {
   CONSULTANT_ERROR,
 } from "@/lib/consultant-chat";
 import {
-  mountNativeGetCourseWidget,
+  mountBitrixManagerForm,
   MANAGER_CONTEXT_ERROR,
 } from "@/lib/manager-form";
 import {
@@ -674,7 +674,7 @@ export function ChatWidget({
     let unmount = () => {};
     void (async () => {
       if (disposed || !managerWidgetRef.current) return;
-      unmount = await mountNativeGetCourseWidget(
+      unmount = await mountBitrixManagerForm(
         managerWidgetRef.current,
         conversationId,
         {
@@ -837,7 +837,7 @@ export function ChatWidget({
                 ref={managerWidgetRef}
                 aria-label="Форма связи с менеджером GetCourse"
                 className="manager-form-modal__widget"
-                data-testid="native-getcourse-widget"
+                data-testid="bitrix-manager-form"
               />
             </div>
           )}

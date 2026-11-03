@@ -42,7 +42,7 @@ async function contextFor(sessionId: string, trace: ManagerFormTrace = () => {})
       dialogSummaryLength: context.dialogSummary.length, transcriptMessageCount: context.transcript.length,
       knowledgeBaseVersion: context.knowledgeBaseVersion, totalContextSize: JSON.stringify(context).length });
     const comment = formatGetCourseManagerComment(context);
-    trace("getcourse_comment_formatted", { commentLength: comment.length,
+    trace("manager_comment_formatted", { commentLength: comment.length,
       containsRecommendation: comment.includes(context.recommendationText),
       containsTranscript: context.transcript.length === 0 || context.transcript.some(turn => comment.includes(turn.text)),
       containsSessionId: comment.includes(sessionId) });
@@ -98,7 +98,7 @@ router.post("/manager-form/success/:sessionId", async (req, res): Promise<void> 
   const managerFormRequestId = UUID_RE.test(submissionId) ? submissionId : randomUUID();
   const trace = traceFor(req, sessionId, managerFormRequestId);
   trace("manager_success_event_received", { timestamp: new Date().toISOString(), nativeSuccessConfirmed: true });
-  if (!UUID_RE.test(sessionId) || !UUID_RE.test(submissionId) || !contacts.name || !contacts.phone || !contacts.email) {
+  if (!UUID_RE.test(sessionId) || !UUID_RE.test(submissionId)) {
     trace("manager_form_completed", { result: "validation_error", errorCode: "MANAGER_NATIVE_SUCCESS_INVALID" });
     res.status(400).json({ success: false, error: "MANAGER_NATIVE_SUCCESS_INVALID" }); return;
   }
