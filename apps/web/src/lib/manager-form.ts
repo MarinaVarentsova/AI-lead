@@ -261,7 +261,7 @@ function mountProxiedGetCourseWidget(container: HTMLElement, sessionId: string,
     if (disposed || event.origin !== expectedMessageOrigin || event.source !== iframe.contentWindow) return;
     const data = event.data as { type?: string; status?: string; sessionId?: string } | null;
     if (data?.type !== "getcourse-manager-widget" || data.sessionId !== sessionId) return;
-    if (data.status === "ready") { ready = true; clearTimeout(timer); callbacks.onReady(); }
+    if (data.status === "ready" && !ready) { ready = true; clearTimeout(timer); callbacks.onReady(); }
     else if (data.status === "success") { clearTimeout(timer); callbacks.onSuccess(); }
     else if (data.status === "error") { clearTimeout(timer); callbacks.onError(); }
   };

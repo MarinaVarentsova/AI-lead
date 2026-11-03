@@ -83,6 +83,8 @@ try {
   assert.match(html, /Я соглашаюсь на получение рекламных рассылок/);
   assert.match(html, /form\.addEventListener\("submit",validate,true\)/);
   assert.match(html, /event\.stopImmediatePropagation\(\)/);
+  assert.match(html, /var notifyReady=function\(\)[\s\S]*context\.value\.trim\(\)[\s\S]*postMessage/);
+  assert.match(html, /attempts\+\+<120[\s\S]*setTimeout\(notifyReady,100\)/);
   assert.match(html, /postMessage[\s\S]*"https:\/\/artem\.inobr-expert\.ru"/);
   assert.match(html, /\[data-id="22041910"\]\{display:none!important\}/);
   assert.ok(trace.some(item => item.stage === "getcourse_widget_fetch_success" && item.formFound));
