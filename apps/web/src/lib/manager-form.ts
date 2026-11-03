@@ -200,7 +200,8 @@ const validComment = (comment: string, sessionId: string) =>
     "Версия базы знаний:",
     sessionId,
   ].every((marker) => comment.includes(marker)) &&
-  /(?:Пользователь|Артём):\s*\S/.test(comment);
+  (/(?:Пользователь|Артём):\s*\S/.test(comment) ||
+    comment.includes("Дополнительных вопросов не было."));
 
 export async function mountNativeGetCourseWidget(
   container: HTMLElement,

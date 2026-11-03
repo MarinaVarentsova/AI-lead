@@ -74,6 +74,7 @@ assert.match(helper, /formParams\[phone\]/);
 assert.match(helper, /xhr\.responseJSON\?\.data\?\.formProcessed === true/);
 assert.match(helper, /manager-form\/success/);
 assert.match(helper, /manager_context_injected/);
+assert.match(helper, /Дополнительных вопросов не было\./);
 assert.match(helper, /manager_native_submit_started/);
 assert.match(helper, /manager_native_submit_success/);
 assert.match(helper, /manager_native_submit_error/);
