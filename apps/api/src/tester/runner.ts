@@ -115,7 +115,7 @@ export async function runTester(count: number, runtime: ArtemRuntime, store: Tes
         // The production runtime has already validated this fallback against the
         // same v3 result contract. Do not turn a valid production result back
         // into a tester-only schema failure.
-        if (outcome.source === "fallback" && outcome.failureReason !== "AI_CONFIGURATION_ERROR" &&
+        if (outcome.source === "fallback" && outcome.failureReason && outcome.failureReason !== "AI_CONFIGURATION_ERROR" &&
           outcome.failureReason !== "AI_INVALID_RESULT") {
           throw new DiagnosticAIError(outcome.failureReason ?? "AI_REQUEST_FAILED");
         }

@@ -12,7 +12,13 @@ export function consultantFallback(input: ConsultantProviderInput, markdown: str
   return fallbackReply(markdown, program ?? (/targetTasks=apartment_house_acceptance|no_professional_education/.test(input.diagnosticContext) ? "apartment_acceptance" : "construction_expertise"),
     input.question, input.history ?? [], input.diagnosticContext);
 }
-const SMALL_TALK_REPLY = "Спасибо, всё хорошо. Продолжим по обучению — что хотите уточнить?";
+function smallTalkReply(question: string): string {
+  const value = question.trim().toLowerCase().replace(/ё/g, "е");
+  if (/как дела/.test(value)) return "Спасибо, всё хорошо. Продолжим по обучению — что хотите уточнить?";
+  if (/^(?:спасибо|благодарю)/.test(value)) return "Пожалуйста! Если появятся вопросы по обучению — помогу разобраться.";
+  if (/^(?:понятно|ок(?:ей)?)/.test(value)) return "Хорошо. Что хотите уточнить по обучению?";
+  return "Здравствуйте! Я помогу выбрать программу обучения и разобраться в условиях. Что хотите уточнить?";
+}
 const OFF_TOPIC_REPLY = "Похоже, мы ушли от темы обучения. Я здесь, чтобы помочь выбрать подходящую программу. Сформулируйте вопрос в этом контексте — буду рад проконсультировать.";
 const ABUSIVE_REPLY = "Давайте вернёмся к теме обучения. Я помогу выбрать подходящую программу и разобраться в условиях.";
 const MANAGER_REFERRAL = "Для точного ответа по этому вопросу лучше связаться с менеджером — он подскажет актуальные условия. Воспользуйтесь кнопкой «Связаться с менеджером».";
@@ -124,13 +130,15 @@ export class ConsultantChatService {
       faqSimilarity: faq.similarity, kbReference: faq.kbReference, sourceVersion: facts.sourceVersion } :
       { faqMatchUsed: false, sourceVersion: facts.sourceVersion };
     const respond = (response: ConsultantChatResponse): ConsultantChatResponse => {
-      const presentation = professional?.intent ? postProcessProfessionalAnswer(response.message, {
+      const safeMessage = guardInternalKnowledgeDisclosure(response.message);
+      const presentation = professional?.intent ? postProcessProfessionalAnswer(safeMessage, {
         question: facts.question, sources: webSources, allowManagerReferral: Boolean(professional.mixedProductAndProfessional),
       }) : null;
       const answerSource = response.answerSource ?? (webResearchUsed ? (professional?.mixedProductAndProfessional ? "mixed" : "professional_web") :
         faq?.policy === "MANAGER" ? "manager" : faq && kbSectionsUsed.length ? "faq_and_kb" : faq ? "faq" :
           kbSectionsUsed.length ? "kb" : response.fallbackReason === "INSUFFICIENT_KNOWLEDGE" ? "manager" : "fallback");
-      return ({ ...response, ...(presentation ? { ...presentation, message: presentation.message } : {}), ...faqMeta, answerSource, kbSectionsUsed, topLevelDomain,
+      return ({ ...response, message: presentation?.message ?? safeMessage,
+      ...(presentation ? presentation : {}), ...faqMeta, answerSource, kbSectionsUsed, topLevelDomain,
       classifiedIntent: professional?.intent ?? faq?.intent ?? null,
       webResearchEligible, webResearchUsed, webResearchIntent: professional?.intent ?? undefined,
       webResearchSourceCount, webResearchDomains, webResearchLatencyMs, webResearchFallbackReason, webResearchProvider,
@@ -152,7 +160,7 @@ export class ConsultantChatService {
     const unknown = facts.matchedSections.every(section => ["faq", "manager"].includes(section.id));
     const intent = shouldAttemptWebResearch ? "relevant_training_question" : classifyConsultantIntent(facts.question, !unknown);
     if (["small_talk", "off_topic", "abusive_or_trolling"].includes(intent)) topLevelDomain = "OTHER";
-    if (intent === "small_talk") return respond({ message: SMALL_TALK_REPLY, isAI: false, provider: "fallback",
+    if (intent === "small_talk") return respond({ message: smallTalkReply(facts.question), isAI: false, provider: "fallback",
       matchedSectionIds: facts.matchedSections.map(section => section.id), fallbackReason: null });
     if (intent === "off_topic" || intent === "abusive_or_trolling") return respond({
       message: intent === "abusive_or_trolling" ? ABUSIVE_REPLY : OFF_TOPIC_REPLY,

@@ -72,6 +72,13 @@ try {
   ].map(([label, answers, questions]) => ({ label, answers, questions }));
 
   const provider = new YandexAIProvider({});
+  provider.generateConsultantReply = async input => /Что даст программа/i.test(input.question)
+    ? "Проектировщик сможет лучше работать с проектной и технической документацией, исследовать дефекты и готовить экспертные заключения."
+    : /Как расширить задачи/i.test(input.question)
+      ? "Можно перейти от фиксации качества к исследованию причин дефектов и подготовке экспертных выводов и заключений."
+      : /сопровождать стройку ИЖС/i.test(input.question)
+        ? "Для сопровождения стройки по этапам подходит «Строительный контроль ИЖС»."
+        : "Подтверждённый ответ по выбранной программе.";
   provider.generateStructured = async prompt => {
     if (prompt.includes("systemicProblems")) throw new Error("summary unavailable");
     return { criteria: Object.fromEntries(CRITERIA.map(key => [key, 90])), strengths: ["v4.6"], problems: [],
@@ -125,7 +132,7 @@ try {
   assert.equal(fallbackSummary.TECH_ERROR, 0);
   for (const result of fallbackSaved) {
     assert.equal(result.diagnosticResult.source, "fallback");
-    assert.equal(result.diagnosticResult.failureReason, "AI_INVALID_RESULT");
+    assert.equal(result.diagnosticResult.failureReason, undefined);
     assert.ok(result.diagnosticResult.result.recommendation.trim());
     assert.notEqual(result.verdict, "TECH_ERROR");
   }

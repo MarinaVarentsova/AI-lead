@@ -426,7 +426,10 @@ try {
   assert.equal(captured, undefined);
   for (const [message, expected] of [
     ["как дела?", /Спасибо, всё хорошо/i],
-    ["привет", /Продолжим по обучению/i],
+    ["привет", /^Здравствуйте!.*выбрать программу обучения/is],
+    ["здравствуйте", /^Здравствуйте!.*Что хотите уточнить/is],
+    ["спасибо", /^Пожалуйста!/i],
+    ["ок", /^Хорошо\./i],
     ["расскажи анекдот", /ушли от темы обучения/i],
     ["абракадабра фыва олдж", /ушли от темы обучения/i],
     ["ты дебил", /вернёмся к теме обучения/i],
@@ -532,6 +535,12 @@ try {
   });
   assert.match(guardedAI.message, /33 000 ₽.*менеджер/is);
   assert.doesNotMatch(guardedAI.message, /в моей базе|в базе не|по базе|источник/i);
+  const noAnswerVariants = await run({
+    message: "Расскажите подробнее о программе",
+    aiReply: "Вариантов ответа в базе знаний у меня нет.",
+  });
+  assert.doesNotMatch(noAnswerVariants.message, /вариантов? ответ|баз[аеы] знаний/i);
+  assert.match(noAnswerVariants.message, /менеджер/i);
   const explicitIncomeGuarantee = await run({
     message: "Можете обещать доход не меньше 100 тысяч?",
   });
@@ -854,6 +863,7 @@ try {
   };
   let evaluatorAttempts = 0;
   const fakeProvider = new YandexAIProvider({});
+  fakeProvider.generateConsultantReply = async () => "Подтверждённый ответ по выбранной программе.";
   fakeProvider.generateStructured = async (prompt) => {
     if (prompt.includes("systemicProblems")) return runAssessment;
     evaluatorAttempts += 1;
