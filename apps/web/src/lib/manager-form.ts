@@ -98,10 +98,15 @@ export async function mountBitrixManagerForm(container: HTMLElement, sessionId: 
   const finishSuccess = async (detail: BitrixFormEventDetail) => {
     if (disposed || successHandled) return;
     successHandled = true;
+    container.style.display = "none";
     try {
       await confirmNativeManagerSuccess(sessionId, crypto.randomUUID(), contactsFrom(detail.data));
       callbacks.onSuccess();
-    } catch { successHandled = false; callbacks.onError(); }
+    } catch {
+      successHandled = false;
+      container.style.removeProperty("display");
+      callbacks.onError();
+    }
   };
   const onInit = (event: Event) => {
     const detail = (event as CustomEvent<BitrixFormEventDetail>).detail;
@@ -153,6 +158,7 @@ export async function mountBitrixManagerForm(container: HTMLElement, sessionId: 
     disposed = true; clearTimeout(timeout);
     window.removeEventListener("b24:form:init", onInit);
     window.removeEventListener("b24:form:send:success", onSuccess);
+    container.style.removeProperty("display");
     container.replaceChildren();
   };
 }

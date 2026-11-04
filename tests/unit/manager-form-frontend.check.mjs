@@ -24,6 +24,8 @@ assert.doesNotMatch(helper, /setProperty\("artem_consultation_summary"/);
 assert.match(helper, /manager_context_loading[\s\S]*await apiFetch[\s\S]*bitrix_script_loading/);
 assert.match(helper, /bitrixSummaryPresent:\s*true[\s\S]*bitrixSummaryLength:\s*summary\.length/);
 assert.match(helper, /b24:form:send:success/);
+assert.match(helper, /container\.style\.display\s*=\s*"none"[\s\S]*await confirmNativeManagerSuccess/);
+assert.match(helper, /catch\s*\{[\s\S]*container\.style\.removeProperty\("display"\)[\s\S]*callbacks\.onError\(\)/);
 assert.match(helper, /confirmNativeManagerSuccess/);
 assert.match(helper, /bitrix_script_error[\s\S]*callbacks\.onError\(\)/);
 assert.match(helper, /manager_form_timeout[\s\S]*callbacks\.onError\(\)/);
