@@ -17,7 +17,10 @@ assert.match(helper, /inline\/\$\{BITRIX_FORM_ID\}\/\$\{BITRIX_FORM_CODE\}/);
 assert.match(helper, /loader_199\.js/);
 assert.match(helper, /b24:form:init/);
 assert.match(helper, /Number\(form\.identification\?\.id\)\s*!==\s*BITRIX_FORM_ID/);
-assert.match(helper, /setProperty\("artem_consultation_summary",\s*summary\)/);
+assert.match(helper, /BITRIX_CONSULTATION_DATA_FIELD\s*=\s*"UF_CRM_1793693484"/);
+assert.match(helper, /setValues\(\{\s*phone:\s*"\+7"\s*\}\)/);
+assert.match(helper, /consultationDataTransferEnabled[\s\S]*setProperty\(BITRIX_CONSULTATION_DATA_FIELD,\s*summary\)/);
+assert.doesNotMatch(helper, /setProperty\("artem_consultation_summary"/);
 assert.match(helper, /manager_context_loading[\s\S]*await apiFetch[\s\S]*bitrix_script_loading/);
 assert.match(helper, /bitrixSummaryPresent:\s*true[\s\S]*bitrixSummaryLength:\s*summary\.length/);
 assert.match(helper, /b24:form:send:success/);
@@ -28,6 +31,9 @@ assert.match(helper, /UTM_SOURCE/); assert.match(helper, /UTM_MEDIUM/); assert.m
 assert.doesNotMatch(helper, /GetCourse|1658046|22041910|widget-submit|intlTelInput/);
 
 assert.match(route, /manager-form\/success\/:sessionId/);
+assert.match(route, /BITRIX_CONSULTATION_DATA_MAX_LENGTH\s*=\s*65_535/);
+assert.match(route, /MANAGER_CONSULTATION_DATA_TOO_LONG/);
+assert.match(route, /BITRIX_CONSULTATION_DATA_ENABLED\s*===\s*"true"/);
 assert.match(route, /recordEventOnce\(sessionId, "manager_form_submit"[\s\S]*sendTelegramManagerLead/);
 assert.doesNotMatch(route, /!contacts\.name\s*\|\|\s*!contacts\.phone\s*\|\|\s*!contacts\.email/);
 assert.match(widget, /setContactPhase\("submitted"\)/);

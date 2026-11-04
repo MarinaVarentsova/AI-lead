@@ -7,11 +7,20 @@ export const BITRIX_FORM_LOADER = "https://cdn-ru.bitrix24.ru/b6693601/crm/form/
 export const BITRIX_FORM_TELEMETRY_SIGN =
   "v1:199:site.1b7e33de2798ab8d6079d8f04866e6127f5fd0859da02db50f0a0f5aadf0adf9";
 export const BITRIX_FORM_READY_TIMEOUT_MS = 8_000;
+export const BITRIX_CONSULTATION_DATA_FIELD = "UF_CRM_1793693484";
 
-interface ManagerContextResponse { sessionId: string; comment: string }
+interface ManagerContextResponse {
+  sessionId: string;
+  comment: string;
+  consultationDataTransferEnabled: boolean;
+}
 export interface NativeManagerContacts { name: string; phone: string; email: string }
 export interface NativeManagerWidgetCallbacks { onReady(): void; onSuccess(): void; onError(): void }
-interface BitrixForm { identification?: { id?: number | string }; setProperty(name: string, value: string): void }
+interface BitrixForm {
+  identification?: { id?: number | string };
+  setProperty(name: string, value: string): void;
+  setValues(values: Record<string, string>): void;
+}
 interface BitrixFormEventDetail { object?: BitrixForm; data?: unknown }
 
 const trace = (stage: string, details: Record<string, unknown> = {}) =>
@@ -86,12 +95,17 @@ export async function mountBitrixManagerForm(container: HTMLElement, sessionId: 
     const detail = (event as CustomEvent<BitrixFormEventDetail>).detail;
     const form = detail?.object;
     if (!form || Number(form.identification?.id) !== BITRIX_FORM_ID) return;
-    form.setProperty("artem_consultation_summary", summary);
+    form.setValues({ phone: "+7" });
+    if (context.consultationDataTransferEnabled) {
+      form.setProperty(BITRIX_CONSULTATION_DATA_FIELD, summary);
+    }
     for (const [name, value] of utmProperties(summary)) form.setProperty(name, value);
     ready = true; clearTimeout(timeout);
     trace("bitrix_form_ready", { sessionId, formId: BITRIX_FORM_ID,
       durationMs: Math.round(performance.now() - startedAt), bitrixSummaryPresent: true,
-      bitrixSummaryLength: summary.length });
+      bitrixSummaryLength: summary.length,
+      consultationDataTransferEnabled: context.consultationDataTransferEnabled,
+      consultationDataField: BITRIX_CONSULTATION_DATA_FIELD });
     callbacks.onReady();
   };
   const onSuccess = (event: Event) => {

@@ -10,6 +10,7 @@ import { managerLeadContacts, sendTelegramManagerLead } from "../services/telegr
 
 const router: IRouter = Router();
 const UUID_RE = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+export const BITRIX_CONSULTATION_DATA_MAX_LENGTH = 65_535;
 const text = (value: unknown, max: number): value is string => typeof value === "string" && Boolean(value.trim()) && value.trim().length <= max;
 const widgetMessageHtml = (sessionId: string, status: "success" | "error", targetOrigin?: string) => `<!doctype html><html lang="ru"><head><meta charset="utf-8"></head><body><p>${status === "success" ? "Заявка отправлена." : "Не удалось отправить заявку. Попробуйте ещё раз."}</p>${targetOrigin ? `<script>window.parent.postMessage({type:"getcourse-manager-widget",status:${JSON.stringify(status)},sessionId:${JSON.stringify(sessionId)}},${JSON.stringify(targetOrigin)});</script>` : ""}</body></html>`;
 const widgetSubmitError = (res: Response, status: number) => res.status(status)
@@ -58,7 +59,14 @@ router.get("/manager-form/context/:sessionId", async (req, res): Promise<void> =
   try {
     if (!UUID_RE.test(req.params.sessionId)) { res.status(404).json({ error: "SESSION_NOT_FOUND" }); return; }
     const { context, comment } = await contextFor(req.params.sessionId);
-    res.json({ sessionId: context.sessionId, comment });
+    if (comment.length > BITRIX_CONSULTATION_DATA_MAX_LENGTH) {
+      req.log.error({ sessionId: context.sessionId, stage: "manager_form_context",
+        commentLength: comment.length, maxLength: BITRIX_CONSULTATION_DATA_MAX_LENGTH,
+        errorCode: "MANAGER_CONSULTATION_DATA_TOO_LONG" }, "MANAGER_FORM_FAILED");
+      res.status(409).json({ error: "MANAGER_CONSULTATION_DATA_TOO_LONG" }); return;
+    }
+    res.json({ sessionId: context.sessionId, comment,
+      consultationDataTransferEnabled: process.env.BITRIX_CONSULTATION_DATA_ENABLED === "true" });
   } catch (error) {
     if (error instanceof ManagerLeadContextError) {
       res.status(error.code === "SESSION_NOT_FOUND" ? 404 : 409).json({ error: error.code }); return;

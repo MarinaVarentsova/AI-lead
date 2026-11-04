@@ -81,6 +81,10 @@ try {
     managerCtaContent: "manager_contact_button",
   };
   const comment = formatGetCourseManagerComment(context);
+  for (const part of ["1. Сфера деятельности: Проектирование", "2. Роль: Проектировщик",
+    "3. Образование: Высшее", "4. Задача и цель: Исследовать дефекты",
+    "5. Рекомендация Артёма:", "6. Полный диалог:",
+    "Пользователь: Сколько стоит?", "Артём: Подтверждённая цена."]) assert.ok(comment.includes(part));
   assert.equal(
     allowedManagerFormOrigin("https://artem.inobr-expert.ru/path"),
     "https://artem.inobr-expert.ru",

@@ -178,8 +178,9 @@ try {
   assert.match(submittedComment, /Источник обращения:/); assert.match(submittedComment, /UTM content: hero/);
   assert.match(submittedComment, /Internal Artem attribution:/);
   assert.match(submittedComment, /manager CTA: recommendation/);
-  for (const part of ["Рекомендованная программа:", "Рекомендация Артёма:", "Диагностика:",
-    "Краткое резюме:", "Диалог:", "Session ID:", "Версия базы знаний:"]) assert.ok(submittedComment.includes(part));
+  for (const part of ["1. Сфера деятельности:", "2. Роль:", "3. Образование:",
+    "4. Задача и цель:", "5. Рекомендация Артёма:", "6. Полный диалог:",
+    "Session ID:", "Версия базы знаний:"]) assert.ok(submittedComment.includes(part));
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE event_type='manager_contact_click'")).rows[0].count, 1);
   const submitEvent = (await pg.query("SELECT event_data FROM ai_events WHERE event_type='manager_form_submit'")).rows[0];
   assert.deepEqual(submitEvent.event_data, { utm_source: "yandex", utm_medium: "cpc",
