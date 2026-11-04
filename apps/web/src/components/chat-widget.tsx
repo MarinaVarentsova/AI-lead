@@ -26,6 +26,7 @@ import {
   managerSubmissionRecorded,
   markManagerSubmitted,
   mountBitrixManagerForm,
+  scheduleLeaveAfterManagerSubmit,
   MANAGER_CONTEXT_ERROR,
 } from "@/lib/manager-form";
 import {
@@ -703,7 +704,7 @@ export function ChatWidget({
             if (!disposed) {
               markManagerSubmitted(conversationId);
               setContactPhase("submitted");
-              leaveArtemAfterManagerSubmit();
+              scheduleLeaveAfterManagerSubmit();
             }
           },
           onError: () => {
