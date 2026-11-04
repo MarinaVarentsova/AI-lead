@@ -186,6 +186,12 @@ export async function recordEvent(sessionId: string, eventType: string, eventDat
   }
 }
 
+export async function hasEvent(sessionId: string, eventType: string): Promise<boolean> {
+  const [event] = await db.select({ id: aiEvents.id }).from(aiEvents)
+    .where(and(eq(aiEvents.sessionId, sessionId), eq(aiEvents.eventType, eventType))).limit(1);
+  return Boolean(event);
+}
+
 export async function recordEventOnce(sessionId: string, eventType: string, eventData?: unknown) {
   try {
     return await db.transaction(async tx => {

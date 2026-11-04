@@ -31,12 +31,19 @@ assert.match(helper, /UTM_SOURCE/); assert.match(helper, /UTM_MEDIUM/); assert.m
 assert.doesNotMatch(helper, /GetCourse|1658046|22041910|widget-submit|intlTelInput/);
 
 assert.match(route, /manager-form\/success\/:sessionId/);
+assert.match(route, /hasEvent\(req\.params\.sessionId,\s*"manager_form_submit"\)/);
+assert.match(route, /MANAGER_FORM_ALREADY_SUBMITTED/);
 assert.match(route, /BITRIX_CONSULTATION_DATA_MAX_LENGTH\s*=\s*65_535/);
 assert.match(route, /MANAGER_CONSULTATION_DATA_TOO_LONG/);
 assert.match(route, /BITRIX_CONSULTATION_DATA_ENABLED\s*===\s*"true"/);
 assert.match(route, /recordEventOnce\(sessionId, "manager_form_submit"[\s\S]*sendTelegramManagerLead/);
 assert.doesNotMatch(route, /!contacts\.name\s*\|\|\s*!contacts\.phone\s*\|\|\s*!contacts\.email/);
 assert.match(widget, /setContactPhase\("submitted"\)/);
+assert.match(widget, /markManagerSubmitted\(conversationId\)[\s\S]*leaveArtemAfterManagerSubmit\(\)/);
+assert.match(widget, /addEventListener\("pageshow",\s*leaveIfSubmitted\)/);
+assert.match(helper, /localStorage\.setItem\(managerSubmissionKey\(sessionId\),\s*"1"\)/);
+assert.match(helper, /window\.location\.replace\(MANAGER_RETURN_URL\)/);
+assert.doesNotMatch(widget, /window\.location\.href/);
 assert.match(widget, /setManagerContextError\(false\)/);
 assert.match(widget, /managerContextError[\s\S]*Повторить/);
 assert.match(css, /\.manager-form-overlay[\s\S]*overflow-y:\s*auto/);

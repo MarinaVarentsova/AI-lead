@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
-import { findSession, recordEvent, recordEventOnce } from "../persistence/artem-repository";
+import { findSession, hasEvent, recordEvent, recordEventOnce } from "../persistence/artem-repository";
 import { buildManagerLeadContext, ManagerLeadContextError } from "../services/manager-lead-context";
 import { formatGetCourseManagerComment, loadGetCourseManagerWidget, serializeGetCourseWidgetBody,
   getCourseCookieHeader, localizeGetCourseCookies, MANAGER_FORM_REQUEST_ID_FIELD, submitGetCourseWidgetBody,
@@ -58,6 +58,9 @@ async function contextFor(sessionId: string, trace: ManagerFormTrace = () => {})
 router.get("/manager-form/context/:sessionId", async (req, res): Promise<void> => {
   try {
     if (!UUID_RE.test(req.params.sessionId)) { res.status(404).json({ error: "SESSION_NOT_FOUND" }); return; }
+    if (await hasEvent(req.params.sessionId, "manager_form_submit")) {
+      res.status(409).json({ error: "MANAGER_FORM_ALREADY_SUBMITTED" }); return;
+    }
     const { context, comment } = await contextFor(req.params.sessionId);
     if (comment.length > BITRIX_CONSULTATION_DATA_MAX_LENGTH) {
       req.log.error({ sessionId: context.sessionId, stage: "manager_form_context",

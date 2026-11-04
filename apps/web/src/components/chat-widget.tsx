@@ -22,6 +22,9 @@ import {
   CONSULTANT_ERROR,
 } from "@/lib/consultant-chat";
 import {
+  leaveArtemAfterManagerSubmit,
+  managerSubmissionRecorded,
+  markManagerSubmitted,
   mountBitrixManagerForm,
   MANAGER_CONTEXT_ERROR,
 } from "@/lib/manager-form";
@@ -648,9 +651,18 @@ export function ChatWidget({
 
   const closeManagerForm = () => {
     setContactPhase(null);
-    window.location.href =
-      "https://inobr-expert.ru/?utm_source=artem&utm_medium=assistant&utm_campaign=return_to_site&utm_content=manager_modal_close";
+    leaveArtemAfterManagerSubmit();
   };
+
+  useEffect(() => {
+    if (!conversationId) return;
+    const leaveIfSubmitted = () => {
+      if (managerSubmissionRecorded(conversationId)) leaveArtemAfterManagerSubmit();
+    };
+    leaveIfSubmitted();
+    window.addEventListener("pageshow", leaveIfSubmitted);
+    return () => window.removeEventListener("pageshow", leaveIfSubmitted);
+  }, [conversationId]);
 
   useEffect(() => {
     if (!contactPhase) return;
@@ -688,7 +700,11 @@ export function ChatWidget({
             }
           },
           onSuccess: () => {
-            if (!disposed) setContactPhase("submitted");
+            if (!disposed) {
+              markManagerSubmitted(conversationId);
+              setContactPhase("submitted");
+              leaveArtemAfterManagerSubmit();
+            }
           },
           onError: () => {
             if (!disposed) setManagerContextError(true);

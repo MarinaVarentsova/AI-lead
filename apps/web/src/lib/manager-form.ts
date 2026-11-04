@@ -8,6 +8,18 @@ export const BITRIX_FORM_TELEMETRY_SIGN =
   "v1:199:site.1b7e33de2798ab8d6079d8f04866e6127f5fd0859da02db50f0a0f5aadf0adf9";
 export const BITRIX_FORM_READY_TIMEOUT_MS = 8_000;
 export const BITRIX_CONSULTATION_DATA_FIELD = "UF_CRM_1793693484";
+export const MANAGER_RETURN_URL =
+  "https://inobr-expert.ru/?utm_source=artem&utm_medium=assistant&utm_campaign=return_to_site&utm_content=manager_form_submitted";
+const MANAGER_SUBMITTED_PREFIX = "artem.managerFormSubmitted.";
+
+export const managerSubmissionKey = (sessionId: string) => `${MANAGER_SUBMITTED_PREFIX}${sessionId}`;
+export const managerSubmissionRecorded = (sessionId: string) => {
+  try { return window.localStorage.getItem(managerSubmissionKey(sessionId)) === "1"; } catch { return false; }
+};
+export const markManagerSubmitted = (sessionId: string) => {
+  try { window.localStorage.setItem(managerSubmissionKey(sessionId), "1"); } catch { /* redirect still protects history */ }
+};
+export const leaveArtemAfterManagerSubmit = () => window.location.replace(MANAGER_RETURN_URL);
 
 interface ManagerContextResponse {
   sessionId: string;
