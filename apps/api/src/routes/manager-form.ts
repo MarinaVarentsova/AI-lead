@@ -31,7 +31,7 @@ const nativeContacts = (body: unknown) => {
   const input = body && typeof body === "object" ? body as Record<string, unknown> : {};
   const value = (name: string, max: number) => typeof input[name] === "string" && input[name].trim().length <= max
     ? input[name].trim() : "";
-  return { name: value("name", 200), phone: value("phone", 100), email: value("email", 320) };
+  return { name: value("fullName", 200), phone: value("phone", 100), email: value("email", 320) };
 };
 
 async function contextFor(sessionId: string, trace: ManagerFormTrace = () => {}) {
@@ -105,7 +105,7 @@ router.get("/manager-form/widget/:sessionId", async (req, res): Promise<void> =>
 router.post("/manager-form/success/:sessionId", async (req, res): Promise<void> => {
   const { sessionId } = req.params;
   const submissionId = typeof req.body?.submissionId === "string" ? req.body.submissionId : "";
-  const contacts = nativeContacts(req.body?.contacts);
+  const contacts = nativeContacts(req.body?.contact);
   const managerFormRequestId = UUID_RE.test(submissionId) ? submissionId : randomUUID();
   const trace = traceFor(req, sessionId, managerFormRequestId);
   trace("bitrix_form_success", { timestamp: new Date().toISOString(), nativeSuccessConfirmed: true,
@@ -115,6 +115,8 @@ router.post("/manager-form/success/:sessionId", async (req, res): Promise<void> 
     res.status(400).json({ success: false, error: "MANAGER_NATIVE_SUCCESS_INVALID" }); return;
   }
   try {
+    trace("manager_success_contact_received", { fullNamePresent: Boolean(contacts.name),
+      phonePresent: Boolean(contacts.phone), emailPresent: Boolean(contacts.email) });
     const { context } = await contextFor(sessionId, trace);
     const metadata = { ...(sourceEventMetadata(context) ?? {}), native_submission_id: submissionId };
     const recorded = await recordEventOnce(sessionId, "manager_form_submit", metadata);

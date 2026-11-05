@@ -29,10 +29,12 @@ interface ManagerContextResponse {
   comment: string;
   consultationDataTransferEnabled: boolean;
 }
-export interface NativeManagerContacts { name: string; phone: string; email: string }
+export interface NativeManagerContacts { fullName: string; phone: string; email: string }
 export interface NativeManagerWidgetCallbacks { onReady(): void; onSuccess(): void; onError(): void }
 interface BitrixForm {
   identification?: { id?: number | string };
+  fields?: { values?: unknown };
+  getValues?(): unknown;
   setProperty(name: string, value: string): void;
   setValues(values: Record<string, string>): void;
 }
@@ -58,10 +60,10 @@ const managerContext = async (sessionId: string): Promise<ManagerContextResponse
 };
 
 export async function confirmNativeManagerSuccess(sessionId: string, submissionId: string,
-  contacts: NativeManagerContacts): Promise<void> {
+  contact: NativeManagerContacts): Promise<void> {
   const response = await apiFetch(`/api/manager-form/success/${encodeURIComponent(sessionId)}`, {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ submissionId, contacts }),
+    body: JSON.stringify({ submissionId, contact }),
   });
   if (!response.ok) throw new Error("MANAGER_SUCCESS_EVENT_FAILED");
 }
@@ -77,9 +79,7 @@ const utmProperties = (comment: string): Array<[string, string]> => {
   return result;
 };
 
-const contactsFrom = (data: unknown): NativeManagerContacts => {
-  const record = data && typeof data === "object" ? data as Record<string, unknown> : {};
-  const fields = record.fields && typeof record.fields === "object" ? record.fields as Record<string, unknown> : record;
+const contactFromBitrix = (form: BitrixForm | undefined, data: unknown): NativeManagerContacts => {
   const textValue = (input: unknown): string => {
     if (typeof input === "string" || typeof input === "number") return String(input).trim();
     if (Array.isArray(input)) {
@@ -94,12 +94,18 @@ const contactsFrom = (data: unknown): NativeManagerContacts => {
     }
     return "";
   };
+  const records = [(() => { try { return form?.getValues?.(); } catch { return undefined; } })(),
+    form?.fields?.values, data && typeof data === "object" ? (data as Record<string, unknown>).fields : undefined,
+    data].filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
+    .map(item => item.values && typeof item.values === "object" ? item.values as Record<string, unknown> : item);
   const value = (...names: string[]) => {
-    for (const name of names) { const found = textValue(fields[name]); if (found) return found; }
+    for (const fields of records) for (const name of names) {
+      const found = textValue(fields[name]); if (found) return found;
+    }
     return "";
   };
-  return { name: value("NAME", "FULL_NAME", "name", "full_name"),
-    phone: value("PHONE", "phone"), email: value("EMAIL", "email") };
+  return { fullName: value("name", "fullName", "full_name", "NAME", "FULL_NAME", "CONTACT_NAME", "LEAD_NAME"),
+    phone: value("phone", "PHONE", "LEAD_PHONE"), email: value("email", "EMAIL", "LEAD_EMAIL") };
 };
 
 export async function mountBitrixManagerForm(container: HTMLElement, sessionId: string,
@@ -108,7 +114,7 @@ export async function mountBitrixManagerForm(container: HTMLElement, sessionId: 
   const summary = context.comment.trim();
   if (!summary) throw new Error("MANAGER_CONTEXT_INVALID");
 
-  let disposed = false; let ready = false; let successHandled = false;
+  let disposed = false; let ready = false; let successHandled = false; let bitrixForm: BitrixForm | undefined;
   const startedAt = performance.now();
   trace("bitrix_script_loading", { sessionId, formId: BITRIX_FORM_ID,
     bitrixSummaryPresent: true, bitrixSummaryLength: summary.length });
@@ -118,7 +124,10 @@ export async function mountBitrixManagerForm(container: HTMLElement, sessionId: 
     successHandled = true;
     container.style.display = "none";
     try {
-      await confirmNativeManagerSuccess(sessionId, crypto.randomUUID(), contactsFrom(detail.data));
+      const contact = contactFromBitrix(bitrixForm ?? detail.object, detail.data);
+      trace("bitrix_contact_capture", { sessionId, fullNamePresent: Boolean(contact.fullName),
+        phonePresent: Boolean(contact.phone), emailPresent: Boolean(contact.email) });
+      await confirmNativeManagerSuccess(sessionId, crypto.randomUUID(), contact);
       callbacks.onSuccess();
     } catch {
       successHandled = false;
@@ -130,6 +139,7 @@ export async function mountBitrixManagerForm(container: HTMLElement, sessionId: 
     const detail = (event as CustomEvent<BitrixFormEventDetail>).detail;
     const form = detail?.object;
     if (!form || Number(form.identification?.id) !== BITRIX_FORM_ID) return;
+    bitrixForm = form;
     form.setValues({ phone: "+7" });
     if (context.consultationDataTransferEnabled) {
       form.setProperty(BITRIX_CONSULTATION_DATA_FIELD, summary);

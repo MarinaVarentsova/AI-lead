@@ -209,7 +209,7 @@ try {
   telegramShouldFail = false;
   const nativeSubmissionId = randomUUID();
   const nativeReq = { params: { sessionId: nativeSessionId }, body: { submissionId: nativeSubmissionId,
-    contacts: { name: "ТЕСТ Артем_Экспертович_NATIVE_FIX", phone: "+79991234567",
+    contact: { fullName: "ТЕСТ Артем_Экспертович_NATIVE_FIX", phone: "+79991234567",
       email: "test-artem-native@example.com" } }, log };
   const telegramBeforeNative = telegramBodies.length;
   const nativeSuccess = response(); await successHandler(nativeReq, nativeSuccess);
