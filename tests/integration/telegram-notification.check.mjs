@@ -49,7 +49,13 @@ try {
   assert.match(joined, /utm_source: yandex/); assert.match(joined, /utm_content: hero/);
   assert.match(joined, /🔘 Точка входа:/); assert.match(joined, /artem_entry_content: diagnostic_question_01/);
   assert.match(joined, /manager_cta_source: post_diagnostic_consultation/);
+  assert.match(joined, /📝 Резюме консультации:/);
   assert.match(joined, /Вопрос клиента/); assert.match(joined, /Ответ Артёма/);
+
+  const direct = formatTelegramManagerLead({ ...context, utmSource: undefined, utmMedium: undefined,
+    utmCampaign: undefined, utmContent: undefined }, { name: "", phone: "", email: "" }).join("\n");
+  assert.match(direct, /Имя: —/); assert.match(direct, /Телефон: —/); assert.match(direct, /Email: —/);
+  assert.match(direct, /📊 Источник:\nПрямой переход/);
 
   const logs = []; const trace = (stage, details) => logs.push({ stage, ...details });
   assert.deepEqual(await sendTelegramManagerLead(context, contacts, {}, async () => assert.fail("must skip"), trace),

@@ -108,7 +108,8 @@ router.post("/manager-form/success/:sessionId", async (req, res): Promise<void> 
   const contacts = nativeContacts(req.body?.contacts);
   const managerFormRequestId = UUID_RE.test(submissionId) ? submissionId : randomUUID();
   const trace = traceFor(req, sessionId, managerFormRequestId);
-  trace("manager_success_event_received", { timestamp: new Date().toISOString(), nativeSuccessConfirmed: true });
+  trace("bitrix_form_success", { timestamp: new Date().toISOString(), nativeSuccessConfirmed: true,
+    formId: 199 });
   if (!UUID_RE.test(sessionId) || !UUID_RE.test(submissionId)) {
     trace("manager_form_completed", { result: "validation_error", errorCode: "MANAGER_NATIVE_SUCCESS_INVALID" });
     res.status(400).json({ success: false, error: "MANAGER_NATIVE_SUCCESS_INVALID" }); return;

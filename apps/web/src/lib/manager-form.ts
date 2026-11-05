@@ -80,11 +80,26 @@ const utmProperties = (comment: string): Array<[string, string]> => {
 const contactsFrom = (data: unknown): NativeManagerContacts => {
   const record = data && typeof data === "object" ? data as Record<string, unknown> : {};
   const fields = record.fields && typeof record.fields === "object" ? record.fields as Record<string, unknown> : record;
-  const value = (...names: string[]) => {
-    for (const name of names) if (typeof fields[name] === "string") return fields[name].trim();
+  const textValue = (input: unknown): string => {
+    if (typeof input === "string" || typeof input === "number") return String(input).trim();
+    if (Array.isArray(input)) {
+      for (const item of input) { const found = textValue(item); if (found) return found; }
+      return "";
+    }
+    if (input && typeof input === "object") {
+      const item = input as Record<string, unknown>;
+      for (const key of ["value", "VALUE", "values", "VALUES", "items", "ITEMS"]) {
+        const found = textValue(item[key]); if (found) return found;
+      }
+    }
     return "";
   };
-  return { name: value("NAME", "name"), phone: value("PHONE", "phone"), email: value("EMAIL", "email") };
+  const value = (...names: string[]) => {
+    for (const name of names) { const found = textValue(fields[name]); if (found) return found; }
+    return "";
+  };
+  return { name: value("NAME", "FULL_NAME", "name", "full_name"),
+    phone: value("PHONE", "phone"), email: value("EMAIL", "email") };
 };
 
 export async function mountBitrixManagerForm(container: HTMLElement, sessionId: string,

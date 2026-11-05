@@ -82,7 +82,8 @@ export function formatTelegramManagerLead(context: ManagerLeadContext,
     : "Дополнительных вопросов не было.";
   const identity = [
     "🆕 Новая заявка от Артёма", "",
-    `👤 Имя: ${contacts.name}`, `📞 Телефон: ${contacts.phone}`, `✉️ Email: ${contacts.email}`, "",
+    `👤 Имя: ${contacts.name || "—"}`, `📞 Телефон: ${contacts.phone || "—"}`,
+    `✉️ Email: ${contacts.email || "—"}`, "",
     "🎓 Рекомендованная программа:", context.recommendedProgram, "",
     "🔗 Session ID:", context.sessionId, "", "📚 KB:", context.knowledgeBaseVersion,
   ].join("\n");
@@ -90,8 +91,8 @@ export function formatTelegramManagerLead(context: ManagerLeadContext,
     "💬 Рекомендация Артёма:", context.recommendationText, "", "📋 Диагностика:",
     `Сфера: ${context.diagnostic.currentArea}`, `Роль: ${context.diagnostic.currentRole}`,
     `Образование: ${context.diagnostic.educationStatus}`, `Задача: ${context.diagnostic.targetTasks}`, "",
-    "📝 Кратко:", context.dialogSummary,
-    ...(sources.length ? ["", "📊 Источник:", ...sources] : []),
+    "📝 Резюме консультации:", context.dialogSummary,
+    "", "📊 Источник:", ...(sources.length ? sources : ["Прямой переход"]),
     ...(entry.length ? ["", "🔘 Точка входа:", ...entry] : []),
   ].join("\n");
   return packSections([identity, details, `💭 Диалог:\n${transcript}`]);
