@@ -40,13 +40,35 @@ function splitLongText(value: string, limit = TELEGRAM_SAFE_MESSAGE_LENGTH): str
   while (remaining.length > limit) {
     const candidate = remaining.slice(0, limit);
     const newline = candidate.lastIndexOf("\n");
+    const sentence = Math.max(candidate.lastIndexOf(". "), candidate.lastIndexOf("! "),
+      candidate.lastIndexOf("? "));
     const space = candidate.lastIndexOf(" ");
-    const boundary = Math.max(newline, space, Math.floor(limit * 0.7));
+    const preferred = Math.max(newline, sentence >= 0 ? sentence + 1 : -1);
+    const boundary = preferred >= Math.floor(limit * 0.6) ? preferred : space > 0 ? space : limit;
     chunks.push(remaining.slice(0, boundary).trimEnd());
     remaining = remaining.slice(boundary).trimStart();
   }
   if (remaining) chunks.push(remaining);
   return chunks;
+}
+
+function transcriptMessages(context: ManagerLeadContext): string[] {
+  const turns = context.transcript.filter(turn => turn.role === "user" || turn.role === "assistant");
+  if (!turns.length) return ["💭 Диалог\n\nДополнительных вопросов не было."];
+  const blocks = turns.flatMap(turn => {
+    const heading = turn.role === "user" ? "👤 Пользователь" : "🤖 Артём";
+    const available = TELEGRAM_SAFE_MESSAGE_LENGTH - "💭 Продолжение диалога".length - heading.length - 4;
+    return splitLongText(turn.text.trim(), available).map(part => `${heading}\n${part}`);
+  });
+  const messages: string[] = []; let current = "💭 Диалог";
+  for (const block of blocks) {
+    const combined = `${current}\n\n${block}`;
+    if (combined.length <= TELEGRAM_SAFE_MESSAGE_LENGTH) { current = combined; continue; }
+    messages.push(current);
+    current = `💭 Продолжение диалога\n\n${block}`;
+  }
+  messages.push(current);
+  return messages;
 }
 
 function packSections(sections: string[]): string[] {
@@ -77,9 +99,6 @@ export function formatTelegramManagerLead(context: ManagerLeadContext,
   contacts: ManagerLeadContacts): string[] {
   const sources = sourceLines(context);
   const entry = entryLines(context);
-  const transcript = context.transcript.length
-    ? context.transcript.map(turn => `${turn.role === "user" ? "Пользователь" : "Артём"}: ${turn.text}`).join("\n")
-    : "Дополнительных вопросов не было.";
   const identity = [
     "🆕 Новая заявка от Артёма", "",
     `👤 Имя: ${contacts.name || "—"}`, `📞 Телефон: ${contacts.phone || "—"}`,
@@ -95,7 +114,7 @@ export function formatTelegramManagerLead(context: ManagerLeadContext,
     "", "📊 Источник:", ...(sources.length ? sources : ["Прямой переход"]),
     ...(entry.length ? ["", "🔘 Точка входа:", ...entry] : []),
   ].join("\n");
-  return packSections([identity, details, `💭 Диалог:\n${transcript}`]);
+  return [...packSections([identity, details]), ...transcriptMessages(context)];
 }
 
 export async function sendTelegramManagerLead(context: ManagerLeadContext, contacts: ManagerLeadContacts,

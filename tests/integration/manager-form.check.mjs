@@ -217,16 +217,19 @@ try {
     { success: true, recorded: true, duplicate: false });
   assert.equal((await pg.query("SELECT count(*)::int count FROM ai_events WHERE session_id=$1 AND event_type='manager_form_submit'",
     [nativeSessionId])).rows[0].count, 1);
-  assert.equal(telegramBodies.length, telegramBeforeNative + 1);
-  assert.match(telegramBodies.at(-1).text, /ТЕСТ Артем_Экспертович_NATIVE_FIX/);
-  assert.match(telegramBodies.at(-1).text, /В какой сфере вы сейчас работаете\?/);
+  assert.ok(telegramBodies.length > telegramBeforeNative);
+  const telegramAfterNative = telegramBodies.length;
+  const nativeTelegramText = telegramBodies.slice(telegramBeforeNative).map(body => body.text).join("\n");
+  assert.match(nativeTelegramText, /ТЕСТ Артем_Экспертович_NATIVE_FIX/);
+  assert.match(nativeTelegramText, /👤 Пользователь\nСколько стоит\?/);
+  assert.match(nativeTelegramText, /🤖 Артём\nСтоимость зависит от тарифа\./);
   const duplicateSuccess = response(); await successHandler(nativeReq, duplicateSuccess);
   assert.equal(duplicateSuccess.statusCode, 200); assert.deepEqual(duplicateSuccess.body,
     { success: true, recorded: false, duplicate: true });
-  assert.equal(telegramBodies.length, telegramBeforeNative + 1);
+  assert.equal(telegramBodies.length, telegramAfterNative);
   const invalidNative = response(); await successHandler({ ...nativeReq, body: { ...nativeReq.body,
     submissionId: "invalid" } }, invalidNative);
-  assert.equal(invalidNative.statusCode, 400); assert.equal(telegramBodies.length, telegramBeforeNative + 1);
+  assert.equal(invalidNative.statusCode, 400); assert.equal(telegramBodies.length, telegramAfterNative);
   const emptySessionId = randomUUID();
   await pg.query("INSERT INTO ai_sessions(id,session_key) VALUES($1,$2)", [emptySessionId, "manager-form-empty"]);
   const contextFailureRes = response();

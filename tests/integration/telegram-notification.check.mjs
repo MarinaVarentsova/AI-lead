@@ -50,7 +50,22 @@ try {
   assert.match(joined, /🔘 Точка входа:/); assert.match(joined, /artem_entry_content: diagnostic_question_01/);
   assert.match(joined, /manager_cta_source: post_diagnostic_consultation/);
   assert.match(joined, /📝 Резюме консультации:/);
-  assert.match(joined, /Вопрос клиента/); assert.match(joined, /Ответ Артёма/);
+  assert.match(joined, /💭 Диалог\n\n👤 Пользователь\nВопрос клиента/);
+  assert.match(joined, /🤖 Артём\nОтвет Артёма/);
+  assert.doesNotMatch(joined, /Пользователь:|Артём:/);
+
+  const sixTurns = formatTelegramManagerLead({ ...context, transcript: [
+    { role: "user", text: "Первый вопрос" }, { role: "assistant", text: "Первый ответ" },
+    { role: "user", text: "Второй вопрос" }, { role: "assistant", text: "Второй ответ" },
+    { role: "user", text: "Третий вопрос" }, { role: "assistant", text: "Третий ответ" },
+    { role: "system", text: "internal metadata" }, { role: "tool", text: "tool output" },
+  ] }, contacts).join("\n");
+  assert.equal((sixTurns.match(/👤 Пользователь/g) ?? []).length, 3);
+  assert.equal((sixTurns.match(/🤖 Артём/g) ?? []).length, 3);
+  assert.doesNotMatch(sixTurns, /internal metadata|tool output|system|tester|evaluator/);
+  assert.match(sixTurns, /Первый вопрос\n\n🤖 Артём\nПервый ответ/);
+  assert.ok(messages.slice(1).every((message, index) =>
+    message.startsWith(index === 0 ? "💭 Диалог" : "💭 Продолжение диалога")));
 
   const direct = formatTelegramManagerLead({ ...context, utmSource: undefined, utmMedium: undefined,
     utmCampaign: undefined, utmContent: undefined }, { name: "", phone: "", email: "" }).join("\n");
